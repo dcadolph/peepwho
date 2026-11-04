@@ -96,7 +96,7 @@ exactly what you name.`,
 					store.PurgeArchive())
 			}
 			if olderThan > 0 {
-				cutoff := time.Now().AddDate(0, 0, -olderThan)
+				cutoff := opts.now().AddDate(0, 0, -olderThan)
 				fmt.Fprintf(out, "forgot %d conversations older than %s\n",
 					store.PurgeBefore(cutoff), cutoff.Format(time.DateOnly))
 			}

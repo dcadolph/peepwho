@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -19,6 +20,10 @@ const policyEnvVar = "PEEPWHO_POLICY_FILE"
 
 // defaultPolicyFile is the path an organization can pin a policy at.
 const defaultPolicyFile = "/etc/peepwho/policy.json"
+
+// nowEnvVar names the environment variable that pins the clock to one RFC 3339
+// instant, so tests and benchmarks get reproducible output.
+const nowEnvVar = "PEEPWHO_NOW"
 
 // options holds the shared flags resolved on the root command.
 type options struct {
@@ -46,6 +51,34 @@ type options struct {
 	// keychain is the credential store, nil for the OS keychain. Tests set a
 	// fake so nothing touches the real one.
 	keychain *secret.Store
+	// clock is the time source every command reads, nil for the system clock.
+	// PEEPWHO_NOW pins it at startup.
+	clock func() time.Time
+}
+
+// now returns the current time from the configured clock, or the system clock.
+func (o *options) now() time.Time {
+	if o.clock != nil {
+		return o.clock()
+	}
+	return time.Now()
+}
+
+// resolveClock pins the clock to the instant in raw, an RFC 3339 time, when raw
+// is set. An unparseable value is an error rather than a silent fallback to the
+// system clock, since a caller who sets it is relying on the output it fixes.
+func (o *options) resolveClock(raw string) error {
+	if raw == "" {
+		return nil
+	}
+	t, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return fmt.Errorf("%w: %s must be an RFC 3339 time such as 2026-11-01T12:00:00Z: %w",
+			ErrBadArgs, nowEnvVar, err)
+	}
+	t = t.UTC()
+	o.clock = func() time.Time { return t }
+	return nil
 }
 
 // secrets returns the credential store: the configured one, or the OS keychain.
@@ -92,6 +125,9 @@ func newRootCmd() *cobra.Command {
 			if (opts.jsonOut || opts.pretty) && opts.humanOut {
 				return fmt.Errorf("%w: --human contradicts --json and --pretty; pass one side or the other",
 					ErrBadArgs)
+			}
+			if err := opts.resolveClock(os.Getenv(nowEnvVar)); err != nil {
+				return err
 			}
 			opts.envPolicyFile = os.Getenv(policyEnvVar)
 			return opts.resolvePolicy(cmd.Flags().Changed("policy"), cmd.ErrOrStderr())

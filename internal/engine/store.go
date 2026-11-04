@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/dcadolph/peepwho/internal/episode"
 	"github.com/dcadolph/peepwho/internal/fact"
@@ -69,6 +70,8 @@ type Store struct {
 	dir Dir
 	// codec seals and opens the files. A nil codec means plain JSON.
 	codec vault.Codec
+	// now is the clock a loaded index reads. Nil means the system clock.
+	now func() time.Time
 }
 
 // NewStore returns a store over dir that seals with c, or reads and writes
@@ -83,14 +86,21 @@ func (s *Store) Dir() Dir { return s.dir }
 // Codec returns the at-rest codec, nil for plain JSON.
 func (s *Store) Codec() vault.Codec { return s.codec }
 
-// WithCodec returns a store over the same directory that seals with c.
+// WithCodec returns a store over the same directory and clock that seals with c.
 func (s *Store) WithCodec(c vault.Codec) *Store {
-	return &Store{dir: s.dir, codec: c}
+	return &Store{dir: s.dir, codec: c, now: s.now}
+}
+
+// WithNow returns a store over the same directory and codec whose loaded index
+// reads now as its clock, so a caller that pins the time gets reproducible
+// recency and build times. A nil clock means the system clock.
+func (s *Store) WithNow(now func() time.Time) *Store {
+	return &Store{dir: s.dir, codec: s.codec, now: now}
 }
 
 // LoadIndex reads the index.
 func (s *Store) LoadIndex() (*index.Index, error) {
-	return index.Load(s.dir.Index(), index.WithCodec(s.codec))
+	return index.Load(s.dir.Index(), index.WithCodec(s.codec), index.WithNow(s.now))
 }
 
 // SaveIndex writes the index.

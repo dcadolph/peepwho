@@ -411,7 +411,7 @@ func indexRecords(cmd *cobra.Command, opts *options, recs []connector.Record, p 
 		prev = existing.Graph
 	}
 
-	ix := index.New()
+	ix := index.New(index.WithNow(opts.clock))
 	if p.merge && existing != nil {
 		// A merge rebuilds from every source, so the records for the sources
 		// already indexed must come back from the sidecar first; without them
@@ -685,7 +685,7 @@ func updateWatermark(opts *options, source, scope string, full bool, recs []conn
 	if prev, ok := st.Get(source, scope); ok && !full && prev.Cursor.After(cursor) {
 		cursor = prev.Cursor
 	}
-	st.Set(state.Watermark{Source: source, Scope: scope, Cursor: cursor, Complete: true, RanAt: time.Now()})
+	st.Set(state.Watermark{Source: source, Scope: scope, Cursor: cursor, Complete: true, RanAt: opts.now()})
 	return opts.saveState(st)
 }
 

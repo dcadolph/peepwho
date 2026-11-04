@@ -809,6 +809,7 @@ override a stored value.
 | `PEEPWHO_ME`                   | recall, serve      | Who is asking, so recall covers your own conversations. |
 | `PEEPWHO_INDEX_KEY`            | index encryption   | Base64 32-byte key that enables at-rest encryption. |
 | `PEEPWHO_INDEX_PASSPHRASE`     | index encryption   | Passphrase for at-rest encryption; prompted if unset on a terminal. |
+| `PEEPWHO_NOW`                  | all commands       | Pins the clock to one RFC 3339 time, e.g. `2026-11-01T12:00:00Z`, for reproducible output in tests and benchmarks. An unparseable value is an error. |
 
 ## Identity aliases
 

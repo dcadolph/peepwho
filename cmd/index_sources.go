@@ -354,7 +354,7 @@ func saveGitMarks(opts *options, marks map[string]string) error {
 	for path, mark := range marks {
 		st.Set(state.Watermark{
 			Source: "git", Scope: "repo:" + path, Mark: mark,
-			Complete: true, RanAt: time.Now(),
+			Complete: true, RanAt: opts.now(),
 		})
 	}
 	return opts.saveState(st)

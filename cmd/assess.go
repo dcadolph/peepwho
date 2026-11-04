@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -92,14 +91,14 @@ Examples:
 					"--org-csv, or --codeowners", ErrBadArgs)
 			}
 			if outDir == "" {
-				outDir = "peepwho-assessment-" + time.Now().Format("20060102")
+				outDir = "peepwho-assessment-" + opts.now().Format("20060102")
 			}
 			if err := os.MkdirAll(outDir, 0o755); err != nil {
 				return fmt.Errorf("assess: %w", err)
 			}
 			log := cmd.ErrOrStderr()
 
-			ix := index.New()
+			ix := index.New(index.WithNow(opts.clock))
 			if orgCSV != "" {
 				oc := connector.NewOrgCSV(orgCSV)
 				oc.Log = log
@@ -242,7 +241,7 @@ Examples:
 			html, err := riskHTML(ix, findings, regions, spans, briefFindings{
 				Systems: places, Checks: checks, Ramp: ramp, Split: split,
 				Aliases: aliases, Successors: successors, Merged: len(ix.Joins()),
-			}, briefRows)
+			}, briefRows, opts.now())
 			if err != nil {
 				return err
 			}
@@ -259,7 +258,7 @@ Examples:
 			if err != nil {
 				return err
 			}
-			if _, err := sealFinding(outDir, priv, ix, findings, del.sealed); err != nil {
+			if _, err := sealFinding(outDir, priv, ix, findings, del.sealed, opts.now()); err != nil {
 				return err
 			}
 

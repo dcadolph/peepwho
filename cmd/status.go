@@ -29,7 +29,7 @@ embeddings, and whether a key is set to encrypt it at rest.`,
 			if err != nil {
 				return err
 			}
-			st := engine.New(ix, opts.pol).Status(time.Now())
+			st := engine.New(ix, opts.pol).Status(opts.now())
 			view := map[string]any{
 				"index":                     opts.indexPath(),
 				"people":                    st.People,

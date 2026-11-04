@@ -225,7 +225,7 @@ func serveWeb(cmd *cobra.Command, opts *options, eng *engine.Engine, store *feed
 			all := resolve.Risk(ix, 0)
 			exposed := report.Exposures(all)
 			return report.Brief{
-				Generated: time.Now(),
+				Generated: opts.now(),
 				People:    len(ix.Graph.People),
 				Scored:    len(all),
 				Sources:   ix.SourceNames(),
@@ -393,7 +393,7 @@ func attestFn(ix *index.Index, opts *options, memoryKey bool, logw io.Writer) we
 			return web.Sealed{}, fmt.Errorf("attest: %w", err)
 		}
 		defer func() { _ = os.RemoveAll(dir) }()
-		m, err := sealRiskDir(dir, priv, ix, resolve.Risk(ix, 0))
+		m, err := sealRiskDir(dir, priv, ix, resolve.Risk(ix, 0), opts.now())
 		if err != nil {
 			return web.Sealed{}, err
 		}

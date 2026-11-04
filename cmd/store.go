@@ -25,7 +25,7 @@ func (o *options) store() (*engine.Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	return engine.NewStore(o.dir(), c), nil
+	return engine.NewStore(o.dir(), c).WithNow(o.clock), nil
 }
 
 // loadState reads the incremental watermark state, returning an empty state when

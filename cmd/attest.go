@@ -51,7 +51,7 @@ with peepwho verify --key.`,
 			if err != nil {
 				return err
 			}
-			m, err := sealRiskDir(outDir, priv, ix, resolve.Risk(ix, 0))
+			m, err := sealRiskDir(outDir, priv, ix, resolve.Risk(ix, 0), opts.now())
 			if err != nil {
 				return err
 			}
@@ -114,7 +114,9 @@ peepwho.`,
 }
 
 // sealRiskDir writes the scored report to risk.json in dir and seals it.
-func sealRiskDir(dir string, priv ed25519.PrivateKey, ix *index.Index, risks []resolve.TopicRisk) (seal.Manifest, error) {
+func sealRiskDir(
+	dir string, priv ed25519.PrivateKey, ix *index.Index, risks []resolve.TopicRisk, now time.Time,
+) (seal.Manifest, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return seal.Manifest{}, fmt.Errorf("attest: %w", err)
 	}
@@ -127,14 +129,15 @@ func sealRiskDir(dir string, priv ed25519.PrivateKey, ix *index.Index, risks []r
 	}
 	return sealFinding(dir, priv, ix, risks, []seal.File{
 		{Path: riskJSONName, MediaType: "application/json", Role: "report"},
-	})
+	}, now)
 }
 
 // sealFinding seals files already written into dir under the knowledge-risk
-// claim. The seal reads each file back from disk, so it covers the bytes that
-// shipped.
+// claim, stamped with now. The seal reads each file back from disk, so it covers
+// the bytes that shipped.
 func sealFinding(
 	dir string, priv ed25519.PrivateKey, ix *index.Index, risks []resolve.TopicRisk, files []seal.File,
+	now time.Time,
 ) (seal.Manifest, error) {
 	payload, err := json.Marshal(attestPayload(risks))
 	if err != nil {
@@ -143,7 +146,7 @@ func sealFinding(
 	return seal.Write(dir, seal.Manifest{
 		Product:        "peepwho",
 		ProductVersion: version,
-		CreatedAt:      time.Now().UTC().Format(time.RFC3339),
+		CreatedAt:      now.UTC().Format(time.RFC3339),
 		Subject:        riskSubject(ix),
 		Claim:          seal.Claim{Type: "peepwho.knowledge-risk/1", Payload: payload},
 		Files:          files,

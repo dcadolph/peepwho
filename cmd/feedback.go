@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -65,7 +64,7 @@ func newFeedbackRecordCmd(opts *options) *cobra.Command {
 				Channel: channel,
 				Vote:    vote,
 				Comment: strings.TrimSpace(comment),
-				Time:    time.Now(),
+				Time:    opts.now(),
 			}
 			if err := store.Add(entry); err != nil {
 				return fmt.Errorf("%w: %w", ErrBadArgs, err)

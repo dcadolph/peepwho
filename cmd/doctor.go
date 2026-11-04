@@ -351,7 +351,7 @@ peepwho from answering, so it works as a gate in a script.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			facts := doctorFacts{
 				IndexPath:  opts.indexPath(),
-				Now:        time.Now(),
+				Now:        opts.now(),
 				Configured: configuredConnectors(),
 			}
 			if ix, err := opts.loadIndex(cmd); err != nil {

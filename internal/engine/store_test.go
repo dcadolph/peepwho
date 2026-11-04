@@ -125,6 +125,33 @@ func TestStoreWithCodec(t *testing.T) {
 	}
 }
 
+// TestStoreWithNow verifies that the store's clock survives WithCodec and reaches
+// every loaded index: an index loaded and saved again records the pinned clock
+// as its build time.
+func TestStoreWithNow(t *testing.T) {
+	t.Parallel()
+	pinned := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	st := NewStore(Dir(t.TempDir()), nil).
+		WithNow(func() time.Time { return pinned }).
+		WithCodec(testKeyCipher(t))
+	if err := st.SaveIndex(index.New()); err != nil {
+		t.Fatalf("SaveIndex: %v", err)
+	}
+	ix, err := st.LoadIndex()
+	if err != nil {
+		t.Fatalf("LoadIndex: %v", err)
+	}
+	if err := st.SaveIndex(ix); err != nil {
+		t.Fatalf("SaveIndex again: %v", err)
+	}
+	if ix, err = st.LoadIndex(); err != nil {
+		t.Fatalf("LoadIndex again: %v", err)
+	}
+	if got := ix.BuiltAt(); !got.Equal(pinned) {
+		t.Errorf("BuiltAt() = %v, want the pinned %v", got, pinned)
+	}
+}
+
 // TestStoreSidecars verifies the episode, feedback, fact, and state files load
 // empty when absent and round-trip through the store, sealed when the store
 // has a codec.

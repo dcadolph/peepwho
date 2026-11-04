@@ -78,19 +78,22 @@ type sourcesSnapshot struct {
 	Sources map[string][]connector.Record `json:"sources,omitempty"`
 }
 
-// Option configures Load and Save. With no option the index is read and written
-// as plain JSON; WithCodec injects an at-rest codec so the file is encrypted.
+// Option configures New, Load, and Save. With no option the index is read and
+// written as plain JSON and reads the system clock; WithCodec injects an at-rest
+// codec so the file is encrypted, and WithNow injects the clock.
 type Option func(*ioConfig)
 
-// ioConfig holds the resolved options for one Load or Save.
+// ioConfig holds the resolved options for one New, Load, or Save.
 type ioConfig struct {
 	// codec transforms the bytes at rest; Plain by default.
 	codec vault.Codec
+	// now is the clock the index measures recency and its build time by.
+	now func() time.Time
 }
 
-// newIOConfig applies opts over the plain-JSON default.
+// newIOConfig applies opts over the plain-JSON, system-clock default.
 func newIOConfig(opts []Option) ioConfig {
-	cfg := ioConfig{codec: vault.Plain{}}
+	cfg := ioConfig{codec: vault.Plain{}, now: time.Now}
 	for _, o := range opts {
 		o(&cfg)
 	}
@@ -103,6 +106,16 @@ func WithCodec(c vault.Codec) Option {
 	return func(cfg *ioConfig) {
 		if c != nil {
 			cfg.codec = c
+		}
+	}
+}
+
+// WithNow sets the clock a new or loaded index reads for recency decay and for
+// the build time Save records. A nil clock is ignored, leaving the system clock.
+func WithNow(now func() time.Time) Option {
+	return func(cfg *ioConfig) {
+		if now != nil {
+			cfg.now = now
 		}
 	}
 }
@@ -242,7 +255,7 @@ func Load(path string, opts ...Option) (*Index, error) {
 		resolver:     identity.NewResolver(),
 		joins:        snap.Joins,
 		halfLife:     DefaultHalfLife,
-		now:          time.Now,
+		now:          cfg.now,
 	}
 	ix.resolver.Restore(snap.Aliases)
 	if ix.Graph == nil {

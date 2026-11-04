@@ -153,8 +153,10 @@ type Index struct {
 	channelVocab vocabIndex
 }
 
-// New returns an empty index with initialized maps.
-func New() *Index {
+// New returns an empty index with initialized maps. Of the options only
+// WithNow applies; the codec matters only to Load and Save.
+func New(opts ...Option) *Index {
+	cfg := newIOConfig(opts)
 	ix := &Index{
 		Graph:           model.NewGraph(),
 		postings:        make(map[string]map[model.ID]float64),
@@ -166,7 +168,7 @@ func New() *Index {
 		topicVecs:       make(map[model.ID][]float32),
 		resolver:        identity.NewResolver(),
 		halfLife:        DefaultHalfLife,
-		now:             time.Now,
+		now:             cfg.now,
 	}
 	ix.refreshStats()
 	return ix

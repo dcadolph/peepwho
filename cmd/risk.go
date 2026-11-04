@@ -54,7 +54,7 @@ Examples:
 				if cmd.Flags().Changed("limit") {
 					capped = limit
 				}
-				return writeRiskHTML(cmd, ix, htmlPath, capped)
+				return writeRiskHTML(cmd, ix, htmlPath, capped, opts.now())
 			}
 			if len(args) > 0 {
 				who := strings.Join(args, " ")
@@ -149,7 +149,7 @@ func successions(found []personSuccession) []report.Succession {
 // walk of the whole graph and an assessment already has all three.
 func riskHTML(
 	ix *index.Index, all []resolve.TopicRisk, regions []resolve.Region,
-	spans []resolve.Span, found briefFindings, limit int,
+	spans []resolve.Span, found briefFindings, limit int, now time.Time,
 ) ([]byte, error) {
 	// Score everything, then cap only what is listed. A brief that quietly
 	// counted just the rows it printed would understate the finding it is for.
@@ -160,7 +160,7 @@ func riskHTML(
 	}
 	systems, checks := report.ListedSystems(found.Systems, found.Checks, briefSystems)
 	brief := report.Brief{
-		Generated: time.Now(),
+		Generated: now,
 		People:    len(ix.Graph.People),
 		Scored:    len(all),
 		Sources:   ix.SourceNames(),
@@ -188,10 +188,10 @@ func riskHTML(
 // finding.
 const briefSystems = 15
 
-// writeRiskHTML renders the knowledge-risk brief to a file. It has no
+// writeRiskHTML renders the knowledge-risk brief, generated at now, to a file. It has no
 // repository in front of it, so it carries the identity judgements, which come
 // from the index alone, and none of the place findings, which do not.
-func writeRiskHTML(cmd *cobra.Command, ix *index.Index, path string, limit int) error {
+func writeRiskHTML(cmd *cobra.Command, ix *index.Index, path string, limit int, now time.Time) error {
 	split := resolve.SplitNames(ix)
 	found := briefFindings{
 		Split:   split,
@@ -199,7 +199,7 @@ func writeRiskHTML(cmd *cobra.Command, ix *index.Index, path string, limit int) 
 		Merged:  len(ix.Joins()),
 	}
 	data, err := riskHTML(ix, resolve.Risk(ix, 0),
-		resolve.Regions(ix, regionsShown), resolve.SoleSpans(ix, spansShown), found, limit)
+		resolve.Regions(ix, regionsShown), resolve.SoleSpans(ix, spansShown), found, limit, now)
 	if err != nil {
 		return err
 	}
