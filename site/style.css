@@ -1,26 +1,28 @@
 :root {
-  --black: #000000;
+  --band: #2A1C13;
   --white: #FFFFFF;
-  --gold: #E2AE30;
-  --gold-deep: #B9841A;
-  --bg: #FFFFFF;
-  --fg: #0A0A0A;
-  --muted: #555555;
-  --accent: #8A5F00;
-  --code-bg: #F4F3EF;
-  --rule: #E6E6E6;
-  --band-fg: #F2F2F2;
-  --band-muted: #B5B5B5;
-  --band-code: #161616;
+  --tawny: #C98A3D;
+  --tawny-light: #DDA35A;
+  --bg: #FBF6EE;
+  --fg: #2A1C13;
+  --muted: #6E5A4A;
+  --accent: #8B4A1C;
+  --code-bg: #F1E8DA;
+  --rule: #E4D8C6;
+  --band-fg: #F6EDE0;
+  --band-muted: #C9B49C;
+  --band-code: #1E140D;
+  --band-line: #3D2A1D;
+  --ghost-hover: #36251A;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0B0B0B;
-    --fg: #F2F2F2;
-    --muted: #A8A8A8;
-    --accent: var(--gold);
-    --code-bg: #171717;
-    --rule: #262626;
+    --bg: #17110C;
+    --fg: #F3E9DC;
+    --muted: #B3A08C;
+    --accent: #D9A260;
+    --code-bg: #241A12;
+    --rule: #33261B;
   }
 }
 * { box-sizing: border-box; }
@@ -39,9 +41,9 @@ body {
   padding: 0 16px;
 }
 .band {
-  background: var(--black);
+  background: var(--band);
   color: var(--band-fg);
-  border-bottom: 3px solid var(--gold);
+  border-bottom: 3px solid var(--tawny);
 }
 .bar {
   display: flex;
@@ -51,6 +53,7 @@ body {
   padding-top: 18px;
   padding-bottom: 18px;
 }
+.bar-end { justify-content: flex-end; }
 .brand {
   display: flex;
   align-items: center;
@@ -60,10 +63,10 @@ body {
 }
 .brand img { width: 34px; height: 44px; flex: none; }
 .word { font-weight: 800; letter-spacing: -0.02em; }
-.word .who { color: var(--gold); }
+.word .who { color: var(--tawny); }
 .brand .word { font-size: 1.6rem; line-height: 1; }
 .bar nav a { color: var(--band-fg); text-decoration: none; font-weight: 600; }
-.bar nav a:hover { color: var(--gold); }
+.bar nav a:hover { color: var(--tawny); }
 .hero {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -83,7 +86,7 @@ body {
   color: var(--band-muted);
 }
 .hero .lede { font-size: 1.15rem; margin: 20px 0 0; color: var(--band-fg); }
-.hero pre { margin: 24px 0 0; background: var(--band-code); border: 1px solid #2A2A2A; color: var(--band-fg); }
+.hero pre { margin: 24px 0 0; background: var(--band-code); border: 1px solid var(--band-line); color: var(--band-fg); }
 .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
 .button {
   display: inline-block;
@@ -91,12 +94,12 @@ body {
   border-radius: 8px;
   font-weight: 700;
   text-decoration: none;
-  border: 2px solid var(--gold);
+  border: 2px solid var(--tawny);
 }
-.button.primary { background: var(--gold); color: var(--black); }
-.button.primary:hover { background: var(--gold-deep); border-color: var(--gold-deep); }
-.button.ghost { color: var(--gold); }
-.button.ghost:hover { background: #1A1A1A; }
+.button.primary { background: var(--tawny); color: var(--band); }
+.button.primary:hover { background: var(--tawny-light); border-color: var(--tawny-light); }
+.button.ghost { color: var(--tawny); }
+.button.ghost:hover { background: var(--ghost-hover); }
 main { padding-top: 24px; }
 h1 { font-size: 2.2rem; margin: 1rem 0 0; line-height: 1.2; }
 h2 { font-size: 1.4rem; margin: 2.4rem 0 0.6rem; line-height: 1.3; }
@@ -106,17 +109,17 @@ h2::after {
   width: 40px;
   height: 3px;
   margin-top: 6px;
-  background: var(--gold);
+  background: var(--tawny);
   border-radius: 2px;
 }
 .lede { font-size: 1.2rem; margin: 1rem 0; }
 a { color: var(--accent); text-underline-offset: 2px; }
-a:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+a:focus-visible { outline: 2px solid var(--tawny); outline-offset: 2px; }
 code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 0.9rem; }
 code { background: var(--code-bg); padding: 0.1em 0.3em; border-radius: 4px; overflow-wrap: anywhere; }
 pre { background: var(--code-bg); padding: 12px 16px; border-radius: 8px; overflow-x: auto; line-height: 1.5; }
 pre code { background: none; padding: 0; overflow-wrap: normal; }
-.notice { border-left: 4px solid var(--gold); padding: 0.5rem 1rem; background: var(--code-bg); border-radius: 0 8px 8px 0; }
+.notice { border-left: 4px solid var(--tawny); padding: 0.5rem 1rem; background: var(--code-bg); border-radius: 0 8px 8px 0; }
 ul { padding-left: 1.4rem; }
 li { margin: 0.25rem 0; }
 footer { margin-top: 48px; padding-top: 24px; padding-bottom: 40px; border-top: 1px solid var(--rule); color: var(--muted); }
