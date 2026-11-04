@@ -21,3 +21,6 @@ coverage.*
 /index/
 .peepwho/
 *.bleve
+
+# Cloudflare deploy cache
+.wrangler/

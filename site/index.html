@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>peepwho: know who knows</title>
+<meta name="description" content="A free, open source command-line tool that answers who to ask, shows where knowledge rests on one person, and points back at past conversations.">
+<link rel="canonical" href="https://peepwho.app/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/style.css">
+<meta property="og:title" content="peepwho: know who knows">
+<meta property="og:description" content="A free, open source command-line tool that answers who to ask, shows where knowledge rests on one person, and points back at past conversations.">
+<meta property="og:url" content="https://peepwho.app/">
+<meta property="og:type" content="website">
+</head>
+<body>
+<header>
+<a class="brand" href="/"><img src="/logo.svg" alt="" width="72" height="72"><span><strong>peepwho</strong></span></a>
+</header>
+<main>
+<h1>peepwho</h1>
+<p class="lede">Know who knows. peepwho reads the tools your team already works in and answers a plain question with the people and channels to ask, the reasons for each, and how strong the match is.</p>
+<p>peepwho is free and MIT licensed. It runs on your machine, with or without a language model.</p>
+
+<h2>What it does</h2>
+<ul>
+<li>Answers questions such as who to talk to about billing retries, with the reasons for each name and the match strength.</li>
+<li>Shows where knowledge has narrowed to one person.</li>
+<li>When nobody who knew is left, points back at the conversation where the problem was solved last time.</li>
+<li>Joins every source into one graph of people, teams, topics, and channels, so one human stays one node.</li>
+</ul>
+
+<h2>What this is not for</h2>
+<p class="notice">peepwho describes where knowledge and systems are at risk. It never ranks, scores, or labels people, and its findings must not be used for performance reviews, layoffs, or any other employment decision. A person who shows up as the only one who knows something is a sign the team needs another person to know it.</p>
+
+<h2>Install</h2>
+<p>With a Go toolchain:</p>
+<pre><code>go install github.com/dcadolph/peepwho@latest</code></pre>
+<p>Or download an archive for Linux, macOS, or Windows from the <a href="https://github.com/dcadolph/peepwho/releases">releases page</a>.</p>
+
+<h2>Verifying a release</h2>
+<p><code>checksums.txt</code> carries a keyless Sigstore signature made by this repository's release workflow, and every archive carries SLSA build provenance. Check a download before you run it:</p>
+<pre><code>id='^https://github.com/dcadolph/peepwho/\.github/workflows/release\.yml@refs/tags/v'
+cosign verify-blob checksums.txt \
+  --signature checksums.txt.sig \
+  --certificate checksums.txt.pem \
+  --certificate-identity-regexp "$id" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+sha256sum -c checksums.txt --ignore-missing
+gh attestation verify peepwho_&lt;version&gt;_linux_amd64.tar.gz --repo dcadolph/peepwho</code></pre>
+<p>On macOS without GNU coreutils, use <code>shasum -a 256 -c checksums.txt --ignore-missing</code> for the second line.</p>
+
+<h2>Quickstart</h2>
+<p>Start with a repository you already have. peepwho reads its git history and opens on the directories the work rests on, and which of them rest on one person. Nothing is fetched and no credentials are needed.</p>
+<pre><code>peepwho demo --repo .</code></pre>
+<p>Then index something real and ask:</p>
+<pre><code>peepwho index --source org-csv --file examples/people.csv
+peepwho ask --pretty "who do I talk to about billing retries"</code></pre>
+<p>When the person who knew has left, ask what happened with <code>recall</code>:</p>
+<pre><code>peepwho recall "certificate renewal"</code></pre>
+<p><code>peepwho connect</code> walks through the rest of your tools one at a time.</p>
+
+<h2>Sources</h2>
+<p>peepwho reads these sources: org chart CSV, time-entry or matter CSV, CODEOWNERS, git, Slack, a Slack workspace export, GitHub, Jira, Confluence, PagerDuty, Microsoft Graph, and JSON records. Indexing talks only to the sources you name, with your own tokens.</p>
+
+<h2>Runs on your machine</h2>
+<p>Keyword answers need no model and always work. Semantic search and written answers run on a local Ollama model, or on Claude, Gemini, or OpenAI once you opt in. The default policy is strict, so answers are computed locally and nothing goes to any model beyond your machine.</p>
+
+<h2>Links</h2>
+<ul>
+<li><a href="https://github.com/dcadolph/peepwho">peepwho on GitHub</a></li>
+<li><a href="https://github.com/dcadolph/peepwho/blob/main/docs/GETTING_STARTED.md">Getting started</a></li>
+<li><a href="https://github.com/dcadolph/peepwho/blob/main/docs/CONNECT.md">Connect your tools</a></li>
+<li><a href="https://github.com/dcadolph/peepwho/blob/main/docs/REFERENCE.md">Reference</a></li>
+<li><a href="https://github.com/dcadolph/peepwho/blob/main/docs/PRIVACY.md">Privacy</a></li>
+<li><a href="https://github.com/dcadolph/peepwho/blob/main/docs/ACCURACY.md">Accuracy</a></li>
+</ul>
+</main>
+<footer>
+<p>MIT License. Copyright (c) 2026 dcadolph. <a href="/privacy">Privacy</a></p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240" role="img" aria-label="peepwho">
+  <rect width="240" height="240" rx="44" fill="#202D35"/>
+  <path d="M36 120c22-38 54-58 84-58s62 20 84 58c-22 38-54 58-84 58s-62-20-84-58z" fill="#FFF5E4"/>
+  <circle cx="120" cy="120" r="38" fill="#F4C86A"/>
+  <circle cx="120" cy="120" r="16" fill="#202D35"/>
+</svg>
