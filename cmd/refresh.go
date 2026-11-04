@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"github.com/dcadolph/peepwho/internal/engine"
 	"github.com/dcadolph/peepwho/internal/util"
 )
 
@@ -52,14 +53,13 @@ func captureIndexFlags(cmd *cobra.Command) []string {
 // older; two runs with different keys, such as two repositories indexed in
 // separate git runs, are both kept and both replayed.
 func refreshScope(source, watermarkScope, file string, repoPaths []string) string {
-	switch source {
-	case "git":
+	if source == "git" {
 		return "repo:" + sortedJoin(repoPaths)
-	case "org-csv", "matters", "codeowners", "slack-export", "json":
-		return "file:" + file
-	default:
-		return watermarkScope
 	}
+	if spec, ok := engine.SourceByName(source); ok && spec.FileKeyed {
+		return "file:" + file
+	}
+	return watermarkScope
 }
 
 // saveInvocation records the flags a source was indexed with under its scope
@@ -90,7 +90,7 @@ func saveInvocation(opts *options, cmd *cobra.Command, source, scope string) err
 // readsStdin reports whether this index run reads its input from stdin, which a
 // scheduled refresh could not supply.
 func readsStdin(cmd *cobra.Command, source string) bool {
-	if source != "json" {
+	if spec, ok := engine.SourceByName(source); !ok || !spec.Stdin {
 		return false
 	}
 	f := cmd.Flags().Lookup("file")

@@ -10,6 +10,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
+	"github.com/dcadolph/peepwho/internal/engine"
 	"github.com/dcadolph/peepwho/internal/httputil"
 	"github.com/dcadolph/peepwho/internal/prompt"
 	"github.com/dcadolph/peepwho/internal/slack"
@@ -32,13 +35,15 @@ func TestConnectHelpMatchesKeychainBehavior(t *testing.T) {
 
 // TestConnectSpecs verifies each source description is internally consistent: a
 // credentialed source has a validator, a fix message, and complete fields; a
-// no-credential source has neither validator nor fields.
+// no-credential source has neither validator nor fields. Connect offers exactly
+// the sources the registry marks connectable.
 func TestConnectSpecs(t *testing.T) {
 	t.Parallel()
-	valid := map[string]bool{
-		"org-csv": true, "codeowners": true, "git": true, "slack": true,
-		"github": true, "jira": true, "confluence": true, "pagerduty": true,
-		"graph": true, "matters": true,
+	valid := make(map[string]bool)
+	for _, s := range engine.Sources() {
+		if s.Connectable {
+			valid[s.Name] = true
+		}
 	}
 	seen := make(map[string]bool)
 	for _, s := range connectSpecs() {
@@ -68,10 +73,8 @@ func TestConnectSpecs(t *testing.T) {
 			t.Errorf("%q has no credentials but a validate func", s.id)
 		}
 	}
-	for _, id := range []string{"slack", "github", "jira", "confluence", "pagerduty"} {
-		if !seen[id] {
-			t.Errorf("missing credentialed source %q", id)
-		}
+	if diff := cmp.Diff(valid, seen); diff != "" {
+		t.Errorf("connect sources differ from the registry (-registry +connect):\n%s", diff)
 	}
 }
 

@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/episode"
+	"github.com/dcadolph/peepwho/internal/engine"
 	"github.com/dcadolph/peepwho/internal/graph"
 	"github.com/dcadolph/peepwho/internal/httputil"
 	"github.com/dcadolph/peepwho/internal/prompt"
@@ -481,121 +481,125 @@ func runFirstIndex(cmd *cobra.Command, opts *options, ui *prompt.IO, spec source
 	}
 
 	merge := indexExists(opts)
-	var (
-		recs []connector.Record
-		eps  []episode.Episode
-		err  error
-	)
-	switch spec.id {
-	case "slack":
-		includePrivate := false
-		if opts.pol.AllowPrivateChannels() {
-			if includePrivate, err = ui.Confirm("Include private channels the bot can read?", false); err != nil {
-				return err
-			}
-		}
-		remember, cerr := ui.Confirm(
-			"Remember conversations, so peepwho recall can find who helped you and when?", true)
-		if cerr != nil {
-			return cerr
-		}
-		recs, eps, err = fetchSlack(cmd, opts, slackArgs{
-			includePrivate: includePrivate, sinceDays: 180, maxMessages: 5000,
-			episodes: remember, maxEpisodes: 200,
-		})
-	case "github":
-		a, gerr := promptGitHubScope(ui)
-		if gerr != nil {
-			return gerr
-		}
-		// Merged changes, resolved tickets, and resolved incidents are recorded
-		// as a matter of course: they are the same metadata already being
-		// indexed, and they are what recall points back at.
-		a.episodes = true
-		recs, eps, err = fetchGitHub(cmd, a)
-	case "jira":
-		projects, perr := promptList(ui, "Jira project keys to index (space-separated, blank for all)")
-		if perr != nil {
-			return perr
-		}
-		recs, eps, err = fetchJira(cmd, jiraArgs{
-			projects: projects, maxIssues: 1000, episodes: true,
-		})
-	case "confluence":
-		spaces, serr := promptList(ui, "Confluence space keys to index (space-separated, blank for all)")
-		if serr != nil {
-			return serr
-		}
-		recs, err = fetchConfluence(cmd, confluenceArgs{spaces: spaces, maxPages: 2000})
-	case "pagerduty":
-		recs, eps, err = fetchPagerDuty(cmd, true)
-	case "org-csv":
-		recs, err = fetchLocal(cmd, ui, "Path to the org chart CSV", func(path string) connector.Source {
-			oc := connector.NewOrgCSV(path)
-			oc.Log = cmd.ErrOrStderr()
-			return oc
-		})
-	case "codeowners":
-		recs, err = fetchLocal(cmd, ui, "Path to a CODEOWNERS file or a repo root", func(path string) connector.Source {
-			return connector.NewCodeOwners(path)
-		})
-	case "git":
-		paths, perr := promptList(ui, "Local repo paths (space-separated)")
-		if perr != nil {
-			return perr
-		}
-		if len(paths) == 0 {
-			return fmt.Errorf("%w: at least one repo path is required for git", ErrBadArgs)
-		}
-		recs, err = connector.NewGitHistory(connector.GitOptions{
-			Paths: paths, SinceDays: 365, MaxCommits: 2000, Log: cmd.ErrOrStderr(),
-		}).Fetch(cmd.Context())
-	default:
+	o, err := firstIndexOptions(opts, ui, spec.id)
+	if err != nil {
+		return err
+	}
+	src, ok := engine.SourceByName(spec.id)
+	if !ok {
 		return fmt.Errorf("%w: %q", ErrUnknownSource, spec.id)
 	}
+	o.Log = cmd.ErrOrStderr()
+	o.AllowPrivateChannels = opts.pol.AllowPrivateChannels()
+	o.Creds = resolveCreds(src)
+	recs, eps, _, err := fetchSource(cmd.Context(), src, o)
 	if err != nil {
 		return err
 	}
 	return indexRecords(cmd, opts, recs, indexParams{merge: merge, halfLifeDays: 180, episodes: eps})
 }
 
-// fetchLocal prompts for a required path and fetches records from the source the
-// build function constructs for it.
-func fetchLocal(
-	cmd *cobra.Command, ui *prompt.IO, label string, build func(path string) connector.Source,
-) ([]connector.Record, error) {
+// firstIndexOptions prompts for the scope a first index of the source needs and
+// returns it as registry options, with the defaults the index command uses.
+// Merged changes, resolved tickets, and resolved incidents are recorded as a
+// matter of course: they are the same metadata already being indexed, and they
+// are what recall points back at.
+func firstIndexOptions(opts *options, ui *prompt.IO, id string) (engine.SourceOptions, error) {
+	var o engine.SourceOptions
+	switch id {
+	case "slack":
+		includePrivate := false
+		if opts.pol.AllowPrivateChannels() {
+			var err error
+			if includePrivate, err = ui.Confirm("Include private channels the bot can read?", false); err != nil {
+				return o, err
+			}
+		}
+		remember, err := ui.Confirm(
+			"Remember conversations, so peepwho recall can find who helped you and when?", true)
+		if err != nil {
+			return o, err
+		}
+		o.Slack = connector.SlackOptions{
+			IncludePrivate: includePrivate, SinceDays: 180, MaxMessages: 5000,
+			Episodes: remember, MaxEpisodesPerChannel: 200,
+		}
+	case "github":
+		gho, err := promptGitHubScope(ui)
+		if err != nil {
+			return o, err
+		}
+		gho.Episodes = true
+		o.GitHub = gho
+	case "jira":
+		projects, err := promptList(ui, "Jira project keys to index (space-separated, blank for all)")
+		if err != nil {
+			return o, err
+		}
+		o.Jira = connector.JiraOptions{Projects: projects, MaxIssues: 1000, Episodes: true}
+	case "confluence":
+		spaces, err := promptList(ui, "Confluence space keys to index (space-separated, blank for all)")
+		if err != nil {
+			return o, err
+		}
+		o.Confluence = connector.ConfluenceOptions{Spaces: spaces, MaxPages: 2000}
+	case "pagerduty":
+		o.PagerDuty = connector.PagerDutyOptions{Episodes: true}
+	case "org-csv", "codeowners":
+		return localFileOptions(ui, id)
+	case "git":
+		paths, err := promptList(ui, "Local repo paths (space-separated)")
+		if err != nil {
+			return o, err
+		}
+		if len(paths) == 0 {
+			return o, fmt.Errorf("%w: at least one repo path is required for git", ErrBadArgs)
+		}
+		o.Git = connector.GitOptions{Paths: paths, SinceDays: 365, MaxCommits: 2000}
+	default:
+		return o, fmt.Errorf("%w: %q", ErrUnknownSource, id)
+	}
+	return o, nil
+}
+
+// localFileOptions prompts for the required path of a file source.
+func localFileOptions(ui *prompt.IO, id string) (engine.SourceOptions, error) {
+	label := "Path to the org chart CSV"
+	if id == "codeowners" {
+		label = "Path to a CODEOWNERS file or a repo root"
+	}
 	path, err := ui.Line(label)
 	if err != nil {
-		return nil, err
+		return engine.SourceOptions{}, err
 	}
 	if path == "" {
-		return nil, fmt.Errorf("%w: a path is required", ErrBadArgs)
+		return engine.SourceOptions{}, fmt.Errorf("%w: a path is required", ErrBadArgs)
 	}
-	return build(path).Fetch(cmd.Context())
+	return engine.SourceOptions{File: path}, nil
 }
 
 // promptGitHubScope asks whether to index a single repo or a whole org and
 // returns the matching fetch arguments, resolving emails so people join sources.
-func promptGitHubScope(ui *prompt.IO) (githubArgs, error) {
+func promptGitHubScope(ui *prompt.IO) (connector.GitHubOptions, error) {
 	ui.Detail("Index a single repo (owner/name) or a whole org.")
 	repo, err := ui.Line("GitHub repo owner/name, or blank to index an org")
 	if err != nil {
-		return githubArgs{}, err
+		return connector.GitHubOptions{}, err
 	}
-	a := githubArgs{emails: true}
+	gho := connector.GitHubOptions{ResolveEmails: true}
 	if repo != "" {
-		a.repos = []string{repo}
-		return a, nil
+		gho.Repos = []string{repo}
+		return gho, nil
 	}
 	org, err := ui.Line("GitHub org to index")
 	if err != nil {
-		return githubArgs{}, err
+		return connector.GitHubOptions{}, err
 	}
 	if org == "" {
-		return githubArgs{}, fmt.Errorf("%w: a repo or an org is required for github", ErrBadArgs)
+		return connector.GitHubOptions{}, fmt.Errorf("%w: a repo or an org is required for github", ErrBadArgs)
 	}
-	a.org = org
-	return a, nil
+	gho.Org = org
+	return gho, nil
 }
 
 // promptList reads a whitespace-separated list, returning nil when left blank.
