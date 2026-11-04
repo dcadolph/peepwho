@@ -147,6 +147,7 @@ func mergePerson(dst, src *model.Person) {
 func movePostings(postings map[string]map[model.ID]float64, from, to model.ID) {
 	for _, m := range postings {
 		if w, ok := m[from]; ok {
+			// mapsum: each term holds its own map, touched once in this walk.
 			m[to] += w
 			delete(m, from)
 		}

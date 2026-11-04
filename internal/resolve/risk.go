@@ -153,6 +153,7 @@ func Risk(ix *index.Index, limit int) []TopicRisk {
 		var cum float64
 		bus := 0
 		for i := range experts {
+			// mapsum: experts and total belong to this topic's iteration alone.
 			experts[i].Share /= total
 			if cum < concentrationCut {
 				cum += experts[i].Share

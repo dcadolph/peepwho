@@ -384,6 +384,7 @@ func (s *Store) Search(q Query) []Result {
 				a = &acc{}
 				hits[id] = a
 			}
+			// mapsum: one add per id for each term, and terms walk in slice order.
 			a.score += weight / (weight + saturation)
 			a.matched = append(a.matched, term)
 		}

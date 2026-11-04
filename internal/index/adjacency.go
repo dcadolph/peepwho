@@ -199,6 +199,7 @@ func (ix *Index) Near(focal model.ID, limit int) []Adjacent {
 				continue
 			}
 			c := get(m)
+			// mapsum: one add per member for each group, and groups walk sorted.
 			c.score += w
 			if len(c.groups) < maxReasonItems {
 				c.groups = append(c.groups, label)
@@ -237,6 +238,7 @@ func (ix *Index) Near(focal model.ID, limit int) []Adjacent {
 		if overlap > 0 && focalReach > 0 {
 			if r := math.Sqrt(p2.Reach()); r > 0 {
 				c := get(pid)
+				// mapsum: one add per person in this walk, after the sorted group adds.
 				c.score += (overlap / (focalReach * r)) * topicAdjacencyWeight
 				c.topics = shared
 			}

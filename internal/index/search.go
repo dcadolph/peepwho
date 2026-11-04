@@ -81,8 +81,10 @@ func applyExpansionPenalty(resolved map[string]termHit, asked map[string]string)
 			// A tie-derived term is a different subject that travels with the
 			// one asked about, not another name for it, so it is discounted
 			// below every synonym and far below every typed word.
+			// mapsum: hit is this iteration's own copy of a struct value.
 			hit.penalty *= tieExpansionPenalty
 		} else {
+			// mapsum: hit is this iteration's own copy of a struct value.
 			hit.penalty *= expansionPenalty
 		}
 		resolved[term] = hit
@@ -608,6 +610,7 @@ func scoreByTerms(
 			// most. The stop is what keeps breadth from dividing an owner's
 			// evidence away entirely.
 			norm := min(max(1, 1-bm25B+bm25B*(lens.byID[id]/lens.avg)), normCap)
+			// mapsum: one add per id for each term, and terms walk in slice order.
 			scores[id] += hit.penalty * idf * (w * (bm25K1 + 1)) / (w + bm25K1*norm)
 		}
 	}
@@ -667,6 +670,7 @@ func (ix *Index) reasons(
 		case pt != nil && take(stemMatch(hit.key, pt.Teams...)):
 			field, strength = "team", evidenceTeam
 		}
+		// mapsum: strength is a constant picked in this iteration, and max is exact in any order.
 		evidence = max(evidence, strength)
 		// A synonym arrives with a deliberate discount, which must not read as a
 		// typo correction: the "for" clause already says why the word differs
@@ -746,6 +750,7 @@ func (ix *Index) channelReasons(
 		case ct != nil && take(stemMatch(hit.key, ct.Name)):
 			field, strength = "name", evidenceTopic
 		}
+		// mapsum: strength is a constant picked in this iteration, and max is exact in any order.
 		evidence = max(evidence, strength)
 		if from := asked[term]; from != "" && from != term {
 			out = append(out, fmt.Sprintf("%s (%s) for %q", term, field, from))

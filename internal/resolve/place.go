@@ -115,8 +115,10 @@ func AddReviewCredit(
 					m = make(map[string]float64)
 					dirWork[dir] = m
 				}
+				// mapsum: every addend is the constant reviewWeight, so order cannot matter.
 				m[key] += reviewWeight
 			}
+			// mapsum: every addend is the constant reviewWeight, so order cannot matter.
 			workTotals[key] += reviewWeight
 		}
 	}
@@ -203,6 +205,7 @@ func PlaceLeads(
 				h = &PlaceHolder{ID: string(canon), Name: name}
 				byCanon[canon] = h
 			}
+			// mapsum: byCanon is made fresh for each directory, and its people walk sorted.
 			h.Work += w / math.Pow(breadth, placeBreadthExp)
 		}
 		if total < minWork || len(byCanon) == 0 {

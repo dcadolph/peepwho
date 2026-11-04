@@ -144,6 +144,7 @@ func (ix *Index) topicVocab() map[model.ID][]string {
 				perTopic[tid] = counts
 			}
 			for _, w := range words {
+				// mapsum: counts is this topic's own map, so no two iterations write the same one.
 				counts[w] += affinity
 				totals[tid] += affinity
 			}
