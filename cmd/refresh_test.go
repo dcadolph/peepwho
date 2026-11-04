@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -13,69 +13,56 @@ import (
 	"github.com/dcadolph/peepwho/internal/policy"
 )
 
-func TestCaptureIndexFlags(t *testing.T) {
+// TestIndexRecordsEveryScope indexes two files in separate org-csv runs and a
+// json run from standard input, and verifies the refresh config keeps both
+// files under their own scopes, records exactly what the core would record for
+// the same flags, and leaves out the stdin run, which a refresh could not
+// supply. Keyed by source alone, the second run once replaced the first and the
+// weekly refresh let the first file go stale with no warning.
+func TestIndexRecordsEveryScope(t *testing.T) {
 	t.Parallel()
-	cmd := &cobra.Command{Use: "index"}
-	f := cmd.Flags()
-	var org, source string
-	var repos []string
-	var merge bool
-	f.StringVar(&org, "github-org", "", "")
-	f.StringArrayVar(&repos, "repo", nil, "")
-	f.StringVar(&source, "source", "", "")
-	f.BoolVar(&merge, "merge", false, "")
-	must := func(err error) {
-		if err != nil {
+	people, err := os.ReadFile("../examples/people.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir, files := t.TempDir(), t.TempDir()
+	a, b := filepath.Join(files, "a.csv"), filepath.Join(files, "b.csv")
+	for _, f := range []string{a, b} {
+		if err := os.WriteFile(f, people, 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
-	must(f.Set("github-org", "acme"))
-	must(f.Set("repo", "a/b"))
-	must(f.Set("repo", "c/d"))
-	must(f.Set("source", "github"))
-	must(f.Set("merge", "true"))
-
-	got := strings.Join(captureIndexFlags(cmd), " ")
-	if !strings.Contains(got, "--github-org=acme") {
-		t.Errorf("missing github-org: %q", got)
-	}
-	if !strings.Contains(got, "--repo a/b") || !strings.Contains(got, "--repo c/d") {
-		t.Errorf("missing repeated repo flags: %q", got)
-	}
-	if strings.Contains(got, "merge") || strings.Contains(got, "source") {
-		t.Errorf("replayed a skipped flag: %q", got)
-	}
-}
-
-// TestSaveInvocationKeepsEveryScope indexes two repositories in separate git
-// runs and verifies both survive in the refresh config. Keyed by source alone,
-// the second run silently replaced the first and the weekly refresh let the
-// first repository go stale with no warning.
-func TestSaveInvocationKeepsEveryScope(t *testing.T) {
-	t.Parallel()
-	opts := &options{dataDir: t.TempDir()}
-	run := func(repo string) {
-		cmd := &cobra.Command{Use: "index"}
-		var repoPaths []string
-		cmd.Flags().StringArrayVar(&repoPaths, "repo-path", nil, "")
-		if err := cmd.Flags().Set("repo-path", repo); err != nil {
-			t.Fatal(err)
-		}
-		if err := saveInvocation(opts, cmd, "git", "repo:"+repo); err != nil {
-			t.Fatalf("save %s: %v", repo, err)
+	steps := []struct {
+		Stdin string
+		Args  []string
+	}{{
+		Args: []string{"index", "--source", "org-csv", "--file", a, "--json"},
+	}, {
+		Args: []string{"index", "--source", "org-csv", "--file", b, "--merge", "--pretty"},
+	}, {
+		Stdin: `[{"name":"Ann Lee","email":"ann@x.com"}]`,
+		Args:  []string{"index", "--source", "json", "--merge"},
+	}}
+	for stepNum, step := range steps {
+		args := append(append([]string(nil), step.Args...), "--data-dir", dir)
+		if _, errOut, err := runCmdIn(t, step.Stdin, args...); err != nil {
+			t.Fatalf("step %d %v: %v\n%s", stepNum, step.Args, err, errOut)
 		}
 	}
-	run("/src/a")
-	run("/src/b")
-	out, err := engine.NewStore(opts.dir(), nil).LoadInvocations()
+	got, err := engine.NewStore(engine.Dir(dir), nil).LoadInvocations()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if diff := cmp.Diff(engine.Invocations{"git": {
-		"repo:/src/a": {"--repo-path", "/src/a"},
-		"repo:/src/b": {"--repo-path", "/src/b"},
-	}}, out); diff != "" {
-		t.Errorf("scopes lost (-want +got):\n%s", diff)
+	want := engine.Invocations{"org-csv": {}}
+	for _, f := range []string{a, b} {
+		run, err := engine.IndexFromFlags("org-csv", []string{"--file", f})
+		if err != nil || len(run.Replay) != 1 || run.Replay[0] != "--file="+f {
+			t.Fatalf("core records %q, %v; want only --file=%s", run.Replay, err, f)
+		}
+		want["org-csv"][engine.RefreshScope("org-csv", "", f, nil)] = run.Replay
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("recorded runs mismatch (-want +got):\n%s", diff)
 	}
 }
 

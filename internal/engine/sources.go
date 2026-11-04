@@ -154,6 +154,13 @@ func SourceByName(name string) (SourceSpec, bool) {
 	return SourceSpec{}, false
 }
 
+// ReadsStdin reports whether indexing source with file reads standard input,
+// which neither a scheduled refresh nor an app can supply.
+func ReadsStdin(source, file string) bool {
+	spec, ok := SourceByName(source)
+	return ok && spec.Stdin && (file == "" || file == "-")
+}
+
 // SourceNames lists the registered names as an English list ending in "or",
 // for the unknown-source error.
 func SourceNames() string {

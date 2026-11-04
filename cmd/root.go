@@ -104,9 +104,6 @@ func (o *options) changesPath() string { return o.dir().Changes() }
 // factsPath returns the facts file path under the data directory.
 func (o *options) factsPath() string { return o.dir().Facts() }
 
-// refreshPath returns the refresh-config path under the data directory.
-func (o *options) refreshPath() string { return o.dir().Refresh() }
-
 // episodePath returns the episode file path under the data directory.
 func (o *options) episodePath() string { return o.dir().Episodes() }
 

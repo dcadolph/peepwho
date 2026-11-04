@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/spf13/pflag"
 
 	"github.com/dcadolph/peepwho/internal/fakeapi"
 	"github.com/dcadolph/peepwho/internal/policy"
@@ -249,5 +250,48 @@ func TestRefreshBadRecordedFlag(t *testing.T) {
 	results, err := x.Refresh(context.Background(), nil, time.Now())
 	if err == nil || len(results) != 1 || !errors.Is(results[0].Err, ErrBadArgs) {
 		t.Errorf("Refresh = %+v, %v; want one ErrBadArgs result and an error", results, err)
+	}
+}
+
+// TestReplayFlags verifies a command line's flag set records only the flags an
+// index run takes, less the ones that steer one run or its output, in name
+// order with a repeatable flag as one pair per value.
+func TestReplayFlags(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		Set        [][2]string
+		WantReplay []string
+	}{{ // Test 0: Nothing set records nothing.
+		Set: nil, WantReplay: nil,
+	}, { // Test 1: Source flags kept, command line and run-steering flags dropped.
+		Set: [][2]string{
+			{"source", "github"}, {"data-dir", "/d"}, {"pretty", "true"}, {"json", "true"},
+			{"human", "true"}, {"merge", "true"}, {"full", "true"}, {"allow-shrink", "true"},
+			{"changes-file", "c.json"}, {"github-org", "acme"}, {"repo", "a/b"}, {"repo", "c/d"},
+			{"policy", "open"},
+		},
+		WantReplay: []string{"--github-org=acme", "--policy=open", "--repo", "a/b", "--repo", "c/d"},
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			var args IndexArgs
+			fs := pflag.NewFlagSet("index", pflag.ContinueOnError)
+			RegisterIndexFlags(fs, &args)
+			fs.String("source", "", "")
+			fs.String("data-dir", "", "")
+			fs.String("policy", "", "")
+			fs.Bool("pretty", false, "")
+			fs.Bool("json", false, "")
+			fs.Bool("human", false, "")
+			for _, kv := range test.Set {
+				if err := fs.Set(kv[0], kv[1]); err != nil {
+					t.Fatalf("set %s: %v", kv[0], err)
+				}
+			}
+			if diff := cmp.Diff(test.WantReplay, ReplayFlags(fs)); diff != "" {
+				t.Errorf("mismatch (-want +got):\n%s", diff)
+			}
+		})
 	}
 }

@@ -2,76 +2,9 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
-	"github.com/dcadolph/peepwho/internal/engine"
 	"github.com/dcadolph/peepwho/internal/policy"
-	"github.com/dcadolph/peepwho/internal/util"
 )
-
-// refreshSkipFlags are index flags that must not be replayed by refresh: they
-// control the run itself, not what to fetch. The source is passed explicitly.
-//
-//nolint:gochecknoglobals // Read-only lookup table.
-var refreshSkipFlags = map[string]bool{
-	"source": true, "merge": true, "full": true, "allow-shrink": true,
-	"data-dir": true, "pretty": true, "changes-file": true,
-}
-
-// captureIndexFlags returns the explicitly-set index flags worth replaying on a
-// refresh, expanding a repeatable flag into one entry per value.
-func captureIndexFlags(cmd *cobra.Command) []string {
-	var args []string
-	cmd.Flags().Visit(func(f *pflag.Flag) {
-		if refreshSkipFlags[f.Name] {
-			return
-		}
-		if sv, ok := f.Value.(pflag.SliceValue); ok {
-			for _, v := range sv.GetSlice() {
-				args = append(args, "--"+f.Name, v)
-			}
-			return
-		}
-		args = append(args, "--"+f.Name+"="+f.Value.String())
-	})
-	return args
-}
-
-// saveInvocation records the flags a source was indexed with under its scope
-// key, so refresh can replay every scope ever indexed. It is best-effort: a
-// failure to save never fails the index. A source reading stdin cannot be
-// replayed, so it is not recorded. The read-modify-write runs under a
-// cross-process lock so two concurrent index runs keep each other's entries.
-func saveInvocation(opts *options, cmd *cobra.Command, source, scope string) error {
-	if readsStdin(cmd, source) {
-		return nil
-	}
-	unlock, err := util.LockFile(opts.refreshPath() + util.LockSuffix)
-	if err != nil {
-		return err
-	}
-	defer unlock()
-	store := engine.NewStore(opts.dir(), nil)
-	inv, err := store.LoadInvocations()
-	if err != nil {
-		return err
-	}
-	if inv[source] == nil {
-		inv[source] = map[string][]string{}
-	}
-	inv[source][scope] = captureIndexFlags(cmd)
-	return store.SaveInvocations(inv)
-}
-
-// readsStdin reports whether this index run reads its input from stdin, which a
-// scheduled refresh could not supply.
-func readsStdin(cmd *cobra.Command, source string) bool {
-	if spec, ok := engine.SourceByName(source); !ok || !spec.Stdin {
-		return false
-	}
-	f := cmd.Flags().Lookup("file")
-	return f == nil || f.Value.String() == "" || f.Value.String() == "-"
-}
 
 // newRefreshCmd builds the refresh command, which re-indexes every source with
 // the flags it was last indexed with, merging each into the existing index.

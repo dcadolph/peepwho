@@ -182,29 +182,49 @@ func IndexFromFlags(source string, args []string) (IndexRun, error) {
 // parseIndexFlags parses args for source and returns the run and any bare
 // arguments left over. label names the list in a parse error.
 func parseIndexFlags(source string, args []string, label string) (IndexRun, []string, error) {
+	run := IndexRun{Request: IndexRequest{Source: source}}
+	fs := indexFlagSet(&run)
+	if err := fs.Parse(args); err != nil {
+		return IndexRun{}, nil, fmt.Errorf("%w: %s: %w", ErrBadArgs, label, err)
+	}
+	run.Replay = ReplayFlags(fs)
+	return run, fs.Args(), nil
+}
+
+// indexFlagSet returns a flag set holding every flag a recorded index run may
+// carry, bound to run.
+func indexFlagSet(run *IndexRun) *pflag.FlagSet {
 	fs := pflag.NewFlagSet("index", pflag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	run := IndexRun{Request: IndexRequest{Source: source}}
 	RegisterIndexFlags(fs, &run.Request.IndexArgs)
 	fs.StringVar(&run.Policy, "policy", "", "")
 	fs.Bool("json", false, "")
 	fs.Bool("human", false, "")
-	if err := fs.Parse(args); err != nil {
-		return IndexRun{}, nil, fmt.Errorf("%w: %s: %w", ErrBadArgs, label, err)
-	}
+	return fs
+}
+
+// ReplayFlags returns the flags set on fs that a recorded run replays, in flag
+// name order: a repeatable flag as one name and value pair per value, any other
+// as name=value. Only flags an index run takes are kept, less the ones that
+// steer one run or its output, so a command line's own flags such as
+// --data-dir never reach the record. The command line and the core record
+// through it, so both write the same list for the same run.
+func ReplayFlags(fs *pflag.FlagSet) []string {
+	known := indexFlagSet(&IndexRun{})
+	var out []string
 	fs.Visit(func(f *pflag.Flag) {
-		if replaySkipFlags[f.Name] {
+		if known.Lookup(f.Name) == nil || replaySkipFlags[f.Name] {
 			return
 		}
 		if sv, ok := f.Value.(pflag.SliceValue); ok {
 			for _, v := range sv.GetSlice() {
-				run.Replay = append(run.Replay, "--"+f.Name, v)
+				out = append(out, "--"+f.Name, v)
 			}
 			return
 		}
-		run.Replay = append(run.Replay, "--"+f.Name+"="+f.Value.String())
+		out = append(out, "--"+f.Name+"="+f.Value.String())
 	})
-	return run, fs.Args(), nil
+	return out
 }
 
 // replay parses one recorded flag list and indexes the source with it as a

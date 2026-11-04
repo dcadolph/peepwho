@@ -491,8 +491,7 @@ func (h *Handle) Index(source, flags string, nowUnix int64) (string, error) {
 		return "", fmt.Errorf("core: index %s: %w: --policy is not accepted: "+
 			"the core runs only under the strict policy", source, engine.ErrBadArgs)
 	}
-	if spec, ok := engine.SourceByName(source); ok && spec.Stdin &&
-		(run.Request.File == "" || run.Request.File == "-") {
+	if engine.ReadsStdin(source, run.Request.File) {
 		return "", fmt.Errorf("core: index %s: %w: the source reads standard input, "+
 			"which an app cannot supply: pass --file", source, engine.ErrBadArgs)
 	}

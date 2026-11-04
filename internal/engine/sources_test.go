@@ -214,3 +214,32 @@ func TestJSONSource(t *testing.T) {
 		})
 	}
 }
+
+// TestReadsStdin verifies only a stdin source given no file, or "-", counts as
+// reading standard input.
+func TestReadsStdin(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		Source    string
+		File      string
+		WantStdin bool
+	}{{ // Test 0: The json source with no file reads stdin.
+		Source: "json", WantStdin: true,
+	}, { // Test 1: The json source with "-" reads stdin.
+		Source: "json", File: "-", WantStdin: true,
+	}, { // Test 2: The json source with a file does not.
+		Source: "json", File: "people.json",
+	}, { // Test 3: A source that never reads stdin does not, even with no file.
+		Source: "org-csv",
+	}, { // Test 4: An unknown source does not.
+		Source: "nosuch",
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			if got := ReadsStdin(test.Source, test.File); got != test.WantStdin {
+				t.Errorf("ReadsStdin(%q, %q) = %t, want %t", test.Source, test.File, got, test.WantStdin)
+			}
+		})
+	}
+}

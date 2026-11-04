@@ -79,11 +79,15 @@ Start with the org chart, then merge everything else onto it:
 }
 
 // runIndex reads one source and folds it into the index through the engine,
-// recording the flags it ran with so a refresh can replay them.
+// recording the flags it ran with so a refresh can replay them. A run reading
+// standard input is not recorded, since a refresh could not supply it.
 func runIndex(cmd *cobra.Command, opts *options, req *engine.IndexRequest) error {
 	x := opts.indexer(cmd)
 	x.Record = func(source, scope string) error {
-		return saveInvocation(opts, cmd, source, scope)
+		if engine.ReadsStdin(source, req.File) {
+			return nil
+		}
+		return engine.NewStore(opts.dir(), nil).RecordInvocation(source, scope, engine.ReplayFlags(cmd.Flags()))
 	}
 	return x.Index(cmd.Context(), *req)
 }
