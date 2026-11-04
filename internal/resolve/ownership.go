@@ -1,7 +1,9 @@
 package resolve
 
 import (
+	"maps"
 	"math"
+	"slices"
 	"sort"
 	"strings"
 
@@ -355,7 +357,7 @@ func actualOwner(ix *index.Index, tr TopicRisk) RiskExpert {
 		// yields it gives a different last bit each run, and this total is a
 		// divisor for every score below it.
 		var total float64
-		for _, tid := range sortedTopics(p.Topics) {
+		for _, tid := range slices.Sorted(maps.Keys(p.Topics)) {
 			if work := p.Topics[tid] - p.Stated[tid]; work > 0 {
 				total += work
 			}

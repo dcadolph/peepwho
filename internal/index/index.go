@@ -3,8 +3,9 @@
 package index
 
 import (
+	"maps"
 	"math"
-	"sort"
+	"slices"
 	"sync/atomic"
 	"time"
 
@@ -220,11 +221,7 @@ func (ix *Index) PostingCount() int { return len(ix.postings) }
 // sorted, so a status view can list each one with its size. It reads the counts
 // kept in the main index, so it works without loading the sources sidecar.
 func (ix *Index) SourceNames() []string {
-	names := make([]string, 0, len(ix.sourceCounts))
-	for name := range ix.sourceCounts {
-		names = append(names, name)
-	}
-	sort.Strings(names)
+	names := slices.Sorted(maps.Keys(ix.sourceCounts))
 	return names
 }
 

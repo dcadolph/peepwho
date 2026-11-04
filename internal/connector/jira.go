@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
+	"slices"
 	"strings"
 	"time"
 
@@ -177,7 +179,7 @@ func (j *Jira) Fetch(ctx context.Context) ([]Record, error) {
 		ties.note(stated, who, is.Fields.Project.Key)
 	}
 	records := make([]Record, 0, len(counts))
-	for _, key := range util.SortedKeys(counts) {
+	for _, key := range slices.Sorted(maps.Keys(counts)) {
 		c := counts[key]
 		rec := jiraPersonRecord(users[key], nil)
 		rec.Topics, rec.WeakTopics = splitCurated(expandTopics(c), curated)

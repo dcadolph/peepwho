@@ -268,6 +268,7 @@ func (r *Resolver) scope() Scope {
 			oldest = ep.Occurred
 		}
 	}
+	// An empty index must still marshal sources as [] rather than null.
 	names := make([]string, 0, len(sources))
 	for s := range sources {
 		names = append(names, s)

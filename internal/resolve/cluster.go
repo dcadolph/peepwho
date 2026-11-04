@@ -1,6 +1,8 @@
 package resolve
 
 import (
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 
@@ -203,11 +205,7 @@ const mergeCut = 0.6
 // said shorter. A topic that maps to itself is its own group.
 func topicGroups(ix *index.Index) map[string]string {
 	holders := topicHolders(ix)
-	names := make([]string, 0, len(holders))
-	for t := range holders {
-		names = append(names, t)
-	}
-	sort.Strings(names)
+	names := slices.Sorted(maps.Keys(holders))
 
 	// Only a topic containing one of a fragment's words can absorb it, so index
 	// the compounds by word and compare against those instead of every pair. A

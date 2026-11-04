@@ -2,6 +2,8 @@ package resolve
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 
@@ -191,11 +193,7 @@ func (in *successorInputs) SuccessorFor(
 		return Successor{}, false
 	}
 
-	ids := make([]model.ID, 0, len(evidence))
-	for id := range evidence {
-		ids = append(ids, id)
-	}
-	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	ids := slices.Sorted(maps.Keys(evidence))
 	if len(ids) > successorCandidates {
 		ids = ids[:successorCandidates]
 	}

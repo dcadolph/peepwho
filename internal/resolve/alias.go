@@ -2,6 +2,8 @@ package resolve
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 
@@ -40,7 +42,7 @@ func SplitNames(ix *index.Index) []SplitName {
 		byName[key] = append(byName[key], string(id))
 	}
 	var out []SplitName
-	for _, key := range util.SortedKeys(byName) {
+	for _, key := range slices.Sorted(maps.Keys(byName)) {
 		ids := byName[key]
 		if len(ids) < 2 {
 			continue

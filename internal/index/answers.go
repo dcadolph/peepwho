@@ -4,7 +4,8 @@
 package index
 
 import (
-	"sort"
+	"maps"
+	"slices"
 
 	"github.com/dcadolph/peepwho/internal/episode"
 	"github.com/dcadolph/peepwho/internal/model"
@@ -96,10 +97,7 @@ func (ix *Index) ScoreAnswers(eps []episode.Episode) AnswerCredit {
 			out.Credits += ix.creditSubjects(p, subjects, ep.Source, weightTopic*answerWeight*decay)
 		}
 	}
-	for id := range unknown {
-		out.Unknown = append(out.Unknown, id)
-	}
-	sort.Strings(out.Unknown)
+	out.Unknown = slices.Sorted(maps.Keys(unknown))
 	return out
 }
 

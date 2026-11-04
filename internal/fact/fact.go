@@ -5,8 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -32,11 +33,7 @@ var knownRelations = map[string]bool{
 // Relations returns the known relations in sorted order, for help text and
 // error messages.
 func Relations() []string {
-	out := make([]string, 0, len(knownRelations))
-	for r := range knownRelations {
-		out = append(out, r)
-	}
-	sort.Strings(out)
+	out := slices.Sorted(maps.Keys(knownRelations))
 	return out
 }
 

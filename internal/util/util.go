@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"unicode/utf8"
 )
@@ -296,17 +295,4 @@ func ReadsAsName(s string) bool {
 		}
 	}
 	return true
-}
-
-// SortedKeys returns a map's keys in ascending order. Connectors emit their
-// records by ranging keys through this, because record order otherwise
-// follows map iteration and an identical fetch indexes in a different order
-// each run, and byte-for-byte reproducibility is a product claim.
-func SortedKeys[V any](m map[string]V) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	sort.Strings(out)
-	return out
 }

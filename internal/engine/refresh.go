@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"slices"
 	"sort"
@@ -114,11 +115,7 @@ func (x *Indexer) Refresh(ctx context.Context, sources []string, now time.Time) 
 	var results []RefreshResult
 	failed := 0
 	for _, src := range names {
-		scopes := make([]string, 0, len(inv[src]))
-		for scope := range inv[src] {
-			scopes = append(scopes, scope)
-		}
-		sort.Strings(scopes)
+		scopes := slices.Sorted(maps.Keys(inv[src]))
 		for _, scope := range scopes {
 			what := src
 			if scope != "" {

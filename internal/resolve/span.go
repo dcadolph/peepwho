@@ -1,6 +1,8 @@
 package resolve
 
 import (
+	"maps"
+	"slices"
 	"sort"
 
 	"github.com/dcadolph/peepwho/internal/index"
@@ -145,11 +147,7 @@ func joinCrossings(ix *index.Index, edges []soleEdge, holders map[string]map[mod
 	for _, e := range edges {
 		byPerson[e.Who] = append(byPerson[e.Who], e)
 	}
-	people := make([]model.ID, 0, len(byPerson))
-	for who := range byPerson {
-		people = append(people, who)
-	}
-	sort.Slice(people, func(i, j int) bool { return people[i] < people[j] })
+	people := slices.Sorted(maps.Keys(byPerson))
 
 	var out []Span
 	for _, who := range people {
@@ -160,11 +158,7 @@ func joinCrossings(ix *index.Index, edges []soleEdge, holders map[string]map[mod
 			near[e.A] = append(near[e.A], e.B)
 			near[e.B] = append(near[e.B], e.A)
 		}
-		starts := make([]string, 0, len(near))
-		for s := range near {
-			starts = append(starts, s)
-		}
-		sort.Strings(starts)
+		starts := slices.Sorted(maps.Keys(near))
 
 		seen := make(map[string]bool, len(near))
 		for _, start := range starts {

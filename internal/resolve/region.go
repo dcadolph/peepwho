@@ -1,7 +1,9 @@
 package resolve
 
 import (
+	"maps"
 	"math"
+	"slices"
 	"sort"
 
 	"github.com/dcadolph/peepwho/internal/index"
@@ -49,11 +51,7 @@ func Regions(ix *index.Index, limit int) []Region {
 		}
 	}
 
-	ids := make([]model.ID, 0, len(lead))
-	for tid := range lead {
-		ids = append(ids, tid)
-	}
-	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	ids := slices.Sorted(maps.Keys(lead))
 
 	var out []Region
 	seen := make(map[model.ID]bool, len(ids))
@@ -141,7 +139,7 @@ func Leaders(ix *index.Index, k int) map[model.ID][]leader {
 		// yields it gives a different last bit each run, and this total is a
 		// divisor for every score below it.
 		var total float64
-		for _, tid := range sortedTopics(p.Topics) {
+		for _, tid := range slices.Sorted(maps.Keys(p.Topics)) {
 			if work := p.Topics[tid] - p.Stated[tid]; work > 0 {
 				total += work
 			}

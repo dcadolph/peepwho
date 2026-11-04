@@ -1,6 +1,7 @@
 package index
 
 import (
+	"maps"
 	"slices"
 	"sort"
 	"strings"
@@ -213,11 +214,7 @@ func sameNameJoins(g *model.Graph, r *identity.Resolver) []Join {
 			byName[name] = append(byName[name], c)
 		}
 	}
-	names := make([]string, 0, len(byName))
-	for name := range byName {
-		names = append(names, name)
-	}
-	sort.Strings(names)
+	names := slices.Sorted(maps.Keys(byName))
 
 	var out []Join
 	for _, name := range names {
@@ -365,11 +362,7 @@ func sameSurnameJoins(g *model.Graph, r *identity.Resolver) []Join {
 			bySurname[surname] = append(bySurname[surname], c)
 		}
 	}
-	surnames := make([]string, 0, len(bySurname))
-	for surname := range bySurname {
-		surnames = append(surnames, surname)
-	}
-	sort.Strings(surnames)
+	surnames := slices.Sorted(maps.Keys(bySurname))
 
 	var out []Join
 	for _, surname := range surnames {
@@ -434,11 +427,7 @@ func sameLocalJoins(g *model.Graph, r *identity.Resolver) []Join {
 			byLocal[local] = append(byLocal[local], c)
 		}
 	}
-	locals := make([]string, 0, len(byLocal))
-	for local := range byLocal {
-		locals = append(locals, local)
-	}
-	sort.Strings(locals)
+	locals := slices.Sorted(maps.Keys(byLocal))
 
 	var out []Join
 	for _, local := range locals {
@@ -784,11 +773,7 @@ func loginNameJoins(g *model.Graph, r *identity.Resolver) []Join {
 		}
 	}
 
-	logins := make([]string, 0, len(holders))
-	for login := range holders {
-		logins = append(logins, login)
-	}
-	sort.Strings(logins)
+	logins := slices.Sorted(maps.Keys(holders))
 
 	var out []Join
 	for _, login := range logins {
@@ -880,11 +865,7 @@ func sameNameMailboxJoins(g *model.Graph, r *identity.Resolver) []Join {
 			byName[name] = append(byName[name], c)
 		}
 	}
-	names := make([]string, 0, len(byName))
-	for name := range byName {
-		names = append(names, name)
-	}
-	sort.Strings(names)
+	names := slices.Sorted(maps.Keys(byName))
 
 	var out []Join
 	for _, name := range names {

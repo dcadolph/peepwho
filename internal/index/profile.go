@@ -1,6 +1,7 @@
 package index
 
 import (
+	"maps"
 	"slices"
 	"strings"
 
@@ -43,11 +44,7 @@ func (ix *Index) Profile(id model.ID) (Profile, bool) {
 	if p.ManagerID != "" {
 		out.Manager = ix.Graph.People[p.ManagerID]
 	}
-	ids := make([]model.ID, 0, len(ix.Graph.Channels))
-	for chID := range ix.Graph.Channels {
-		ids = append(ids, chID)
-	}
-	slices.Sort(ids)
+	ids := slices.Sorted(maps.Keys(ix.Graph.Channels))
 	for _, chID := range ids {
 		ch := ix.Graph.Channels[chID]
 		if slices.Contains(ch.Members, p.ID) {

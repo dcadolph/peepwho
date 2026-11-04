@@ -7,14 +7,14 @@ package connector
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	git "github.com/go-git/go-git/v5"
-
-	"github.com/dcadolph/peepwho/internal/util"
 )
 
 // diffCommits computes what each commit touched, in parallel. Every commit is
@@ -302,7 +302,7 @@ func (t *tally) walkJob(
 func (t *tally) notePull(ref PullRef, paths []string) {
 	dirs := dirPrefixes(paths)
 	if len(dirs) > 0 && len(dirs) <= maxPullDirs {
-		t.pullDirs[ref] = util.SortedKeys(dirs)
+		t.pullDirs[ref] = slices.Sorted(maps.Keys(dirs))
 	}
 }
 

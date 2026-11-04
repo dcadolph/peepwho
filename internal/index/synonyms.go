@@ -1,6 +1,7 @@
 package index
 
 import (
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -145,11 +146,7 @@ func expandTerms(query string) []expTerm {
 	// scoring, where per-person floats accumulate term by term, so an unstable
 	// order here changes the last bits of scores between runs of one query on
 	// one index, and byte-for-byte reproducibility is a product claim.
-	groups := make([]int, 0, len(triggered))
-	for g := range triggered {
-		groups = append(groups, g)
-	}
-	slices.Sort(groups)
+	groups := slices.Sorted(maps.Keys(triggered))
 	var out []expTerm
 	for _, g := range groups {
 		trig := triggered[g]

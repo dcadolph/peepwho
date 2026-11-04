@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"sort"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/dcadolph/peepwho/internal/index"
@@ -276,11 +277,7 @@ func staleSourceFindings(f doctorFacts) []finding {
 // credentialFindings reports which live connectors are ready to run. It lists
 // only connectors that need credentials; the file and repo sources never do.
 func credentialFindings(f doctorFacts) []finding {
-	names := make([]string, 0, len(f.Configured))
-	for name := range f.Configured {
-		names = append(names, name)
-	}
-	sort.Strings(names)
+	names := slices.Sorted(maps.Keys(f.Configured))
 	ready := 0
 	for _, name := range names {
 		if f.Configured[name] {

@@ -1,6 +1,7 @@
 package index
 
 import (
+	"maps"
 	"slices"
 	"strings"
 
@@ -18,11 +19,7 @@ func (ix *Index) Canonicalize() {
 	r := ix.identityResolver()
 	g := ix.Graph
 
-	ids := make([]model.ID, 0, len(g.People))
-	for id := range g.People {
-		ids = append(ids, id)
-	}
-	slices.Sort(ids)
+	ids := slices.Sorted(maps.Keys(g.People))
 	for _, id := range ids {
 		cid := r.Canonical(id)
 		if cid == id {

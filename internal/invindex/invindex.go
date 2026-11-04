@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"maps"
 	"math"
 	"slices"
 )
@@ -23,11 +24,7 @@ func EncodePostings[K ~string](postings map[string]map[K]float64) []byte {
 			keySet[k] = struct{}{}
 		}
 	}
-	keys := make([]K, 0, len(keySet))
-	for k := range keySet {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
+	keys := slices.Sorted(maps.Keys(keySet))
 	index := make(map[K]uint32, len(keys))
 	for i, k := range keys {
 		index[k] = uint32(i)
@@ -47,11 +44,7 @@ func EncodePostings[K ~string](postings map[string]map[K]float64) []byte {
 	for _, k := range keys {
 		putStr(string(k))
 	}
-	terms := make([]string, 0, len(postings))
-	for term := range postings {
-		terms = append(terms, term)
-	}
-	slices.Sort(terms)
+	terms := slices.Sorted(maps.Keys(postings))
 	putU32(uint32(len(terms)))
 	for _, term := range terms {
 		putStr(term)

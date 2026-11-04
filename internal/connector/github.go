@@ -6,8 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"math"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -237,7 +238,7 @@ func (g *GitHub) Fetch(ctx context.Context) ([]Record, error) {
 	accounts := g.resolveAccounts(ctx, counts)
 
 	records := make([]Record, 0, len(counts)+len(codeOwnerRecords))
-	for _, login := range util.SortedKeys(counts) {
+	for _, login := range slices.Sorted(maps.Keys(counts)) {
 		tokenCounts := counts[login]
 		rec := githubPersonRecord(login, nil, accounts[login])
 		rec.Topics, rec.WeakTopics = splitCurated(expandTopics(tokenCounts), curated)
@@ -614,11 +615,7 @@ func splitCurated(tokens []string, curated map[string]bool) (strong, weak []stri
 // expandTopics turns per-token counts into a topic slice with each token
 // repeated by its capped count, so volume of work raises a person's score.
 func expandTopics(counts map[string]int) []string {
-	tokens := make([]string, 0, len(counts))
-	for t := range counts {
-		tokens = append(tokens, t)
-	}
-	sort.Strings(tokens)
+	tokens := slices.Sorted(maps.Keys(counts))
 
 	var out []string
 	for _, t := range tokens {

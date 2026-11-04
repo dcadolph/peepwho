@@ -1,6 +1,8 @@
 package resolve
 
 import (
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 
@@ -64,37 +66,6 @@ type TopicRisk struct {
 	Includes []string `json:"includes,omitempty"`
 }
 
-// sortedPeople returns every person in the graph in identifier order, so a
-// walk that accumulates floats yields the same sum on every run.
-func sortedPeople(ix *index.Index) []model.ID {
-	out := make([]model.ID, 0, len(ix.Graph.People))
-	for id := range ix.Graph.People {
-		out = append(out, id)
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
-	return out
-}
-
-// sortedTopics returns a person's subjects in identifier order.
-func sortedTopics(topics map[model.ID]float64) []model.ID {
-	out := make([]model.ID, 0, len(topics))
-	for tid := range topics {
-		out = append(out, tid)
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
-	return out
-}
-
-// sortedTopicPeople returns the holders of one subject in identifier order.
-func sortedTopicPeople(people map[model.ID]float64) []model.ID {
-	out := make([]model.ID, 0, len(people))
-	for id := range people {
-		out = append(out, id)
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
-	return out
-}
-
 // LeadQuiet reports whether the person the subject rests on has stopped working
 // on it.
 //
@@ -128,9 +99,9 @@ func Risk(ix *index.Index, limit int) []TopicRisk {
 	// Nothing visible moved, but a share feeds a sort comparison, so a tie
 	// could break differently between runs, and an assessment a client cannot
 	// reproduce byte for byte is not the thing this product claims to be.
-	for _, id := range sortedPeople(ix) {
+	for _, id := range slices.Sorted(maps.Keys(ix.Graph.People)) {
 		p := ix.Graph.People[id]
-		for _, tid := range sortedTopics(p.Topics) {
+		for _, tid := range slices.Sorted(maps.Keys(p.Topics)) {
 			w := p.Topics[tid]
 			if w <= 0 {
 				continue
@@ -162,7 +133,7 @@ func Risk(ix *index.Index, limit int) []TopicRisk {
 	for topic, people := range byTopic {
 		var total float64
 		experts := make([]RiskExpert, 0, len(people))
-		for _, id := range sortedTopicPeople(people) {
+		for _, id := range slices.Sorted(maps.Keys(people)) {
 			w := people[id]
 			total += w
 			experts = append(experts, RiskExpert{
@@ -199,11 +170,7 @@ func Risk(ix *index.Index, limit int) []TopicRisk {
 		if len(experts) > 5 {
 			experts = experts[:5]
 		}
-		includes := make([]string, 0, len(aliases[topic]))
-		for a := range aliases[topic] {
-			includes = append(includes, a)
-		}
-		sort.Strings(includes)
+		includes := slices.Sorted(maps.Keys(aliases[topic]))
 		leadName, leadID := "", ""
 		if who := lead[model.ID(topic)]; who != "" {
 			leadName, leadID = personName(ix, who), string(who)

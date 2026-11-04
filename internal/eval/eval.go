@@ -9,6 +9,8 @@
 package eval
 
 import (
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 
@@ -143,10 +145,7 @@ func Measure(ix *index.Index) Result {
 	// figure to compare against another run.
 	r.Ties /= 2
 
-	for s := range sources {
-		r.Sources = append(r.Sources, s)
-	}
-	sort.Strings(r.Sources)
+	r.Sources = slices.Sorted(maps.Keys(sources))
 	return r
 }
 

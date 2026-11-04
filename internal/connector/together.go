@@ -1,6 +1,8 @@
 package connector
 
 import (
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 
@@ -227,11 +229,7 @@ func (t *togetherIndex) note(subjects []string, who, where string) {
 	if !t.begin(distinct, where) {
 		return
 	}
-	names := make([]string, 0, len(distinct))
-	for s := range distinct {
-		names = append(names, s)
-	}
-	sort.Strings(names)
+	names := slices.Sorted(maps.Keys(distinct))
 	for i := range names {
 		for j := i + 1; j < len(names); j++ {
 			if util.SameFamily(names[i], names[j]) {
@@ -310,11 +308,7 @@ func (t *togetherIndex) records(source string) []Record {
 	links = dropScaffolding(links)
 	links = t.dropSpread(links)
 
-	names := make([]string, 0, len(links))
-	for name := range links {
-		names = append(names, name)
-	}
-	sort.Strings(names)
+	names := slices.Sorted(maps.Keys(links))
 
 	out := make([]Record, 0, len(names))
 	for _, name := range names {

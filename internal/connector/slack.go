@@ -5,8 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/url"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -386,11 +387,7 @@ func channelRecord(
 // carries the direct message link when teamID is known; an author keyed by
 // email gets it from their user record.
 func authorTextRecords(authorText map[string]string, authorLatest map[string]time.Time, teamID string) []Record {
-	pids := make([]string, 0, len(authorText))
-	for pid := range authorText {
-		pids = append(pids, pid)
-	}
-	sort.Strings(pids)
+	pids := slices.Sorted(maps.Keys(authorText))
 	out := make([]Record, 0, len(pids))
 	for _, pid := range pids {
 		out = append(out, Record{
