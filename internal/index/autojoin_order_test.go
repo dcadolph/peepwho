@@ -13,7 +13,7 @@ import (
 )
 
 // handleRec builds a handle-only person record such as github:kim-doe.
-func handleRec(id, team string) connector.Record { //nolint:unparam // Team keeps the shared record shape.
+func handleRec(id, team string) connector.Record {
 	return connector.Record{
 		Kind: connector.KindPerson, PersonID: id, Name: "@" + handlePart(model.ID(id)),
 		Team: team, Source: "t",
@@ -21,7 +21,7 @@ func handleRec(id, team string) connector.Record { //nolint:unparam // Team keep
 }
 
 // emailRec builds a person record keyed by email.
-func emailRec(email, name, team string) connector.Record { //nolint:unparam // Team keeps the shared record shape.
+func emailRec(email, name, team string) connector.Record {
 	return connector.Record{
 		Kind: connector.KindPerson, Email: email, Name: name, Team: team, Source: "t",
 	}
