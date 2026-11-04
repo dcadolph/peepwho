@@ -14,7 +14,6 @@ import (
 	"github.com/dcadolph/peepwho/internal/index"
 	"github.com/dcadolph/peepwho/internal/keyring"
 	"github.com/dcadolph/peepwho/internal/prompt"
-	"github.com/dcadolph/peepwho/internal/state"
 	"github.com/dcadolph/peepwho/internal/vault"
 )
 
@@ -26,17 +25,6 @@ func (o *options) store() (*engine.Store, error) {
 		return nil, err
 	}
 	return engine.NewStore(o.dir(), c).WithNow(o.clock), nil
-}
-
-// loadState reads the incremental watermark state, returning an empty state when
-// the file is absent so a first run is a full index rather than an error.
-func (o *options) loadState() (*state.State, error) {
-	return engine.NewStore(o.dir(), nil).LoadState()
-}
-
-// saveState writes the incremental watermark state.
-func (o *options) saveState(st *state.State) error {
-	return engine.NewStore(o.dir(), nil).SaveState(st)
 }
 
 // codec resolves the at-rest codec from the environment once and caches it on

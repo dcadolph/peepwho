@@ -107,9 +107,6 @@ func (o *options) refreshPath() string { return o.dir().Refresh() }
 // episodePath returns the episode file path under the data directory.
 func (o *options) episodePath() string { return o.dir().Episodes() }
 
-// statePath returns the incremental watermark file under the data directory.
-func (o *options) statePath() string { return o.dir().State() }
-
 // newRootCmd builds the root command, wires shared flags, and adds subcommands.
 func newRootCmd() *cobra.Command {
 	opts := &options{
