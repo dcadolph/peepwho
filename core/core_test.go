@@ -273,3 +273,42 @@ func TestClampLimit(t *testing.T) {
 		})
 	}
 }
+
+// mapSecrets is a Secrets backed by a map, standing in for the host Keychain.
+type mapSecrets map[string]string
+
+// Get returns the value stored under name.
+func (m mapSecrets) Get(name string) string { return m[name] }
+
+// TestHandleSecrets verifies the handle reads credentials only from the
+// Secrets the host set, and reads every name as empty without one.
+func TestHandleSecrets(t *testing.T) {
+	t.Parallel()
+	var nilHandle *Handle
+	tests := []struct {
+		Handle    *Handle
+		Secrets   Secrets
+		Name      string
+		WantValue string
+	}{{ // Test 0: Name the host stored.
+		Handle: &Handle{}, Secrets: mapSecrets{engine.JiraTokenEnv: "tok-1"},
+		Name: engine.JiraTokenEnv, WantValue: "tok-1",
+	}, { // Test 1: Name the host does not hold.
+		Handle: &Handle{}, Secrets: mapSecrets{engine.JiraTokenEnv: "tok-1"}, Name: "PEEPWHO_SLACK_TOKEN",
+	}, { // Test 2: No Secrets set.
+		Handle: &Handle{}, Name: engine.JiraTokenEnv,
+	}, { // Test 3: Secrets cleared with nil.
+		Handle: &Handle{secrets: mapSecrets{engine.JiraTokenEnv: "tok-1"}}, Name: engine.JiraTokenEnv,
+	}, { // Test 4: Nil handle.
+		Handle: nilHandle, Secrets: mapSecrets{engine.JiraTokenEnv: "tok-1"}, Name: engine.JiraTokenEnv,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			test.Handle.SetSecrets(test.Secrets)
+			if diff := cmp.Diff(test.WantValue, test.Handle.secret(test.Name)); diff != "" {
+				t.Errorf("secret mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}

@@ -921,6 +921,31 @@ then ignored. The lock constrains the installed binary for regular users; it
 is not a security boundary against an administrator. Private-channel ingest
 can be denied the same way. See `examples/policy.json`.
 
+## App core
+
+The `core` package is the surface the Mac and iPhone apps call, bound with
+`gomobile bind ./core` as the PeepwhoCore framework. Calls take strings and
+integers and return the same JSON `--json` prints, or an error.
+
+The host supplies every secret. `Open(dir, key)` takes the base64 index key
+from `peepwho vault keygen`, or empty for a plain index. Source tokens come
+from a `Secrets` the host sets with `SetSecrets`: one method, `Get(name)`,
+returning the secret stored under an environment variable name such as
+`PEEPWHO_JIRA_TOKEN`, or empty when unset. Without one, every token reads as
+empty. The core never reads the environment or a keychain, and `make
+core-deps` fails the build when it links the command line or a keychain
+package.
+
+| Call                           | Returns                                                     |
+| ------------------------------ | ----------------------------------------------------------- |
+| `Open(dir, key)`               | A handle on the data directory, or an error naming the key. |
+| `Handle.SetSecrets(s)`         | Nothing. Sets where source tokens are read from.            |
+| `Handle.Ask(q, limit)`         | The `ask --json` answer, keyword ranking only.              |
+| `Handle.Search(q, limit)`      | The `search --json` results.                                |
+| `Handle.Person(id)`            | The full profile of one person, as JSON.                    |
+| `Handle.Recall(who, q, limit)` | The `recall --json` answer for one person.                  |
+| `Handle.Status(nowUnix)`       | Counts, seal state, and index age at the host's clock.      |
+
 ## Files
 
 Everything lives under `--data-dir` (default `~/.peepwho`):

@@ -6,6 +6,11 @@
 // are the same JSON the command line prints with --json. Only keyword ranking
 // and recall run here, under the strict egress policy, so nothing an app asks
 // leaves the device. The host supplies the clock, so the core never reads one.
+//
+// The host also supplies every secret. The index key is an argument to Open,
+// and source tokens come through a Secrets the host sets on the handle. The
+// core never reads the environment or a keychain, so a sandboxed app keeps its
+// tokens in its own Keychain items and the core never learns where they live.
 package core
 
 import (
@@ -38,6 +43,36 @@ type Handle struct {
 	episodes *episode.Store
 	// sealed reports whether the index was opened with a key.
 	sealed bool
+	// secrets supplies source tokens by name. Nil reads every name as empty.
+	secrets Secrets
+}
+
+// Secrets supplies source credentials to the core. The host implements it,
+// such as a Swift type reading the app's Keychain, since gomobile binds a Go
+// interface to a Swift protocol but cannot carry a Go func value.
+type Secrets interface {
+	// Get returns the secret stored under name, or empty when it is unset.
+	// Names are the environment variable names the command line reads, such as
+	// PEEPWHO_JIRA_TOKEN, so the app and the command line agree on them.
+	Get(name string) string
+}
+
+// SetSecrets sets where the handle reads source credentials. A nil Secrets
+// makes every credential read as empty.
+func (h *Handle) SetSecrets(s Secrets) {
+	if h == nil {
+		return
+	}
+	h.secrets = s
+}
+
+// secret returns the credential stored under name, or empty when the handle
+// has no Secrets or the host has none by that name.
+func (h *Handle) secret(name string) string {
+	if h == nil || h.secrets == nil {
+		return ""
+	}
+	return h.secrets.Get(name)
 }
 
 // Open opens the data directory at dir. key is the base64 index key that

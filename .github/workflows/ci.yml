@@ -34,3 +34,5 @@ jobs:
       - uses: golangci/golangci-lint-action@v8
         with:
           version: v2.12.2
+      - name: Core dependencies
+        run: make core-deps
