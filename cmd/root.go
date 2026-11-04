@@ -98,6 +98,9 @@ func (o *options) indexPath() string { return o.dir().Index() }
 // feedbackPath returns the feedback file path under the data directory.
 func (o *options) feedbackPath() string { return o.dir().Feedback() }
 
+// changesPath returns the change log path under the data directory.
+func (o *options) changesPath() string { return o.dir().Changes() }
+
 // factsPath returns the facts file path under the data directory.
 func (o *options) factsPath() string { return o.dir().Facts() }
 

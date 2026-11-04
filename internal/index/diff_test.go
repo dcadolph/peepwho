@@ -1,8 +1,12 @@
 package index
 
 import (
+	"fmt"
 	"slices"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/dcadolph/peepwho/internal/connector"
 )
@@ -96,5 +100,39 @@ func TestDiffRecognizesRekeying(t *testing.T) {
 	// shared mailbox is not identity.
 	if !slices.Contains(c.PeopleJoined, "Alert Bot") || !slices.Contains(c.PeopleLeft, "Pager Bot") {
 		t.Errorf("role-mailbox accounts were hidden: joined=%v left=%v", c.PeopleJoined, c.PeopleLeft)
+	}
+}
+
+// TestChangesMerge verifies merged changes are the sorted union per list and
+// that the later side of a pair wins over the earlier one.
+func TestChangesMerge(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		Earlier    Changes
+		Later      Changes
+		WantResult Changes
+	}{{ // Test 0: Disjoint changes union and sort.
+		Earlier:    Changes{PeopleJoined: []string{"Zoe"}, TeamsRemoved: []string{"core"}},
+		Later:      Changes{PeopleJoined: []string{"Ann", "Zoe"}, ChannelsAdded: []string{"#ops"}},
+		WantResult: Changes{PeopleJoined: []string{"Ann", "Zoe"}, TeamsRemoved: []string{"core"}, ChannelsAdded: []string{"#ops"}},
+	}, { // Test 1: Joined then left reads as left.
+		Earlier:    Changes{PeopleJoined: []string{"Ann", "Bo"}},
+		Later:      Changes{PeopleLeft: []string{"Ann"}},
+		WantResult: Changes{PeopleJoined: []string{"Bo"}, PeopleLeft: []string{"Ann"}},
+	}, { // Test 2: Left then joined reads as joined, for teams and channels too.
+		Earlier: Changes{PeopleLeft: []string{"Ann"}, TeamsRemoved: []string{"core"}, ChannelsRemoved: []string{"#ops"}},
+		Later:   Changes{PeopleJoined: []string{"Ann"}, TeamsAdded: []string{"core"}, ChannelsAdded: []string{"#ops"}},
+		WantResult: Changes{PeopleJoined: []string{"Ann"}, TeamsAdded: []string{"core"},
+			ChannelsAdded: []string{"#ops"}},
+	}, { // Test 3: Both empty.
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			got := test.Earlier.Merge(test.Later)
+			if diff := cmp.Diff(test.WantResult, got, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("merge mismatch (-want +got):\n%s", diff)
+			}
+		})
 	}
 }

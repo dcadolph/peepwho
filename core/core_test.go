@@ -6,12 +6,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/dcadolph/peepwho/internal/engine"
+	"github.com/dcadolph/peepwho/internal/index"
 	"github.com/dcadolph/peepwho/internal/policy"
 	"github.com/dcadolph/peepwho/internal/simorg"
 	"github.com/dcadolph/peepwho/internal/vault"
@@ -242,6 +247,7 @@ func TestUnopenedHandle(t *testing.T) {
 			func() (string, error) { return h.Person("angela@corp.com") },
 			func() (string, error) { return h.Recall("angela@corp.com", "billing", 5) },
 			func() (string, error) { return h.Status(0) },
+			func() (string, error) { return h.ChangesSince(0) },
 		}
 		for i, call := range calls {
 			if _, err := call(); !errors.Is(err, errNotOpen) {
@@ -308,6 +314,78 @@ func TestHandleSecrets(t *testing.T) {
 			test.Handle.SetSecrets(test.Secrets)
 			if diff := cmp.Diff(test.WantValue, test.Handle.secret(test.Name)); diff != "" {
 				t.Errorf("secret mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// foldRosters indexes each org chart roster into dir under c in turn, the
+// indexer clock one hour later each time from start.
+func foldRosters(t *testing.T, dir string, c vault.Codec, start time.Time, rosters ...string) {
+	t.Helper()
+	for i, roster := range rosters {
+		csv := filepath.Join(t.TempDir(), "people.csv")
+		if err := os.WriteFile(csv, []byte("name,email,title,team,topics\n"+roster), 0o600); err != nil {
+			t.Fatalf("write csv: %v", err)
+		}
+		at := start.Add(time.Duration(i) * time.Hour)
+		x := &engine.Indexer{
+			Dir: engine.Dir(dir), Codec: func() (vault.Codec, error) { return c, nil },
+			Now: func() time.Time { return at },
+		}
+		req := engine.IndexRequest{Source: "org-csv", IndexArgs: engine.IndexArgs{File: csv}}
+		if err := x.Index(context.Background(), req); err != nil {
+			t.Fatalf("index roster %d: %v", i, err)
+		}
+	}
+}
+
+// TestHandleChangesSince verifies the change log entries after the host's
+// last look merge into one answer, and zero means the whole log.
+func TestHandleChangesSince(t *testing.T) {
+	t.Parallel()
+	start := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	base := "Jane Doe,jane@x.com,Engineer,Billing,retries\n"
+	dir := t.TempDir()
+	foldRosters(t, dir, testKeyCipher(t), start,
+		base,
+		base+"Ann Lee,ann@x.com,Engineer,Payments,ledger\n",
+		base+"Ann Lee,ann@x.com,Engineer,Billing,ledger\n",
+		base+"Ann Lee,ann@x.com,Engineer,Billing,ledger\n")
+	h, err := Open(dir, testKeyB64)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	tests := []struct {
+		Since      int64
+		WantResult changesView
+	}{{ // Test 0: Everything the log holds.
+		WantResult: changesView{
+			AsOf: "2026-11-01T14:00:00Z", Entries: 2,
+			Changes: index.Changes{PeopleJoined: []string{"Ann Lee"}, TeamsRemoved: []string{"Payments"}},
+		},
+	}, { // Test 1: After the first logged fold.
+		Since: start.Add(time.Hour).Unix(),
+		WantResult: changesView{
+			AsOf: "2026-11-01T14:00:00Z", Entries: 1,
+			Changes: index.Changes{TeamsRemoved: []string{"Payments"}},
+		},
+	}, { // Test 2: After the newest fold.
+		Since: start.Add(3 * time.Hour).Unix(),
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			raw, err := h.ChangesSince(test.Since)
+			if err != nil {
+				t.Fatalf("ChangesSince: %v", err)
+			}
+			var got changesView
+			if err := json.Unmarshal([]byte(raw), &got); err != nil {
+				t.Fatalf("unmarshal %s: %v", raw, err)
+			}
+			if diff := cmp.Diff(test.WantResult, got, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("changes mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}

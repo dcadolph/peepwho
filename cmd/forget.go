@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/dcadolph/peepwho/internal/engine"
 	"github.com/dcadolph/peepwho/internal/fact"
 	"github.com/dcadolph/peepwho/internal/model"
 	"github.com/dcadolph/peepwho/internal/util"
@@ -24,9 +25,10 @@ func newForgetCmd(opts *options) *cobra.Command {
 Their records are removed from the index under every identity they were known
 by, references to them are stripped from channel membership and org relations,
 their retained conversation notes are deleted, conversations they were alone in
-are forgotten entirely, and recorded facts naming any of their identities are
-removed. A conversation with other participants keeps its pointer and loses its
-searchable words, since theirs cannot be separated out.
+are forgotten entirely, recorded facts naming any of their identities are
+removed, and the change history stops naming them. A conversation with other
+participants keeps its pointer and loses its searchable words, since theirs
+cannot be separated out.
 
 Two caveats:
   - feedback.json holds questions people asked; prune it by deleting the file.
@@ -83,8 +85,10 @@ func runForgetPerson(cmd *cobra.Command, opts *options, query string, yes bool) 
 		return nil
 	}
 
-	// Collect the identity set before the purge rewrites the graph.
+	// Collect the identity set and the labels the change log may show before
+	// the purge rewrites the graph.
 	purgeIDs := append([]model.ID{person.ID}, person.Identities...)
+	labels := changeLabels(person, purgeIDs)
 
 	res := ix.Forget(person)
 	if err := opts.saveIndex(ix); err != nil {
@@ -108,10 +112,15 @@ func runForgetPerson(cmd *cobra.Command, opts *options, query string, yes bool) 
 		return err
 	}
 
+	changes, err := forgetChanges(opts, labels)
+	if err != nil {
+		return err
+	}
+
 	fmt.Fprintf(out,
 		"forgot %s: %d records removed, %d mentions stripped, "+
-			"%d conversations dropped, %d edited, %d facts removed\n",
-		label, res.Records, res.Mentions, dropped, edited, facts)
+			"%d conversations dropped, %d edited, %d facts removed, %d change entries edited\n",
+		label, res.Records, res.Mentions, dropped, edited, facts, changes)
 	return nil
 }
 
@@ -170,6 +179,35 @@ func forgetFacts(opts *options, purgeIDs []model.ID) (int, error) {
 	return store.ForgetMatching(func(f fact.Fact) bool {
 		return factRefNames(f.Subject, ids) || factRefNames(f.Object, ids)
 	})
+}
+
+// changeLabels returns every label the change log can show for the person:
+// the name, the email in its stored and normalized forms, and each identity.
+func changeLabels(p *model.Person, ids []model.ID) []string {
+	labels := []string{p.Name, p.Email, util.NormalizeEmail(p.Email)}
+	for _, id := range ids {
+		labels = append(labels, string(id))
+	}
+	return labels
+}
+
+// forgetChanges strips the person's labels from the change log, so the history
+// of who joined and left stops naming them, and returns how many entries it
+// edited or dropped.
+func forgetChanges(opts *options, labels []string) (int, error) {
+	st, err := opts.store()
+	if err != nil {
+		return 0, err
+	}
+	entries, err := st.LoadChanges()
+	if err != nil {
+		return 0, err
+	}
+	kept, edited := engine.ForgetChangeLabels(entries, labels)
+	if edited == 0 {
+		return 0, nil
+	}
+	return edited, st.SaveChanges(kept)
 }
 
 // factRefNames reports whether a fact reference names one of the purged

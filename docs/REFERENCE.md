@@ -170,6 +170,8 @@ your people graph. Encryption turns on whenever a key is configured, through
     peepwho vault decrypt    # rewrite the index back to plain JSON
 
 With a key set, every `peepwho index` write is encrypted and every read decrypts.
+`encrypt` and `decrypt` rewrite every store beside the index too: the
+conversations, facts, feedback, and the change log, and `status` reports each.
 Reading an encrypted index without the key fails rather than exposing anything. See
 [PRIVACY.md](PRIVACY.md) for the full model.
 
@@ -618,8 +620,8 @@ Purges one person from everything peepwho stores on this machine.
 Their records are removed under every identity they were known by, the alias
 entries joining those identities are deleted, references to them are stripped
 from channel membership and org relations, their retained conversation notes
-are deleted, and conversations where they were the only participant are
-forgotten. A conversation with other participants keeps its pointer and loses
+are deleted, conversations where they were the only participant are
+forgotten, and the change log stops naming them. A conversation with other participants keeps its pointer and loses
 its searchable words. `feedback.json` is not touched, and re-indexing a source
 that still contains the person brings them back.
 
@@ -630,7 +632,7 @@ that still contains the person brings them back.
 Delete everything peepwho stored on this machine: every file it writes under
 the data directory (the index and its sources sidecar, `index.state.json`,
 `episodes.json` with any archive, `feedback.json`, `facts.json`,
-`refresh.json`, `attest.key`, and their lock and temporary files) and every
+`changes.json`, `refresh.json`, `attest.key`, and their lock and temporary files) and every
 credential `peepwho connect` saved in the OS keychain. It lists what it will
 remove and asks you to type `wipe`; `--yes` skips the question for scripts.
 Anything else declines and leaves every file in place.
@@ -936,15 +938,22 @@ empty. The core never reads the environment or a keychain, and `make
 core-deps` fails the build when it links the command line or a keychain
 package.
 
-| Call                           | Returns                                                     |
-| ------------------------------ | ----------------------------------------------------------- |
-| `Open(dir, key)`               | A handle on the data directory, or an error naming the key. |
-| `Handle.SetSecrets(s)`         | Nothing. Sets where source tokens are read from.            |
-| `Handle.Ask(q, limit)`         | The `ask --json` answer, keyword ranking only.              |
-| `Handle.Search(q, limit)`      | The `search --json` results.                                |
-| `Handle.Person(id)`            | The full profile of one person, as JSON.                    |
-| `Handle.Recall(who, q, limit)` | The `recall --json` answer for one person.                  |
-| `Handle.Status(nowUnix)`       | Counts, seal state, and index age at the host's clock.      |
+`ChangesSince(sinceUnix)` merges the change log entries written after
+`sinceUnix` into `{"as_of", "entries", "changes"}`: the newest counted run's
+time, how many runs it merged, and the people, teams, and channels that joined
+or left, where a later run wins over an earlier one for the same name. Zero
+means the whole log. The app keeps its own last-look time.
+
+| Call                             | Returns                                                     |
+| -------------------------------- | ----------------------------------------------------------- |
+| `Open(dir, key)`                 | A handle on the data directory, or an error naming the key. |
+| `Handle.SetSecrets(s)`           | Nothing. Sets where source tokens are read from.            |
+| `Handle.Ask(q, limit)`           | The `ask --json` answer, keyword ranking only.              |
+| `Handle.Search(q, limit)`        | The `search --json` results.                                |
+| `Handle.Person(id)`              | The full profile of one person, as JSON.                    |
+| `Handle.Recall(who, q, limit)`   | The `recall --json` answer for one person.                  |
+| `Handle.Status(nowUnix)`         | Counts, seal state, and index age at the host's clock.      |
+| `Handle.ChangesSince(sinceUnix)` | Who and what joined or left after the host's last look.     |
 
 ## Files
 
@@ -954,6 +963,7 @@ Everything lives under `--data-dir` (default `~/.peepwho`):
 | --------------- | -------------------------------------------------------------------------------- |
 | `index.json`    | The graph, postings, embeddings, aliases, and a capped Slack text sample per person. |
 | `feedback.json` | Votes and the queries behind them, kept apart so they survive re-indexing. Encrypted with the same key as the index. |
+| `changes.json`  | Who and what joined or left in each of the last 100 index runs that changed anything, stamped with the run's time. A first index logs nothing. Encrypted with the same key as the index. |
 | `episodes.json` | Past conversations: who took part, where, when, the link back, and matched terms. Written by `peepwho index --episodes`, and by `peepwho connect`, which records conversations as a matter of course. Holds the words themselves only after an `--archive` index. Encrypted with the same key as the index. |
 | `index.sources.json` | The per-source records the index was built from, redacted to stemmed terms, so a `--merge` rebuilds without re-reading every source. Encrypted with the same key as the index. |
 | `index.state.json` | Per-source incremental watermarks: the newest activity time indexed for each source and scope, so a `--merge` fetches only what changed. Plain JSON of timestamps and scope names. |

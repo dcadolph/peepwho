@@ -2,12 +2,16 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/dcadolph/peepwho/internal/engine"
 	"github.com/dcadolph/peepwho/internal/episode"
 	"github.com/dcadolph/peepwho/internal/keyring"
 	"github.com/dcadolph/peepwho/internal/model"
@@ -277,6 +281,70 @@ func TestVaultCoversFactsAndFeedback(t *testing.T) {
 	}
 	if raw, _ := os.ReadFile(fbPath); vault.IsEncrypted(raw) {
 		t.Error("feedback still sealed after vault decrypt")
+	}
+}
+
+// TestVaultCoversChangeLog verifies encrypt seals the change log, status
+// lists it, and decrypt opens it so a later index with no key still appends.
+func TestVaultCoversChangeLog(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv(keyring.EnvKey, "")
+	t.Setenv(keyring.EnvPassphrase, "")
+	csv := writeOrgCSV(t, dir)
+	indexCSV := func(rows string) error {
+		if err := os.WriteFile(csv, []byte("name,email,title,team,topics\n"+rows), 0o600); err != nil {
+			t.Fatalf("write csv: %v", err)
+		}
+		_, stderr, err := runCmd(t, "index", "--data-dir", dir, "--source", "org-csv", "--file", csv)
+		if err != nil {
+			return fmt.Errorf("%w: %s", err, stderr)
+		}
+		return nil
+	}
+	if err := indexCSV("Jane Roe,jane@x.com,Eng,Billing,retries\n"); err != nil {
+		t.Fatalf("first index: %v", err)
+	}
+	if err := indexCSV("Jane Roe,jane@x.com,Eng,Billing,retries\nAl Poe,al@x.com,Eng,Billing,ledger\n"); err != nil {
+		t.Fatalf("second index: %v", err)
+	}
+	logPath := filepath.Join(dir, "changes.json")
+	if raw, err := os.ReadFile(logPath); err != nil || !bytes.Contains(raw, []byte("Al Poe")) {
+		t.Fatalf("change log missing the joiner before encrypt (err %v): %s", err, raw)
+	}
+
+	key, _ := keyring.GenerateKey()
+	t.Setenv(keyring.EnvKey, key)
+	if _, _, err := runCmd(t, "vault", "encrypt", "--data-dir", dir); err != nil {
+		t.Fatalf("encrypt: %v", err)
+	}
+	if raw, _ := os.ReadFile(logPath); !vault.IsEncrypted(raw) || bytes.Contains(raw, []byte("Al Poe")) {
+		t.Error("change log not sealed after vault encrypt")
+	}
+	out, _, err := runCmd(t, "vault", "status", "--data-dir", dir)
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	if !regexp.MustCompile(`(?m)^changes:\s+encrypted`).Match(out) {
+		t.Errorf("status does not call the change log encrypted:\n%s", out)
+	}
+
+	if _, _, err := runCmd(t, "vault", "decrypt", "--data-dir", dir); err != nil {
+		t.Fatalf("decrypt: %v", err)
+	}
+	t.Setenv(keyring.EnvKey, "")
+	if err := indexCSV("Jane Roe,jane@x.com,Eng,Billing,retries\n"); err != nil {
+		t.Fatalf("index with no key after decrypt: %v", err)
+	}
+	raw, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read change log: %v", err)
+	}
+	var entries []engine.ChangeEntry
+	if err := json.Unmarshal(raw, &entries); err != nil {
+		t.Fatalf("change log not plain JSON after decrypt: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Errorf("change log holds %d entries, want 2: %s", len(entries), raw)
 	}
 }
 

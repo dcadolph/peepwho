@@ -53,6 +53,44 @@ func (c Changes) Summary() string {
 	return strings.Join(parts, ", ")
 }
 
+// Merge folds later, a set of changes made after c, into c. Each list becomes
+// the sorted union of both, except that a name later reports on one side of a
+// pair is taken off the other side, so someone who left and came back reads
+// as joined and someone who joined and then left reads as left. Merge entries
+// oldest first to get the net of a run of folds.
+func (c Changes) Merge(later Changes) Changes {
+	return Changes{
+		PeopleJoined:    mergeSide(c.PeopleJoined, later.PeopleJoined, later.PeopleLeft),
+		PeopleLeft:      mergeSide(c.PeopleLeft, later.PeopleLeft, later.PeopleJoined),
+		TeamsAdded:      mergeSide(c.TeamsAdded, later.TeamsAdded, later.TeamsRemoved),
+		TeamsRemoved:    mergeSide(c.TeamsRemoved, later.TeamsRemoved, later.TeamsAdded),
+		ChannelsAdded:   mergeSide(c.ChannelsAdded, later.ChannelsAdded, later.ChannelsRemoved),
+		ChannelsRemoved: mergeSide(c.ChannelsRemoved, later.ChannelsRemoved, later.ChannelsAdded),
+	}
+}
+
+// mergeSide returns the sorted union of earlier and later without any name in
+// opposite, the later change on the other side of the pair.
+func mergeSide(earlier, later, opposite []string) []string {
+	drop := make(map[string]bool, len(opposite))
+	for _, s := range opposite {
+		drop[s] = true
+	}
+	seen := make(map[string]bool, len(earlier)+len(later))
+	var out []string
+	for _, list := range [][]string{earlier, later} {
+		for _, s := range list {
+			if drop[s] || seen[s] {
+				continue
+			}
+			seen[s] = true
+			out = append(out, s)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
 // Diff reports what changed from the prev graph to the cur graph.
 func Diff(prev, cur *model.Graph) Changes {
 	if prev == nil {

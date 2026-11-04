@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/dcadolph/peepwho/internal/fact"
 	"github.com/dcadolph/peepwho/internal/feedback"
@@ -46,7 +47,7 @@ func testKeyCipher(t *testing.T) vault.Codec {
 func TestDirPaths(t *testing.T) {
 	t.Parallel()
 	d := Dir(filepath.Join("data", "dir"))
-	got := []string{d.Index(), d.Feedback(), d.Facts(), d.Refresh(), d.Episodes(), d.State()}
+	got := []string{d.Index(), d.Feedback(), d.Facts(), d.Refresh(), d.Episodes(), d.State(), d.Changes()}
 	want := []string{
 		filepath.Join("data", "dir", "index.json"),
 		filepath.Join("data", "dir", "feedback.json"),
@@ -54,6 +55,7 @@ func TestDirPaths(t *testing.T) {
 		filepath.Join("data", "dir", "refresh.json"),
 		filepath.Join("data", "dir", "episodes.json"),
 		filepath.Join("data", "dir", "index.state.json"),
+		filepath.Join("data", "dir", "changes.json"),
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("paths mismatch (-want +got):\n%s", diff)
@@ -275,6 +277,105 @@ func TestNeedsKey(t *testing.T) {
 			t.Parallel()
 			if got := NeedsKey(test.Path); got != test.Want {
 				t.Errorf("NeedsKey(%s) = %t, want %t", filepath.Base(test.Path), got, test.Want)
+			}
+		})
+	}
+}
+
+// TestStoreChangesCapAndRewrite verifies a save keeps the newest
+// MaxChangeEntries entries, and a rewrite seals and then opens the log in place.
+func TestStoreChangesCapAndRewrite(t *testing.T) {
+	t.Parallel()
+	start := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	entries := make([]ChangeEntry, MaxChangeEntries+1)
+	for i := range entries {
+		entries[i] = ChangeEntry{
+			At:      start.Add(time.Duration(i) * time.Minute),
+			Changes: index.Changes{PeopleJoined: []string{fmt.Sprintf("p%03d", i)}},
+		}
+	}
+	dir := Dir(t.TempDir())
+	plain := NewStore(dir, nil)
+	if err := plain.SaveChanges(entries); err != nil {
+		t.Fatalf("SaveChanges: %v", err)
+	}
+	got, err := plain.LoadChanges()
+	if err != nil {
+		t.Fatalf("LoadChanges: %v", err)
+	}
+	if diff := cmp.Diff(entries[1:], got); diff != "" {
+		t.Errorf("capped log mismatch (-want +got):\n%s", diff)
+	}
+
+	key := testKeyCipher(t)
+	if err := plain.RewriteChanges(key); err != nil {
+		t.Fatalf("RewriteChanges sealed: %v", err)
+	}
+	if _, err := plain.LoadChanges(); !errors.Is(err, vault.ErrEncrypted) {
+		t.Errorf("plain load of a sealed log = %v, want %v", err, vault.ErrEncrypted)
+	}
+	sealed := NewStore(dir, key)
+	if err := sealed.RewriteChanges(nil); err != nil {
+		t.Fatalf("RewriteChanges plain: %v", err)
+	}
+	got, err = plain.LoadChanges()
+	if err != nil {
+		t.Fatalf("LoadChanges after opening: %v", err)
+	}
+	if diff := cmp.Diff(entries[1:], got); diff != "" {
+		t.Errorf("reopened log mismatch (-want +got):\n%s", diff)
+	}
+
+	missing := NewStore(Dir(t.TempDir()), nil)
+	if err := missing.RewriteChanges(key); err != nil {
+		t.Fatalf("RewriteChanges with no log: %v", err)
+	}
+	if _, err := os.Stat(missing.Dir().Changes()); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("a rewrite with no log created one: %v", err)
+	}
+}
+
+// TestForgetChangeLabels verifies matching labels leave the joined and left
+// lists, entries left empty are dropped, and every edited entry is counted.
+func TestForgetChangeLabels(t *testing.T) {
+	t.Parallel()
+	at := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	tests := []struct {
+		In         []ChangeEntry
+		Labels     []string
+		WantResult []ChangeEntry
+		WantCount  int
+	}{{ // Test 0: Name and email match after case folding and trimming.
+		In: []ChangeEntry{
+			{At: at, Changes: index.Changes{PeopleJoined: []string{"Bob Okafor", "Zed"}}},
+			{At: at, Changes: index.Changes{PeopleLeft: []string{"BOB@corp.com"}, TeamsAdded: []string{"pay"}}},
+		},
+		Labels: []string{" bob okafor ", "bob@corp.com"},
+		WantResult: []ChangeEntry{
+			{At: at, Changes: index.Changes{PeopleJoined: []string{"Zed"}}},
+			{At: at, Changes: index.Changes{TeamsAdded: []string{"pay"}}},
+		},
+		WantCount: 2,
+	}, { // Test 1: An entry naming only the person is dropped.
+		In:        []ChangeEntry{{At: at, Changes: index.Changes{PeopleJoined: []string{"Bob Okafor"}}}},
+		Labels:    []string{"Bob Okafor"},
+		WantCount: 1,
+	}, { // Test 2: A label that only contains the name is kept.
+		In:         []ChangeEntry{{At: at, Changes: index.Changes{PeopleJoined: []string{"Bob Okafor Jr"}}}},
+		Labels:     []string{"Bob Okafor", ""},
+		WantResult: []ChangeEntry{{At: at, Changes: index.Changes{PeopleJoined: []string{"Bob Okafor Jr"}}}},
+	}, { // Test 3: Empty log.
+		Labels: []string{"Bob Okafor"},
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			got, count := ForgetChangeLabels(test.In, test.Labels)
+			if diff := cmp.Diff(test.WantResult, got, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("entries mismatch (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(test.WantCount, count); diff != "" {
+				t.Errorf("count mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}

@@ -24,6 +24,7 @@ import (
 
 	"github.com/dcadolph/peepwho/internal/engine"
 	"github.com/dcadolph/peepwho/internal/episode"
+	"github.com/dcadolph/peepwho/internal/index"
 	"github.com/dcadolph/peepwho/internal/policy"
 	"github.com/dcadolph/peepwho/internal/recall"
 	"github.com/dcadolph/peepwho/internal/vault"
@@ -43,6 +44,8 @@ type Handle struct {
 	episodes *episode.Store
 	// sealed reports whether the index was opened with a key.
 	sealed bool
+	// store reads the files beside the index, such as the change log.
+	store *engine.Store
 	// secrets supplies source tokens by name. Nil reads every name as empty.
 	secrets Secrets
 }
@@ -102,7 +105,7 @@ func Open(dir, key string) (*Handle, error) {
 	if err != nil {
 		return nil, openError(st.Dir().Episodes(), codec, err)
 	}
-	return &Handle{eng: eng, episodes: eps, sealed: codec != nil}, nil
+	return &Handle{eng: eng, episodes: eps, sealed: codec != nil, store: st}, nil
 }
 
 // keyCodec builds the raw-key codec for key, or nil when key is empty.
@@ -146,7 +149,7 @@ var errNotOpen = errors.New("core: handle is not open: get one from Open")
 // ready reports whether the handle came from Open. gomobile exposes a bare
 // initializer for every struct, so a Swift caller can hold an empty handle.
 func (h *Handle) ready() error {
-	if h == nil || h.eng == nil || h.episodes == nil {
+	if h == nil || h.eng == nil || h.episodes == nil || h.store == nil {
 		return errNotOpen
 	}
 	return nil
@@ -272,6 +275,39 @@ func (h *Handle) Status(nowUnix int64) (string, error) {
 	if !st.BuiltAt.IsZero() {
 		v.BuiltAt = st.BuiltAt.UTC().Format(time.RFC3339)
 		v.AgeSeconds = int64(st.Age / time.Second)
+	}
+	return toJSON(v)
+}
+
+// changesView is the JSON shape ChangesSince returns.
+type changesView struct {
+	// AsOf is when the newest counted fold ran, RFC 3339, empty when none.
+	AsOf string `json:"as_of,omitempty"`
+	// Entries is how many logged folds the answer merges.
+	Entries int `json:"entries"`
+	// Changes is the net of those folds: who and what joined or left.
+	Changes index.Changes `json:"changes"`
+}
+
+// ChangesSince reports what changed in the index after sinceUnix, seconds since
+// the Unix epoch, merged into one set of changes. Zero means everything the
+// log holds. The host keeps its own last-look time and passes it in.
+func (h *Handle) ChangesSince(sinceUnix int64) (string, error) {
+	if err := h.ready(); err != nil {
+		return "", err
+	}
+	entries, err := h.store.LoadChanges()
+	if err != nil {
+		return "", fmt.Errorf("core: changes: %w", err)
+	}
+	var v changesView
+	for _, e := range entries {
+		if e.At.Unix() <= sinceUnix {
+			continue
+		}
+		v.Changes = v.Changes.Merge(e.Changes)
+		v.Entries++
+		v.AsOf = e.At.UTC().Format(time.RFC3339)
 	}
 	return toJSON(v)
 }

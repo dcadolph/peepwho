@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dcadolph/peepwho/internal/keyring"
+	"github.com/dcadolph/peepwho/internal/util"
 	"github.com/dcadolph/peepwho/internal/vault"
 )
 
@@ -103,6 +104,7 @@ func vaultStores(opts *options) []vaultStore {
 		{label: "conversations", path: opts.episodePath(), absent: "none kept yet"},
 		{label: "facts", path: opts.factsPath(), absent: "none recorded yet"},
 		{label: "feedback", path: opts.feedbackPath(), absent: "none recorded yet"},
+		{label: "changes", path: opts.changesPath(), absent: "none logged yet"},
 	}
 }
 
@@ -155,7 +157,10 @@ func newVaultEncryptCmd(opts *options) *cobra.Command {
 			if err := rewriteFacts(opts, w, c, "facts are already encrypted"); err != nil {
 				return err
 			}
-			return rewriteFeedback(opts, w, c, "feedback is already encrypted")
+			if err := rewriteFeedback(opts, w, c, "feedback is already encrypted"); err != nil {
+				return err
+			}
+			return rewriteChanges(opts, w, c, "change log is already encrypted")
 		},
 	}
 }
@@ -199,7 +204,10 @@ func newVaultDecryptCmd(opts *options) *cobra.Command {
 			if err := rewriteFacts(opts, w, nil, "facts are already plain JSON"); err != nil {
 				return err
 			}
-			return rewriteFeedback(opts, w, nil, "feedback is already plain JSON")
+			if err := rewriteFeedback(opts, w, nil, "feedback is already plain JSON"); err != nil {
+				return err
+			}
+			return rewriteChanges(opts, w, nil, "change log is already plain JSON")
 		},
 	}
 }
@@ -257,6 +265,40 @@ func rewriteFeedback(opts *options, w io.Writer, codec vault.Codec, already stri
 		return err
 	}
 	fmt.Fprintf(w, "%s %s\n", rewriteVerb(codec), opts.feedbackPath())
+	return nil
+}
+
+// rewriteChanges re-persists an existing change log under codec, exactly as
+// rewriteFeedback does for votes. The log names everyone who joined or left,
+// so an encrypt that skipped it would leave those names in plaintext, and a
+// decrypt that skipped it would strand it sealed and fail the next index.
+func rewriteChanges(opts *options, w io.Writer, codec vault.Codec, already string) error {
+	enc, err := isEncryptedOnDisk(opts.changesPath())
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if enc == (codec != nil) {
+		fmt.Fprintln(w, already)
+		return nil
+	}
+	// The same lock every index write takes, so a scheduled refresh cannot
+	// append to the log between this read and write.
+	unlock, err := util.LockFile(opts.indexPath() + util.LockSuffix)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	st, err := opts.store()
+	if err != nil {
+		return err
+	}
+	if err := st.RewriteChanges(codec); err != nil {
+		return err
+	}
+	fmt.Fprintf(w, "%s %s\n", rewriteVerb(codec), opts.changesPath())
 	return nil
 }
 

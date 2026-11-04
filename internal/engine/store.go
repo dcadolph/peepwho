@@ -51,6 +51,10 @@ func (d Dir) State() string { return filepath.Join(string(d), "index.state.json"
 // Sources returns the path of the per-source records the index was built from.
 func (d Dir) Sources() string { return index.SourcesPath(d.Index()) }
 
+// Changes returns the change log path: what each fold added and removed, kept
+// so an app can say what changed since the user last looked.
+func (d Dir) Changes() string { return filepath.Join(string(d), "changes.json") }
+
 // AttestKey returns the path of the seed every sealed finding is signed with.
 func (d Dir) AttestKey() string { return filepath.Join(string(d), "attest.key") }
 
@@ -58,7 +62,7 @@ func (d Dir) AttestKey() string { return filepath.Join(string(d), "attest.key") 
 func (d Dir) Files() []string {
 	return []string{
 		d.Index(), d.Sources(), d.State(), d.Episodes(), d.Feedback(), d.Facts(),
-		d.Refresh(), d.AttestKey(),
+		d.Changes(), d.Refresh(), d.AttestKey(),
 	}
 }
 
@@ -136,6 +140,32 @@ func (s *Store) LoadFeedback() (*feedback.Store, error) {
 // off a stolen disk, so the two are never split.
 func (s *Store) LoadFacts() (*fact.Store, error) {
 	return fact.Load(s.dir.Facts(), fact.WithCodec(s.codec))
+}
+
+// LoadChanges reads the change log, oldest entry first. A missing file is an
+// empty log. It is sealed with the same codec as the index, since it names
+// everyone who joined or left.
+func (s *Store) LoadChanges() ([]ChangeEntry, error) {
+	return readChanges(s.dir.Changes(), s.codec)
+}
+
+// SaveChanges writes the change log, keeping the newest MaxChangeEntries.
+func (s *Store) SaveChanges(entries []ChangeEntry) error {
+	return writeChanges(s.dir.Changes(), entries, s.codec)
+}
+
+// RewriteChanges re-persists an existing change log under c, reading it with
+// the store's codec, so a vault encrypt seals it and a decrypt opens it. A
+// missing log is left missing.
+func (s *Store) RewriteChanges(c vault.Codec) error {
+	if _, err := os.Stat(s.dir.Changes()); errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	entries, err := s.LoadChanges()
+	if err != nil {
+		return err
+	}
+	return writeChanges(s.dir.Changes(), entries, c)
 }
 
 // LoadState reads the incremental watermark state, returning an empty state

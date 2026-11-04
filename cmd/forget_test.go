@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dcadolph/peepwho/internal/engine"
 	"github.com/dcadolph/peepwho/internal/resolve"
 )
 
@@ -17,10 +18,28 @@ func TestForgetPurgesPerson(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 
+	// A first index of someone else, so the Slack fold below is a change the
+	// change log records with bob among the people who joined.
+	csv := filepath.Join(t.TempDir(), "people.csv")
+	rows := "name,email,title,team,topics\nZed Example,zed@corp.com,Eng,Core,billing\n"
+	if err := os.WriteFile(csv, []byte(rows), 0o600); err != nil {
+		t.Fatalf("write csv: %v", err)
+	}
 	if _, stderr, err := runCmd(t, "index", "--data-dir", dir,
-		"--source", "slack-export", "--file", exportZip,
+		"--source", "org-csv", "--file", csv); err != nil {
+		t.Fatalf("index csv: %v\n%s", err, stderr)
+	}
+	if _, stderr, err := runCmd(t, "index", "--data-dir", dir,
+		"--source", "slack-export", "--file", exportZip, "--merge",
 		"--episodes", "--since-days", "36500"); err != nil {
 		t.Fatalf("index: %v\n%s", err, stderr)
+	}
+	logged, err := os.ReadFile(filepath.Join(dir, "changes.json"))
+	if err != nil {
+		t.Fatalf("read change log: %v", err)
+	}
+	if !strings.Contains(string(logged), "Bob Okafor") {
+		t.Fatalf("change log does not name bob before the purge:\n%s", logged)
 	}
 
 	// A recorded fact naming bob, which survives re-indexing by design and so
@@ -70,6 +89,19 @@ func TestForgetPurgesPerson(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("walk: %v", err)
+	}
+
+	// The change log still parses and still names the people who remain.
+	var entries []engine.ChangeEntry
+	logged, err = os.ReadFile(filepath.Join(dir, "changes.json"))
+	if err != nil {
+		t.Fatalf("read change log after forget: %v", err)
+	}
+	if err := json.Unmarshal(logged, &entries); err != nil {
+		t.Fatalf("change log after forget does not parse: %v\n%s", err, logged)
+	}
+	if len(entries) != 1 || len(entries[0].Changes.PeopleJoined) == 0 {
+		t.Errorf("change log lost the people who remain:\n%s", logged)
 	}
 
 	// Gone from answers, while alice still stands.

@@ -302,11 +302,25 @@ func (x *Indexer) Fold(ctx context.Context, recs []connector.Record, p FoldParam
 	}
 
 	changes := index.Diff(prev, ix.Graph)
+	// Read the change log before anything is written, so a log the codec
+	// cannot open fails the fold instead of leaving a saved index behind an
+	// error.
+	history, err := x.loadChanges()
+	if err != nil {
+		return err
+	}
 	if err := x.saveIndex(ix); err != nil {
 		return err
 	}
 	if err := x.saveEpisodes(ctx, ix, p); err != nil {
 		return err
+	}
+	// A first build diffs against nothing, so everyone would read as joined.
+	// That is no change anyone looks for, so only a fold over an index logs.
+	if prev != nil && !changes.Empty() {
+		if err := x.saveChanges(append(history, ChangeEntry{At: x.now().UTC(), Changes: changes})); err != nil {
+			return err
+		}
 	}
 	x.reportFold(ix, changes)
 	if p.ChangesFile != "" {
@@ -593,6 +607,24 @@ func (x *Indexer) saveIndex(ix *index.Index) error {
 		return err
 	}
 	return st.SaveIndex(ix)
+}
+
+// loadChanges reads the change log under the current codec.
+func (x *Indexer) loadChanges() ([]ChangeEntry, error) {
+	st, err := x.store()
+	if err != nil {
+		return nil, err
+	}
+	return st.LoadChanges()
+}
+
+// saveChanges writes the change log under the current codec.
+func (x *Indexer) saveChanges(entries []ChangeEntry) error {
+	st, err := x.store()
+	if err != nil {
+		return err
+	}
+	return st.SaveChanges(entries)
 }
 
 // loadEpisodes reads the episode store, calling Unlock when it is sealed under

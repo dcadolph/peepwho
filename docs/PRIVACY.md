@@ -21,6 +21,11 @@ guarantees in one place.
   with whom is information the index alone does not hold, so this is a real
   addition: index without `--episodes` and none of it is written. `peepwho archive
   prune` deletes what is already there.
+- What changed between index runs lives at `~/.peepwho/changes.json`, same
+  permissions: the names of people, teams, and channels that joined or left in
+  each of the last 100 runs that changed anything. A first index logs nothing,
+  since everyone would read as joined. It is encrypted with the same key as the
+  index.
 - The words of a conversation are kept only when you pass `--archive` (see
   [the archive](#the-archive) below). Without it, peepwho stores a pointer and
   nothing more.
@@ -65,9 +70,9 @@ key. It is off unless you ask for it:
 `peepwho forget <email or name>` removes one person from everything peepwho
 stores: their records under every identity they were known by, the alias
 entries joining those identities, their entries in channel member lists, their
-retained conversation notes, and any conversation where they were the only
-participant. A conversation with other participants keeps its pointer and
-loses its searchable words.
+retained conversation notes, any conversation where they were the only
+participant, and their name and email in the change history. A conversation
+with other participants keeps its pointer and loses its searchable words.
 
 Two caveats it prints and that bear repeating: `feedback.json` holds questions
 askers typed and is pruned by deleting the file, and re-indexing a source that
@@ -113,7 +118,7 @@ Three things to know:
 - The key is the only way back in. Losing it makes an encrypted index unrecoverable,
   so store it as carefully as any other secret and keep a backup.
 - The vault covers the index, its per-source sidecar, the conversations,
-  `feedback.json` (your queries and votes), and `facts.json`. Only
+  `feedback.json` (your queries and votes), `facts.json`, and `changes.json`. Only
   `index.state.json` stays plain JSON, by design: it holds per-source re-index
   timestamps and scope names, nothing about people.
 

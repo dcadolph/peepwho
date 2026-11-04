@@ -106,7 +106,7 @@ func dirEntries(t *testing.T, dir string) []string {
 func TestWipe(t *testing.T) {
 	t.Parallel()
 	all := []string{
-		"attest.key", "episodes.json", "facts.json", "feedback.json", "index.json",
+		"attest.key", "changes.json", "episodes.json", "facts.json", "feedback.json", "index.json",
 		"index.json.lock", "index.json.tmp-123", "index.sources.json", "index.state.json",
 		"refresh.json",
 	}
@@ -120,10 +120,10 @@ func TestWipe(t *testing.T) {
 		WantOut     string
 	}{{ // Test 0: Typing the word wipes files, credentials, and the empty directory.
 		Stdin: "wipe\n", WantFiles: nil, WantKeys: []string{"UNRELATED"}, WantDirGone: true,
-		WantOut: "wiped 10 files and 2 stored credentials",
+		WantOut: "wiped 11 files and 2 stored credentials",
 	}, { // Test 1: --yes wipes without reading input.
 		Args: []string{"--yes"}, WantFiles: nil, WantKeys: []string{"UNRELATED"}, WantDirGone: true,
-		WantOut: "wiped 10 files and 2 stored credentials",
+		WantOut: "wiped 11 files and 2 stored credentials",
 	}, { // Test 2: A y answer is not the word and declines.
 		Stdin: "y\n", WantFiles: all, WantKeys: []string{"GITHUB", "SLACK", "UNRELATED"},
 		WantOut: "left everything as it was",
@@ -132,7 +132,7 @@ func TestWipe(t *testing.T) {
 		WantOut: "left everything as it was",
 	}, { // Test 4: A file peepwho did not write survives, and so does its directory.
 		Args: []string{"--yes"}, Foreign: true, WantFiles: []string{"notes.txt"},
-		WantKeys: []string{"UNRELATED"}, WantOut: "wiped 10 files",
+		WantKeys: []string{"UNRELATED"}, WantOut: "wiped 11 files",
 	}}
 	for testNum, test := range tests {
 		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {

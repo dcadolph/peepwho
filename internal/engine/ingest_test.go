@@ -3,6 +3,7 @@ package engine
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -12,8 +13,10 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/dcadolph/peepwho/internal/connector"
+	"github.com/dcadolph/peepwho/internal/index"
 	"github.com/dcadolph/peepwho/internal/policy"
 	"github.com/dcadolph/peepwho/internal/vault"
 )
@@ -190,4 +193,91 @@ func testKeyCodec(t *testing.T) vault.Codec {
 		t.Fatalf("cipher: %v", err)
 	}
 	return c
+}
+
+// changeRosters are org charts indexed in turn: a first build, a person and a
+// team joining, the team going, and a rerun that changes nothing.
+var changeRosters = []string{ //nolint:gochecknoglobals // Not modified, simplifies testing.
+	"Jane Doe,jane@x.com,Engineer,Billing,retries\nRaj Patel,raj@x.com,Engineer,Billing,invoices\n",
+	"Jane Doe,jane@x.com,Engineer,Billing,retries\nRaj Patel,raj@x.com,Engineer,Billing,invoices\n" +
+		"Ann Lee,ann@x.com,Engineer,Payments,ledger\n",
+	"Jane Doe,jane@x.com,Engineer,Billing,retries\nRaj Patel,raj@x.com,Engineer,Billing,invoices\n" +
+		"Ann Lee,ann@x.com,Engineer,Billing,ledger\n",
+	"Jane Doe,jane@x.com,Engineer,Billing,retries\nRaj Patel,raj@x.com,Engineer,Billing,invoices\n" +
+		"Ann Lee,ann@x.com,Engineer,Billing,ledger\n",
+}
+
+// indexRoster indexes one roster from the org CSV source into dir under codec
+// with the indexer clock pinned to at.
+func indexRoster(t *testing.T, dir string, codec vault.Codec, roster string, at time.Time) {
+	t.Helper()
+	csv := filepath.Join(t.TempDir(), "people.csv")
+	if err := os.WriteFile(csv, []byte("name,email,title,team,topics\n"+roster), 0o600); err != nil {
+		t.Fatalf("write csv: %v", err)
+	}
+	x := &Indexer{
+		Dir: Dir(dir), Codec: func() (vault.Codec, error) { return codec, nil },
+		Now: func() time.Time { return at },
+	}
+	if err := x.Index(context.Background(), IndexRequest{Source: "org-csv", IndexArgs: IndexArgs{File: csv}}); err != nil {
+		t.Fatalf("index: %v", err)
+	}
+}
+
+// TestFoldLogsChanges verifies a first build logs nothing, each later fold
+// that changes the graph appends one entry stamped with the indexer clock, a
+// fold that changes nothing appends none, and a sealed store seals the log.
+func TestFoldLogsChanges(t *testing.T) {
+	t.Parallel()
+	start := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	tests := []struct {
+		Codec       vault.Codec
+		WantEntries []ChangeEntry
+	}{{ // Test 0: Plain store.
+		WantEntries: []ChangeEntry{{
+			At:      start.Add(time.Hour),
+			Changes: index.Changes{PeopleJoined: []string{"Ann Lee"}, TeamsAdded: []string{"Payments"}},
+		}, {
+			At:      start.Add(2 * time.Hour),
+			Changes: index.Changes{TeamsRemoved: []string{"Payments"}},
+		}},
+	}, { // Test 1: Sealed store.
+		Codec: testKeyCodec(t),
+		WantEntries: []ChangeEntry{{
+			At:      start.Add(time.Hour),
+			Changes: index.Changes{PeopleJoined: []string{"Ann Lee"}, TeamsAdded: []string{"Payments"}},
+		}, {
+			At:      start.Add(2 * time.Hour),
+			Changes: index.Changes{TeamsRemoved: []string{"Payments"}},
+		}},
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			indexRoster(t, dir, test.Codec, changeRosters[0], start)
+			if _, err := os.Stat(Dir(dir).Changes()); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("a first build wrote a change log: %v", err)
+			}
+			for i, roster := range changeRosters[1:] {
+				indexRoster(t, dir, test.Codec, roster, start.Add(time.Duration(i+1)*time.Hour))
+			}
+			raw, err := os.ReadFile(Dir(dir).Changes())
+			if err != nil {
+				t.Fatalf("read change log: %v", err)
+			}
+			var plain []ChangeEntry
+			parseErr := json.Unmarshal(raw, &plain)
+			if sealed := test.Codec != nil; sealed == (parseErr == nil) {
+				t.Errorf("sealed %v but the file parses as JSON: %v", sealed, parseErr == nil)
+			}
+			got, err := NewStore(Dir(dir), test.Codec).LoadChanges()
+			if err != nil {
+				t.Fatalf("LoadChanges: %v", err)
+			}
+			if diff := cmp.Diff(test.WantEntries, got, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("change log mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
 }
