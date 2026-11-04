@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -8,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dcadolph/peepwho/internal/engine"
+	"github.com/dcadolph/peepwho/internal/policy"
 )
 
 func TestCaptureIndexFlags(t *testing.T) {
@@ -73,5 +76,43 @@ func TestSaveInvocationKeepsEveryScope(t *testing.T) {
 		"repo:/src/b": {"--repo-path", "/src/b"},
 	}}, out); diff != "" {
 		t.Errorf("scopes lost (-want +got):\n%s", diff)
+	}
+}
+
+// TestRecordedPolicy verifies a refreshed scope runs under the --policy it was
+// recorded with, or the flag's default when none was, and never under the
+// --policy the refresh itself was given.
+func TestRecordedPolicy(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		Recorded string
+		WantMode policy.Mode
+		WantErr  bool
+	}{{ // Test 0: Nothing recorded runs under the default mode.
+		Recorded: "", WantMode: policy.Strict,
+	}, { // Test 1: A recorded mode is used.
+		Recorded: "open", WantMode: policy.Open,
+	}, { // Test 2: A recorded mode that no longer parses fails the scope.
+		Recorded: "loose", WantErr: true,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			root := &cobra.Command{Use: "peepwho"}
+			root.PersistentFlags().String("policy", "strict", "")
+			sub := &cobra.Command{Use: "refresh"}
+			root.AddCommand(sub)
+			o := &options{policyName: "redacted", systemPolicyFile: filepath.Join(t.TempDir(), "absent.json")}
+			got, err := o.recordedPolicy(sub)(test.Recorded)
+			if (err != nil) != test.WantErr {
+				t.Fatalf("recordedPolicy(%q) error = %v, want error %t", test.Recorded, err, test.WantErr)
+			}
+			if err == nil && got.Mode() != test.WantMode {
+				t.Errorf("mode = %v, want %v", got.Mode(), test.WantMode)
+			}
+			if o.policyName != "redacted" {
+				t.Errorf("refresh's own policy changed to %q", o.policyName)
+			}
+		})
 	}
 }

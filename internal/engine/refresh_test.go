@@ -1,12 +1,24 @@
 package engine
 
 import (
+	"bytes"
+	"context"
+	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"net/http/httputil"
+	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/dcadolph/peepwho/internal/fakeapi"
+	"github.com/dcadolph/peepwho/internal/policy"
 )
 
 // TestInvocationsRoundTrip verifies the refresh config saves and loads, and a
@@ -82,5 +94,160 @@ func TestRefreshScope(t *testing.T) {
 				t.Errorf("mismatch (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+// authJira serves a fake Jira Server site that answers only the bearer token
+// good, so a refresh can be run with a right and a wrong token.
+func authJira(t *testing.T) string {
+	t.Helper()
+	fake := &fakeapi.Jira{ServerMode: true, Issues: []fakeapi.JiraIssue{{
+		Key: "KAFKA-1", Summary: "consumer group rebalance", Description: "session timeout",
+		AssigneeEmail: "amaki@apache.invalid", ProjectKey: "KAFKA", ProjectName: "Kafka",
+		Updated: "2026-06-20T09:30:00.000+0000",
+	}}}
+	inner := fake.Server()
+	t.Cleanup(inner.Close)
+	target, err := url.Parse(inner.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxy := httputil.NewSingleHostReverseProxy(target)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer good" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		proxy.ServeHTTP(w, r)
+	}))
+	t.Cleanup(srv.Close)
+	return srv.URL
+}
+
+// TestRefresh replays recorded scopes in process and reports each one, so a
+// wrong token fails its own scope, by name, and leaves the others indexed.
+func TestRefresh(t *testing.T) {
+	t.Parallel()
+	people, err := filepath.Abs("../../examples/people.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	tests := []struct {
+		Sources      []string
+		WantResults  []string
+		WantPolicies []string
+		WantAuth     bool
+		WantErr      string
+		Token        string
+	}{{ // Test 0: The right token indexes both sources, in name order.
+		Token:        "good",
+		WantResults:  []string{"jira project:KAFKA ok", "org-csv file:" + people + " ok"},
+		WantPolicies: []string{"open", ""},
+	}, { // Test 1: A wrong token fails jira alone and names the run count.
+		Token:        "wrong",
+		WantResults:  []string{"jira project:KAFKA failed", "org-csv file:" + people + " ok"},
+		WantPolicies: []string{"open", ""},
+		WantAuth:     true,
+		WantErr:      "refresh: 1 of 2 run(s) failed",
+	}, { // Test 2: Naming one source replays only that source.
+		Token:        "wrong",
+		Sources:      []string{"org-csv"},
+		WantResults:  []string{"org-csv file:" + people + " ok"},
+		WantPolicies: []string{""},
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			jira := authJira(t)
+			dir := Dir(t.TempDir())
+			if err := NewStore(dir, nil).SaveInvocations(Invocations{
+				"jira": {"project:KAFKA": {
+					"--jira-server=true", "--jira-url=" + jira, "--jira-project", "KAFKA", "--policy=open",
+				}},
+				"org-csv": {"file:" + people: {"--file=" + people}},
+			}); err != nil {
+				t.Fatal(err)
+			}
+			var log bytes.Buffer
+			var policies []string
+			x := &Indexer{
+				Dir: dir, Log: &log, Now: func() time.Time { return now },
+				Policy: policy.Default(),
+				Creds: func(env string) string {
+					if env == "PEEPWHO_JIRA_TOKEN" {
+						return test.Token
+					}
+					return ""
+				},
+				PolicyFor: func(recorded string) (policy.Policy, error) {
+					policies = append(policies, recorded)
+					return policy.Default(), nil
+				},
+				Record: func(string, string) error {
+					t.Error("refresh recorded a replay")
+					return nil
+				},
+			}
+			results, err := x.Refresh(context.Background(), test.Sources, now)
+			if got := fmt.Sprint(err); test.WantErr != "" && got != test.WantErr {
+				t.Errorf("Refresh error = %q, want %q", got, test.WantErr)
+			}
+			if test.WantErr == "" && err != nil {
+				t.Errorf("Refresh error = %v, want nil\n%s", err, log.String())
+			}
+			var got []string
+			for _, r := range results {
+				word := "ok"
+				if !r.OK {
+					word = "failed"
+				}
+				got = append(got, r.Source+" "+r.Scope+" "+word)
+				if !r.RanAt.Equal(now) {
+					t.Errorf("%s RanAt = %v, want %v", r.Source, r.RanAt, now)
+				}
+				if r.OK != (r.Err == nil) {
+					t.Errorf("%s OK = %v with Err %v", r.Source, r.OK, r.Err)
+				}
+				if r.Source == "jira" && errors.Is(r.Err, ErrAuth) != test.WantAuth {
+					t.Errorf("jira Err = %v, want ErrAuth %v", r.Err, test.WantAuth)
+				}
+			}
+			if diff := cmp.Diff(test.WantResults, got); diff != "" {
+				t.Errorf("results mismatch (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(test.WantPolicies, policies); diff != "" {
+				t.Errorf("recorded policies mismatch (-want +got):\n%s", diff)
+			}
+			if test.WantAuth && !strings.Contains(log.String(), "refresh jira (project:KAFKA) failed: ") {
+				t.Errorf("log does not name the failed scope:\n%s", log.String())
+			}
+		})
+	}
+}
+
+// TestRefreshNothingRecorded verifies a refresh with no recorded scope is a
+// bad-arguments error that says how to record one.
+func TestRefreshNothingRecorded(t *testing.T) {
+	t.Parallel()
+	x := &Indexer{Dir: Dir(t.TempDir()), Log: &bytes.Buffer{}}
+	_, err := x.Refresh(context.Background(), nil, time.Now())
+	if !errors.Is(err, ErrBadArgs) || !strings.Contains(err.Error(), "peepwho index --source") {
+		t.Errorf("Refresh = %v, want ErrBadArgs naming peepwho index", err)
+	}
+}
+
+// TestRefreshBadRecordedFlag verifies a recorded flag the index no longer
+// knows fails that scope as bad arguments instead of running it half parsed.
+func TestRefreshBadRecordedFlag(t *testing.T) {
+	t.Parallel()
+	dir := Dir(t.TempDir())
+	if err := NewStore(dir, nil).SaveInvocations(Invocations{"org-csv": {"file:x": {"--no-such-flag"}}}); err != nil {
+		t.Fatal(err)
+	}
+	x := &Indexer{Dir: dir, Log: &bytes.Buffer{}}
+	results, err := x.Refresh(context.Background(), nil, time.Now())
+	if err == nil || len(results) != 1 || !errors.Is(results[0].Err, ErrBadArgs) {
+		t.Errorf("Refresh = %+v, %v; want one ErrBadArgs result and an error", results, err)
 	}
 }

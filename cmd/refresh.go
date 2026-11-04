@@ -1,15 +1,11 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
-	"os/exec"
-	"sort"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
 	"github.com/dcadolph/peepwho/internal/engine"
+	"github.com/dcadolph/peepwho/internal/policy"
 	"github.com/dcadolph/peepwho/internal/util"
 )
 
@@ -91,53 +87,30 @@ graph stays current without retyping each source's scope.
   peepwho refresh`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			inv, err := engine.NewStore(opts.dir(), nil).LoadInvocations()
-			if err != nil {
-				return err
-			}
-			if len(inv) == 0 {
-				return fmt.Errorf("%w: nothing to refresh; run `peepwho index --source ...` at least once first", ErrBadArgs)
-			}
-			exe, err := os.Executable()
-			if err != nil {
-				return fmt.Errorf("refresh: locate binary: %w", err)
-			}
-			sources := make([]string, 0, len(inv))
-			for s := range inv {
-				sources = append(sources, s)
-			}
-			sort.Strings(sources)
-
-			failed, total := 0, 0
-			for _, src := range sources {
-				scopes := make([]string, 0, len(inv[src]))
-				for scope := range inv[src] {
-					scopes = append(scopes, scope)
-				}
-				sort.Strings(scopes)
-				for _, scope := range scopes {
-					total++
-					what := src
-					if scope != "" {
-						what += " (" + scope + ")"
-					}
-					fmt.Fprintf(cmd.ErrOrStderr(), "refreshing %s...\n", what)
-					args := append([]string{"index", "--source", src, "--merge", "--data-dir", opts.dataDir},
-						inv[src][scope]...)
-					sub := exec.CommandContext(cmd.Context(), exe, args...)
-					sub.Stdout = cmd.OutOrStdout()
-					sub.Stderr = cmd.ErrOrStderr()
-					if err := sub.Run(); err != nil {
-						failed++
-						fmt.Fprintf(cmd.ErrOrStderr(), "refresh %s failed: %v\n", what, err)
-					}
-				}
-			}
-			if failed > 0 {
-				return fmt.Errorf("refresh: %d of %d run(s) failed", failed, total)
-			}
-			return nil
+			x := opts.indexer(cmd)
+			x.PolicyFor = opts.recordedPolicy(cmd)
+			_, err := x.Refresh(cmd.Context(), nil, opts.now())
+			return err
 		},
 	}
 	return cmd
+}
+
+// recordedPolicy returns the policy a refreshed scope runs under. A scope runs
+// as its own index run did: under the --policy it was recorded with, or the
+// flag's default and the org policy files when none was, whatever --policy
+// the refresh itself was given.
+func (o *options) recordedPolicy(cmd *cobra.Command) func(string) (policy.Policy, error) {
+	def := cmd.Root().PersistentFlags().Lookup("policy").DefValue
+	return func(recorded string) (policy.Policy, error) {
+		run := *o
+		run.policyName = def
+		if recorded != "" {
+			run.policyName = recorded
+		}
+		if err := run.resolvePolicy(recorded != "", cmd.ErrOrStderr()); err != nil {
+			return policy.Policy{}, err
+		}
+		return run.pol, nil
+	}
 }

@@ -50,6 +50,10 @@ type Indexer struct {
 	// Policy is the egress policy for private channels, archives, and the
 	// embedding host.
 	Policy policy.Policy
+	// PolicyFor resolves the policy a refreshed scope runs under from the
+	// --policy value it was recorded with, empty when none was. Nil runs every
+	// scope under Policy.
+	PolicyFor func(recorded string) (policy.Policy, error)
 	// Creds reads one credential by its environment variable name.
 	Creds func(env string) string
 	// Record saves the flags a source was indexed with under its refresh
