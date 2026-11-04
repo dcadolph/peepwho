@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -24,11 +22,6 @@ var refreshSkipFlags = map[string]bool{
 	"data-dir": true, "pretty": true, "changes-file": true,
 }
 
-// invocations records, per source and per scope within it, the flags an index
-// run used, so refresh replays every distinct scope rather than only the last
-// one indexed.
-type invocations map[string]map[string][]string
-
 // captureIndexFlags returns the explicitly-set index flags worth replaying on a
 // refresh, expanding a repeatable flag into one entry per value.
 func captureIndexFlags(cmd *cobra.Command) []string {
@@ -48,20 +41,6 @@ func captureIndexFlags(cmd *cobra.Command) []string {
 	return args
 }
 
-// refreshScope keys one indexing run for the refresh config. Two runs with the
-// same key describe the same slice of a source and the newer flags replace the
-// older; two runs with different keys, such as two repositories indexed in
-// separate git runs, are both kept and both replayed.
-func refreshScope(source, watermarkScope, file string, repoPaths []string) string {
-	if source == "git" {
-		return "repo:" + sortedJoin(repoPaths)
-	}
-	if spec, ok := engine.SourceByName(source); ok && spec.FileKeyed {
-		return "file:" + file
-	}
-	return watermarkScope
-}
-
 // saveInvocation records the flags a source was indexed with under its scope
 // key, so refresh can replay every scope ever indexed. It is best-effort: a
 // failure to save never fails the index. A source reading stdin cannot be
@@ -76,7 +55,8 @@ func saveInvocation(opts *options, cmd *cobra.Command, source, scope string) err
 		return err
 	}
 	defer unlock()
-	inv, err := loadInvocations(opts.refreshPath())
+	store := engine.NewStore(opts.dir(), nil)
+	inv, err := store.LoadInvocations()
 	if err != nil {
 		return err
 	}
@@ -84,7 +64,7 @@ func saveInvocation(opts *options, cmd *cobra.Command, source, scope string) err
 		inv[source] = map[string][]string{}
 	}
 	inv[source][scope] = captureIndexFlags(cmd)
-	return saveInvocations(opts.refreshPath(), inv)
+	return store.SaveInvocations(inv)
 }
 
 // readsStdin reports whether this index run reads its input from stdin, which a
@@ -95,46 +75,6 @@ func readsStdin(cmd *cobra.Command, source string) bool {
 	}
 	f := cmd.Flags().Lookup("file")
 	return f == nil || f.Value.String() == "" || f.Value.String() == "-"
-}
-
-// loadInvocations reads the refresh config. A missing file yields an empty map.
-// A file in the older one-invocation-per-source shape is folded into the keyed
-// shape under an empty scope, so nothing already recorded is dropped.
-func loadInvocations(path string) (invocations, error) {
-	raw, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return invocations{}, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("refresh: read %s: %w", path, err)
-	}
-	inv := invocations{}
-	if err := json.Unmarshal(raw, &inv); err == nil {
-		return inv, nil
-	}
-	old := map[string][]string{}
-	if err := json.Unmarshal(raw, &old); err != nil {
-		return nil, fmt.Errorf("refresh: parse %s: %w", path, err)
-	}
-	// The failed decode above can leave partial entries behind, so the keyed
-	// map is rebuilt from nothing.
-	inv = invocations{}
-	for source, args := range old {
-		inv[source] = map[string][]string{"": args}
-	}
-	return inv, nil
-}
-
-// saveInvocations writes the refresh config atomically.
-func saveInvocations(path string, inv invocations) error {
-	raw, err := json.Marshal(inv)
-	if err != nil {
-		return fmt.Errorf("refresh: encode: %w", err)
-	}
-	if err := util.WriteFileAtomic(path, raw, 0o600); err != nil {
-		return fmt.Errorf("refresh: write %s: %w", path, err)
-	}
-	return nil
 }
 
 // newRefreshCmd builds the refresh command, which re-indexes every source with
@@ -151,7 +91,7 @@ graph stays current without retyping each source's scope.
   peepwho refresh`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			inv, err := loadInvocations(opts.refreshPath())
+			inv, err := engine.NewStore(opts.dir(), nil).LoadInvocations()
 			if err != nil {
 				return err
 			}

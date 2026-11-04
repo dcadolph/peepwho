@@ -6,8 +6,9 @@ import (
 	"github.com/dcadolph/peepwho/internal/engine"
 )
 
-// ErrUnknownSource indicates an unsupported --source value.
-var ErrUnknownSource = errors.New("unknown source")
+// ErrUnknownSource indicates an unsupported --source value. It is the engine's
+// error, so a source the engine rejects reads the same at every caller.
+var ErrUnknownSource = engine.ErrUnknownSource
 
 // ErrBadArgs indicates missing or invalid command arguments. It is the engine's
 // error, so an argument the engine rejects reads and exits the same way as
@@ -29,18 +30,16 @@ var ErrNoIdentity = errors.New("unknown identity")
 var ErrSeal = errors.New("the seal did not verify")
 
 // ErrAuth indicates a source rejected the credentials or could not find what
-// was named. It is distinct so the message can name the token to fix rather
-// than surfacing a bare status code.
-var ErrAuth = errors.New("source rejected the request")
+// was named. It is the engine's error.
+var ErrAuth = engine.ErrAuth
 
-// ErrShrunkSource indicates a source returned far less than it did last time,
-// which is what a rate limit or a lost scope looks like from here.
-var ErrShrunkSource = errors.New("source returned much less than before")
+// ErrShrunkSource indicates a source returned far less than it did last time.
+// It is the engine's error.
+var ErrShrunkSource = engine.ErrShrunkSource
 
-// ErrNoRecords indicates a run read nothing from any source. It stops a
-// replacing index from writing an empty result over a good one, which is what
-// an expired token would otherwise do silently.
-var ErrNoRecords = errors.New("nothing was read from any source")
+// ErrNoRecords indicates a run read nothing from any source. It is the
+// engine's error.
+var ErrNoRecords = engine.ErrNoRecords
 
 // ErrEval indicates a measurement could not be read, written, or compared.
 var ErrEval = errors.New("cannot evaluate")

@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"sort"
 	"strings"
 	"time"
 
@@ -43,80 +42,8 @@ const (
 type indexFlags struct {
 	// source is the --source name.
 	source string
-	// file is the input path for a file source.
-	file string
-	// includePrivate requests private Slack channels.
-	includePrivate bool
-	// slackJoin has the bot self-join public channels.
-	slackJoin bool
-	// sinceDays is the Slack history window in days.
-	sinceDays int
-	// maxMessages caps Slack messages per channel.
-	maxMessages int
-	// episodes records past conversations for recall.
-	episodes bool
-	// maxEpisodes caps episodes per channel.
-	maxEpisodes int
-	// archive keeps the words of each Slack conversation.
-	archive bool
-	// maxArchive caps retained messages per conversation.
-	maxArchive int
-	// changesFile receives the index diff as JSON.
-	changesFile string
-	// embed generates embeddings via Ollama.
-	embed bool
-	// embedModel names the Ollama embedding model.
-	embedModel string
-	// ollamaURL is the Ollama base URL.
-	ollamaURL string
-	// repos are the GitHub owner/name repositories.
-	repos []string
-	// githubOrg is the GitHub org to index.
-	githubOrg string
-	// maxRepos caps repositories taken from the org.
-	maxRepos int
-	// githubEmails resolves GitHub user emails.
-	githubEmails bool
-	// jiraURL is the Jira site URL.
-	jiraURL string
-	// jiraProjects are the Jira project keys.
-	jiraProjects []string
-	// jiraServer selects self-hosted Jira.
-	jiraServer bool
-	// jiraJQL is an explicit Jira query.
-	jiraJQL string
-	// maxIssues caps Jira issues read.
-	maxIssues int
-	// merge adds onto the existing index.
-	merge bool
-	// full re-reads everything on a merge.
-	full bool
-	// allowShrink accepts a much smaller read.
-	allowShrink bool
-	// aliasesFile is the identity alias JSON file.
-	aliasesFile string
-	// halfLifeDays is the recency half-life.
-	halfLifeDays int
-	// repoPaths are the local repositories for git.
-	repoPaths []string
-	// gitSinceDays is the git history window in days.
-	gitSinceDays int
-	// gitUntilDays stops the git window this many days before today.
-	gitUntilDays int
-	// gitWorkers is how many commits to diff at once.
-	gitWorkers int
-	// maxCommits caps commits per repository.
-	maxCommits int
-	// confluenceURL is the Confluence site URL.
-	confluenceURL string
-	// confluenceSpaces are the Confluence space keys.
-	confluenceSpaces []string
-	// confluenceServer selects self-hosted Confluence.
-	confluenceServer bool
-	// confluenceCQL is an explicit Confluence query.
-	confluenceCQL string
-	// maxPages caps Confluence pages read.
-	maxPages int
+	// IndexArgs holds every other index flag.
+	engine.IndexArgs
 }
 
 // newIndexCmd builds the index command, which ingests a source into the index.
@@ -163,54 +90,7 @@ Start with the org chart, then merge everything else onto it:
 	f := cmd.Flags()
 	f.Var(newOnceValue(&fl.source, "org-csv"), "source",
 		"Source type: org-csv, matters, slack, codeowners, github, jira, confluence, pagerduty, git, json, or graph.")
-	f.StringVar(&fl.file, "file", "", "Path to the source file: the CSV for org-csv, the CODEOWNERS file or repo root for codeowners, the JSON array for json (- for stdin).")
-	f.BoolVar(&fl.includePrivate, "include-private", false, "Ingest private Slack channels if policy allows.")
-	f.BoolVar(&fl.slackJoin, "slack-join", false,
-		"Have the bot self-join public channels it is not in, so a workspace indexes without manual invites (needs channels:join; posts a join notice per channel).")
-	f.IntVar(&fl.sinceDays, "since-days", 180, "Slack history window in days.")
-	f.IntVar(&fl.maxMessages, "max-messages", 5000, "Slack message cap per channel.")
-	f.BoolVar(&fl.episodes, "episodes", false,
-		"Record past conversations so peepwho recall can point back at them.")
-	f.IntVar(&fl.maxEpisodes, "max-episodes-per-channel", 200, "Episode cap per channel.")
-	f.BoolVar(&fl.archive, "archive", false,
-		"Slack only: keep the words of each conversation, not just a link. Needs an index key, implies --episodes.")
-	f.IntVar(&fl.maxArchive, "max-archive-messages", 50, "Retained message cap per conversation.")
-	f.StringVar(&fl.changesFile, "changes-file", "", "Write the index diff as JSON to this path.")
-	f.BoolVar(&fl.merge, "merge", false, "Merge into the existing index instead of replacing it.")
-	f.BoolVar(&fl.full, "full", false,
-		"With --merge, re-read every item and recompact instead of only what changed since the last run.")
-	f.BoolVar(&fl.allowShrink, "allow-shrink", false,
-		"Accept a source returning far less than last time, which is otherwise refused as a truncated read.")
-	f.StringVar(&fl.aliasesFile, "aliases", "",
-		"JSON file mapping a canonical id to its aliases, joining one person across sources.")
-	f.IntVar(&fl.halfLifeDays, "half-life-days", 180,
-		"Days for a dated record's weight to halve; 0 disables recency decay.")
-	f.StringArrayVar(&fl.repoPaths, "repo-path", nil, "Local repository root for the git source (repeatable).")
-	f.IntVar(&fl.gitSinceDays, "git-since-days", 365, "Git history window in days.")
-	f.IntVar(&fl.maxCommits, "max-commits", 2000, "Commit cap per repository for the git source.")
-	f.IntVar(&fl.gitUntilDays, "git-until-days", 0,
-		"Stop the git window this many days before today; 0 reads up to the present.")
-	f.IntVar(&fl.gitWorkers, "git-workers", 0,
-		"Commits to diff at once for the git source; 0 picks a default from the machine.")
-	f.BoolVar(&fl.embed, "embed", false, "Generate embeddings via Ollama for semantic search.")
-	f.StringVar(&fl.embedModel, "embed-model", "", "Ollama embed model (default nomic-embed-text).")
-	f.StringVar(&fl.ollamaURL, "ollama-url", "http://localhost:11434", "Ollama base URL for --embed.")
-	f.StringArrayVar(&fl.repos, "repo", nil, "GitHub repo owner/name (repeatable).")
-	f.StringVar(&fl.githubOrg, "github-org", "", "GitHub org to index all repositories of.")
-	f.IntVar(&fl.maxRepos, "max-repos", 0, "Cap repositories taken from --github-org (0 = all).")
-	f.BoolVar(&fl.githubEmails, "github-emails", false, "Resolve GitHub user emails to join other sources.")
-	f.StringVar(&fl.jiraURL, "jira-url", "", "Jira site URL (or PEEPWHO_JIRA_URL).")
-	f.StringArrayVar(&fl.jiraProjects, "jira-project", nil, "Jira project key (repeatable).")
-	f.StringVar(&fl.jiraJQL, "jira-jql", "", "Jira JQL query (overrides --jira-project).")
-	f.IntVar(&fl.maxIssues, "max-issues", 1000, "Cap Jira issues read.")
-	f.BoolVar(&fl.jiraServer, "jira-server", false,
-		"Jira is self-hosted Server or Data Center (v2 API, bearer or anonymous auth), not Cloud.")
-	f.StringArrayVar(&fl.confluenceSpaces, "confluence-space", nil, "Confluence space key (repeatable).")
-	f.StringVar(&fl.confluenceURL, "confluence-url", "", "Confluence site URL; or PEEPWHO_CONFLUENCE_URL (falls back to the Jira URL).")
-	f.StringVar(&fl.confluenceCQL, "confluence-cql", "", "Confluence CQL query (overrides --confluence-space).")
-	f.BoolVar(&fl.confluenceServer, "confluence-server", false,
-		"Confluence is self-hosted Server or Data Center (REST at site root, bearer/anonymous auth), not Cloud.")
-	f.IntVar(&fl.maxPages, "max-pages", 2000, "Cap Confluence pages read.")
+	engine.RegisterIndexFlags(f, &fl.IndexArgs)
 	return cmd
 }
 
@@ -218,21 +98,21 @@ Start with the org chart, then merge everything else onto it:
 // run is incremental, builds the source from the registry, indexes the records,
 // and saves the refresh config and the watermark the next run resumes from.
 func runIndex(cmd *cobra.Command, opts *options, fl *indexFlags) error {
-	if fl.archive {
+	if fl.Archive {
 		if err := guardArchive(cmd, opts); err != nil {
 			return err
 		}
 	}
-	scope := indexScope(fl.source, scopeInputs{
-		jiraJQL: fl.jiraJQL, jiraProjects: fl.jiraProjects,
-		confluenceCQL: fl.confluenceCQL, confluenceSpaces: fl.confluenceSpaces,
-		githubRepos: fl.repos, githubOrg: fl.githubOrg, slackPrivate: fl.includePrivate,
+	scope := engine.IndexScope(fl.source, engine.ScopeInputs{
+		JiraJQL: fl.JiraJQL, JiraProjects: fl.JiraProjects,
+		ConfluenceCQL: fl.ConfluenceCQL, ConfluenceSpaces: fl.ConfluenceSpaces,
+		GitHubRepos: fl.Repos, GitHubOrg: fl.GitHubOrg, SlackPrivate: fl.IncludePrivate,
 	})
 	// An explicit --jira-jql or --confluence-cql is authoritative, so the
 	// connector ignores the watermark and returns the full result. Folding
 	// that would stack a copy every run, so such a source is never treated
 	// as incremental: it replaces on every merge, as a full read does.
-	canInc := incrementalCapable(fl.source) && !usesExplicitQuery(fl.source, fl.jiraJQL, fl.confluenceCQL)
+	canInc := incrementalCapable(fl.source) && !engine.UsesExplicitQuery(fl.source, fl.JiraJQL, fl.ConfluenceCQL)
 	since, incremental, err := indexWatermark(opts, fl, canInc, scope)
 	if err != nil {
 		return err
@@ -245,7 +125,7 @@ func runIndex(cmd *cobra.Command, opts *options, fl *indexFlags) error {
 	// thing that catches it.
 	var gitStops map[string]string
 	if fl.source == "git" {
-		gitStops = gitMarks(opts, fl.merge && !fl.full, fl.repoPaths)
+		gitStops = gitMarks(opts, fl.Merge && !fl.Full, fl.RepoPaths)
 		incremental = len(gitStops) > 0
 	}
 	spec, ok := engine.SourceByName(fl.source)
@@ -265,9 +145,9 @@ func runIndex(cmd *cobra.Command, opts *options, fl *indexFlags) error {
 		return err
 	}
 	if err := indexRecords(cmd, opts, recs, indexParams{
-		merge: fl.merge, incremental: incremental, allowShrink: fl.allowShrink, halfLifeDays: fl.halfLifeDays,
-		aliasesFile: fl.aliasesFile, embed: fl.embed, embedModel: fl.embedModel, ollamaURL: fl.ollamaURL,
-		changesFile: fl.changesFile, episodes: eps,
+		merge: fl.Merge, incremental: incremental, allowShrink: fl.AllowShrink, halfLifeDays: fl.HalfLifeDays,
+		aliasesFile: fl.AliasesFile, embed: fl.Embed, embedModel: fl.EmbedModel, ollamaURL: fl.OllamaURL,
+		changesFile: fl.ChangesFile, episodes: eps,
 	}); err != nil {
 		return err
 	}
@@ -279,7 +159,7 @@ func runIndex(cmd *cobra.Command, opts *options, fl *indexFlags) error {
 // --full. When so it returns the watermark, so the run fetches only what
 // changed since and folds it in rather than re-reading the whole source.
 func indexWatermark(opts *options, fl *indexFlags, canInc bool, scope string) (time.Time, bool, error) {
-	if !fl.merge || fl.full || !canInc || !indexExists(opts) {
+	if !fl.Merge || fl.Full || !canInc || !indexExists(opts) {
 		return time.Time{}, false, nil
 	}
 	st, err := opts.loadState()
@@ -303,7 +183,7 @@ func saveIndexProgress(
 	cmd *cobra.Command, opts *options, fl *indexFlags, scope string, canInc bool,
 	gitAfter map[string]string, recs []connector.Record,
 ) error {
-	rscope := refreshScope(fl.source, scope, fl.file, fl.repoPaths)
+	rscope := engine.RefreshScope(fl.source, scope, fl.File, fl.RepoPaths)
 	if err := saveInvocation(opts, cmd, fl.source, rscope); err != nil {
 		fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not save refresh config: %v\n", err)
 	}
@@ -316,7 +196,7 @@ func saveIndexProgress(
 	// Advance the incremental watermark only after a successful index, so a
 	// failed run never moves it.
 	if canInc && fl.source != "git" {
-		return updateWatermark(opts, fl.source, scope, fl.full, recs)
+		return updateWatermark(opts, fl.source, scope, fl.Full, recs)
 	}
 	return nil
 }
@@ -326,42 +206,42 @@ func saveIndexProgress(
 func (fl *indexFlags) sourceOptions(
 	cmd *cobra.Command, opts *options, since time.Time, gitStops map[string]string,
 ) engine.SourceOptions {
-	episodes := fl.episodes || fl.archive
+	episodes := fl.Episodes || fl.Archive
 	return engine.SourceOptions{
-		File:                 fl.file,
+		File:                 fl.File,
 		Stdin:                cmd.InOrStdin(),
 		Log:                  cmd.ErrOrStderr(),
 		Since:                since,
 		AllowPrivateChannels: opts.pol.AllowPrivateChannels(),
 		Slack: connector.SlackOptions{
-			IncludePrivate: fl.includePrivate, JoinPublic: fl.slackJoin,
-			SinceDays: fl.sinceDays, MaxMessages: fl.maxMessages,
-			Episodes: episodes, MaxEpisodesPerChannel: fl.maxEpisodes,
-			Archive: fl.archive, MaxArchiveMessages: fl.maxArchive,
+			IncludePrivate: fl.IncludePrivate, JoinPublic: fl.SlackJoin,
+			SinceDays: fl.SinceDays, MaxMessages: fl.MaxMessages,
+			Episodes: episodes, MaxEpisodesPerChannel: fl.MaxEpisodes,
+			Archive: fl.Archive, MaxArchiveMessages: fl.MaxArchive,
 		},
 		SlackExport: connector.SlackExportOptions{
-			IncludePrivate: fl.includePrivate, SinceDays: fl.sinceDays, MaxMessages: fl.maxMessages,
-			Episodes: episodes, MaxEpisodesPerChannel: fl.maxEpisodes,
-			Archive: fl.archive, MaxArchiveMessages: fl.maxArchive,
+			IncludePrivate: fl.IncludePrivate, SinceDays: fl.SinceDays, MaxMessages: fl.MaxMessages,
+			Episodes: episodes, MaxEpisodesPerChannel: fl.MaxEpisodes,
+			Archive: fl.Archive, MaxArchiveMessages: fl.MaxArchive,
 		},
 		GitHub: connector.GitHubOptions{
-			Repos: fl.repos, Org: fl.githubOrg, MaxRepos: fl.maxRepos,
-			ResolveEmails: fl.githubEmails, Episodes: episodes,
+			Repos: fl.Repos, Org: fl.GitHubOrg, MaxRepos: fl.MaxRepos,
+			ResolveEmails: fl.GitHubEmails, Episodes: episodes,
 		},
-		JiraURL: fl.jiraURL,
+		JiraURL: fl.JiraURL,
 		Jira: connector.JiraOptions{
-			Projects: fl.jiraProjects, JQL: fl.jiraJQL, MaxIssues: fl.maxIssues,
-			Episodes: episodes, Server: fl.jiraServer,
+			Projects: fl.JiraProjects, JQL: fl.JiraJQL, MaxIssues: fl.MaxIssues,
+			Episodes: episodes, Server: fl.JiraServer,
 		},
-		ConfluenceURL: fl.confluenceURL,
+		ConfluenceURL: fl.ConfluenceURL,
 		Confluence: connector.ConfluenceOptions{
-			Spaces: fl.confluenceSpaces, CQL: fl.confluenceCQL, MaxPages: fl.maxPages,
-			Server: fl.confluenceServer,
+			Spaces: fl.ConfluenceSpaces, CQL: fl.ConfluenceCQL, MaxPages: fl.MaxPages,
+			Server: fl.ConfluenceServer,
 		},
 		PagerDuty: connector.PagerDutyOptions{Episodes: episodes},
 		Git: connector.GitOptions{
-			Paths: fl.repoPaths, SinceDays: fl.gitSinceDays, UntilDays: fl.gitUntilDays,
-			MaxCommits: fl.maxCommits, Workers: fl.gitWorkers, StopAt: gitStops,
+			Paths: fl.RepoPaths, SinceDays: fl.GitSinceDays, UntilDays: fl.GitUntilDays,
+			MaxCommits: fl.MaxCommits, Workers: fl.GitWorkers, StopAt: gitStops,
 		},
 	}
 }
@@ -376,25 +256,12 @@ func resolveCreds(spec engine.SourceSpec) map[string]string {
 	return creds
 }
 
-// fetchSource builds the source from the registry and reads it, explaining a
-// rejected credential in the source's own terms. It returns the source too, so
-// a caller can read state only that source keeps, such as git's marks.
+// fetchSource builds the source from the registry and reads it. It is the
+// engine's FetchSource, named here for the commands that share it.
 func fetchSource(
 	ctx context.Context, spec engine.SourceSpec, o engine.SourceOptions,
 ) ([]connector.Record, []episode.Episode, connector.Source, error) {
-	src, err := spec.New(o)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	recs, err := src.Fetch(ctx)
-	if err != nil {
-		return nil, nil, src, explainFetchError(spec, err)
-	}
-	var eps []episode.Episode
-	if es, ok := src.(connector.EpisodeSource); ok {
-		eps = es.Episodes()
-	}
-	return recs, eps, src, nil
+	return engine.FetchSource(ctx, spec, o)
 }
 
 // indexParams holds the index-build knobs shared by the index and connect
@@ -476,7 +343,7 @@ func indexRecords(cmd *cobra.Command, opts *options, recs []connector.Record, p 
 	// smaller than the last full read; the shrink guard, which protects a full
 	// replace from a truncated read, does not apply to it.
 	if !p.incremental {
-		if err := guardShrink(existing, recs, p.allowShrink); err != nil {
+		if err := engine.GuardShrink(existing, recs, p.allowShrink); err != nil {
 			return err
 		}
 	}
@@ -618,83 +485,6 @@ func incrementalCapable(source string) bool {
 	return ok && spec.Incremental
 }
 
-// usesExplicitQuery reports whether a source is driven by a raw query the
-// connector treats as authoritative. Such a query ignores the watermark and
-// returns its full result, so the run must replace rather than fold, and no
-// watermark is kept for it, keeping the raw query out of the plain state file.
-func usesExplicitQuery(source, jiraJQL, confluenceCQL string) bool {
-	switch source {
-	case "jira":
-		return strings.TrimSpace(jiraJQL) != ""
-	case "confluence":
-		return strings.TrimSpace(confluenceCQL) != ""
-	default:
-		return false
-	}
-}
-
-// scopeInputs carries the query-scope flags that key a source's watermark.
-type scopeInputs struct {
-	// jiraJQL and jiraProjects scope a Jira read.
-	jiraJQL      string
-	jiraProjects []string
-	// confluenceCQL and confluenceSpaces scope a Confluence read.
-	confluenceCQL    string
-	confluenceSpaces []string
-	// githubRepos and githubOrg scope a GitHub read.
-	githubRepos []string
-	githubOrg   string
-	// slackPrivate reports whether private channels are in scope.
-	slackPrivate bool
-}
-
-// indexScope returns the watermark key for a source's current query, so changing
-// the scope, such as the set of projects, spaces, or repositories indexed,
-// starts a fresh watermark rather than reusing one taken over different items.
-func indexScope(source string, in scopeInputs) string {
-	switch source {
-	case "jira":
-		if strings.TrimSpace(in.jiraJQL) != "" {
-			return "jql:" + in.jiraJQL
-		}
-		if len(in.jiraProjects) > 0 {
-			return "project:" + sortedJoin(in.jiraProjects)
-		}
-		return "all"
-	case "confluence":
-		if strings.TrimSpace(in.confluenceCQL) != "" {
-			return "cql:" + in.confluenceCQL
-		}
-		if len(in.confluenceSpaces) > 0 {
-			return "space:" + sortedJoin(in.confluenceSpaces)
-		}
-		return "all"
-	case "github":
-		if in.githubOrg != "" {
-			return "org:" + in.githubOrg
-		}
-		if len(in.githubRepos) > 0 {
-			return "repos:" + sortedJoin(in.githubRepos)
-		}
-		return "all"
-	case "slack":
-		if in.slackPrivate {
-			return "all"
-		}
-		return "public"
-	default:
-		return ""
-	}
-}
-
-// sortedJoin returns the values sorted and comma-joined, so a scope key does not
-// depend on the order the flags were given.
-func sortedJoin(values []string) string {
-	v := append([]string(nil), values...)
-	sort.Strings(v)
-	return strings.Join(v, ",")
-}
-
 // updateWatermark advances a source's incremental watermark to the newest
 // activity just indexed, after a successful run. It never moves the cursor
 // backward, and does nothing for a source without incremental support or a read
@@ -730,34 +520,6 @@ func updateWatermark(opts *options, source, scope string, full bool, recs []conn
 	}
 	st.Set(state.Watermark{Source: source, Scope: scope, Cursor: cursor, Complete: true, RanAt: opts.now()})
 	return opts.saveState(st)
-}
-
-// guardShrink refuses to replace a source's contribution with a far smaller
-// one. A rate limit or a scope a token quietly lost makes a connector keep
-// what it managed to read and return no error, so without this a run that saw
-// a fraction of a source would shrink the index while reporting success.
-func guardShrink(existing *index.Index, recs []connector.Record, allow bool) error {
-	if existing == nil || allow {
-		return nil
-	}
-	incoming := make(map[string]int)
-	for _, rec := range recs {
-		incoming[rec.Source]++
-	}
-	for name, got := range incoming {
-		if name == "" {
-			continue
-		}
-		had := existing.SourceSize(name)
-		if had > 0 && got*2 < had {
-			return fmt.Errorf(
-				"%w: %s returned %d records where it last returned %d, so the existing index "+
-					"was left alone. Check the messages above for a rate limit or a token that "+
-					"lost a scope. Pass --allow-shrink if the source really did get smaller",
-				ErrShrunkSource, name, got, had)
-		}
-	}
-	return nil
 }
 
 // saveEpisodes merges newly observed conversations into the episode store.
