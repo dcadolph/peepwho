@@ -9,7 +9,8 @@ guarantees in one place.
 
 - The index lives at `~/.peepwho/index.json`, on your machine, created readable only
   by you (mode `0600`). It is never uploaded. Stated plainly, it holds: each person's
-  name, email, title, team, and linked identities, their topic weights, an alias
+  name, email, title, team, and linked identities, a Slack direct message link
+  for anyone read from the Slack API, their topic weights, an alias
   table joining one person's identifiers across sources, channel names with member
   lists, and an inverted search index of stemmed word terms keyed to people and
   channels. A stemmed term index is not message text, but it still says who used

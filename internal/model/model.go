@@ -30,6 +30,9 @@ type Person struct {
 	// Identities lists alternate identifiers merged into this person, such as
 	// a GitHub login joined to an email.
 	Identities []ID
+	// Links are deep links that open a conversation with the person in a
+	// source's own app, such as slack://user?team=T0&id=U1, sorted.
+	Links []string `json:"Links,omitempty"`
 	// Topics maps a topic ID to this person's affinity weight for it.
 	Topics map[ID]float64
 	// Owns lists topic IDs this person is a declared owner of, from a source of

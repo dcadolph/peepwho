@@ -64,8 +64,9 @@ type Record struct {
 	Links []TopicLink
 	// Members lists person references active in a KindChannel record.
 	Members []string
-	// Link is the web URL of a KindChannel record, used to open the channel in
-	// its source tool.
+	// Link opens the record's subject in its source tool: the web URL of a
+	// KindChannel record, or a deep link that starts a direct message with the
+	// person on a KindPerson record.
 	Link string
 	// Text is free-form text attributed to the person or channel, mined for
 	// topics. It is readable message content and is never written to disk: the

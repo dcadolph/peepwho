@@ -2,6 +2,7 @@ package resolve
 
 import (
 	"math"
+	"slices"
 	"sort"
 
 	"github.com/dcadolph/peepwho/internal/index"
@@ -182,6 +183,9 @@ type JSONProfile struct {
 	Manager *JSONMember `json:"manager,omitempty"`
 	// Identities lists alternate identifiers merged into this person.
 	Identities []string `json:"identities,omitempty"`
+	// Links are deep links that open a conversation with the person in a
+	// source's own app, such as slack://user?team=T0&id=U1, sorted.
+	Links []string `json:"links,omitempty"`
 	// Joins explains the inferred merges among those identities: which alias,
 	// how confident, and the evidence. Certain email or provider-id joins are
 	// not listed.
@@ -199,6 +203,7 @@ func ProfileView(ix *index.Index, p index.Profile) JSONProfile {
 		Name:   p.Person.Name,
 		Email:  p.Person.Email,
 		Title:  p.Person.Title,
+		Links:  slices.Clone(p.Person.Links),
 		Topics: salientTopics(ix, p.Person.Topics, 32),
 	}
 	for _, id := range p.Person.Identities {

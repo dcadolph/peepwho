@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -113,6 +114,18 @@ func (s *Slack) Ping(ctx context.Context) error {
 // members come through like anyone else: their history is exactly what a
 // continuity question is about, and the export path keeps them too.
 func (s *Slack) Fetch(ctx context.Context) ([]Record, error) {
+	// The workspace URL turns a channel id into a link and a message timestamp
+	// into a permalink, and the workspace ID turns a user into a direct message
+	// link, with no further calls. Losing them costs links, not data, so a
+	// failure here is logged and the read goes on. A bad token still fails at
+	// the users call below.
+	auth, err := s.client.AuthTest(ctx)
+	if err != nil {
+		fmt.Fprintf(s.opts.Log, "slack: no workspace url, person, channel, and episode links unavailable: %v\n", err)
+		auth = slack.Auth{}
+	}
+	workspaceURL := auth.URL
+
 	users, err := s.client.Users(ctx)
 	switch {
 	case errors.Is(err, slack.ErrTruncated):
@@ -134,7 +147,7 @@ func (s *Slack) Fetch(ctx context.Context) ([]Record, error) {
 		if u.Profile.Email == "" {
 			noEmail++
 		}
-		records = append(records, personRecord(u))
+		records = append(records, personRecord(u, auth.TeamID))
 	}
 	if noEmail > 0 {
 		// A user with no email keys on the opaque slack:UID and joins nothing,
@@ -164,16 +177,6 @@ func (s *Slack) Fetch(ctx context.Context) ([]Record, error) {
 	if s.opts.Episodes {
 		s.episodes = nil
 	}
-	// The workspace URL turns a channel id into a link, and a message timestamp
-	// into a permalink, with no further calls. Fetch it whether or not episodes
-	// are on; losing it costs links, not data, so a failure here is logged.
-	workspaceURL := ""
-	if auth, err := s.client.AuthTest(ctx); err != nil {
-		fmt.Fprintf(s.opts.Log, "slack: no workspace url, channel and episode links unavailable: %v\n", err)
-	} else {
-		workspaceURL = auth.URL
-	}
-
 	oldest := slackOldestSince(s.opts.SinceDays, s.opts.Since)
 	skipped, read, notInChannel := 0, 0, 0
 	joined := 0
@@ -238,7 +241,7 @@ func (s *Slack) Fetch(ctx context.Context) ([]Record, error) {
 
 		chRec, authorText, authorLatest := channelRecord(ch, msgs, byID, workspaceURL)
 		records = append(records, chRec)
-		records = append(records, authorTextRecords(authorText, authorLatest)...)
+		records = append(records, authorTextRecords(authorText, authorLatest, auth.TeamID)...)
 		if s.opts.Episodes {
 			eps := collectEpisodes(ch, msgs, episodeOpts{
 				byID:         byID,
@@ -292,8 +295,9 @@ func (s *Slack) Fetch(ctx context.Context) ([]Record, error) {
 // personRecord builds a person record from a Slack user. The record carries
 // the Slack user ID as its identifier and the email alongside it, so the
 // indexer joins the two. Without that join a Slack user ID resolves to nobody,
-// and the bot cannot tell which person is asking.
-func personRecord(u slack.User) Record {
+// and the bot cannot tell which person is asking. With the workspace ID known
+// it also carries the link that opens a direct message with them.
+func personRecord(u slack.User, teamID string) Record {
 	return Record{
 		Kind:     KindPerson,
 		Source:   "slack",
@@ -302,7 +306,17 @@ func personRecord(u slack.User) Record {
 		Name:     u.Profile.RealName,
 		Email:    u.Profile.Email,
 		Title:    u.Profile.Title,
+		Link:     dmLink(teamID, u.ID),
 	}
+}
+
+// dmLink is the slack:// deep link that opens a direct message with userID in
+// the workspace teamID, empty when either is unknown.
+func dmLink(teamID, userID string) string {
+	if teamID == "" || userID == "" {
+		return ""
+	}
+	return "slack://user?team=" + url.QueryEscape(teamID) + "&id=" + url.QueryEscape(userID)
 }
 
 // channelRecord builds a channel record, the per-author message text mined
@@ -368,8 +382,10 @@ func channelRecord(
 // authorTextRecords turns per-author mined text into person records, in
 // sorted author order. Map order here was the one nondeterminism in a Slack
 // read: same workspace, differently ordered records, and byte-for-byte
-// reproducibility is a product claim.
-func authorTextRecords(authorText map[string]string, authorLatest map[string]time.Time) []Record {
+// reproducibility is a product claim. An author known only by Slack user ID
+// carries the direct message link when teamID is known; an author keyed by
+// email gets it from their user record.
+func authorTextRecords(authorText map[string]string, authorLatest map[string]time.Time, teamID string) []Record {
 	pids := make([]string, 0, len(authorText))
 	for pid := range authorText {
 		pids = append(pids, pid)
@@ -379,10 +395,20 @@ func authorTextRecords(authorText map[string]string, authorLatest map[string]tim
 	for _, pid := range pids {
 		out = append(out, Record{
 			Kind: KindPerson, Source: "slack", Weight: 1, PersonID: pid, Text: authorText[pid],
-			Time: authorLatest[pid],
+			Time: authorLatest[pid], Link: authorLink(pid, teamID),
 		})
 	}
 	return out
+}
+
+// authorLink is the direct message link for an author keyed by Slack user ID,
+// empty for an author keyed by email.
+func authorLink(pid, teamID string) string {
+	uid, ok := strings.CutPrefix(pid, "slack:")
+	if !ok {
+		return ""
+	}
+	return dmLink(teamID, uid)
 }
 
 // slackTime parses a Slack epoch timestamp such as "1712345678.000100",

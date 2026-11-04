@@ -110,7 +110,7 @@ func (s *SlackExport) Fetch(ctx context.Context) ([]Record, error) {
 		if u.Profile.Email == "" {
 			noEmail++
 		}
-		records = append(records, personRecord(u))
+		records = append(records, personRecord(u, ""))
 	}
 	if noEmail > 0 {
 		fmt.Fprintf(s.opts.Log,
@@ -141,7 +141,7 @@ func (s *SlackExport) Fetch(ctx context.Context) ([]Record, error) {
 		}
 		chRec, authorText, authorLatest := channelRecord(ch, msgs, byID, "")
 		records = append(records, chRec)
-		records = append(records, authorTextRecords(authorText, authorLatest)...)
+		records = append(records, authorTextRecords(authorText, authorLatest, "")...)
 		if s.opts.Episodes {
 			// The archive settings ride along the way the live connector passes
 			// them, so a window conversation keeps its verbatim notes here too;

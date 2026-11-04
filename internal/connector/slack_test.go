@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
 
 	"github.com/dcadolph/peepwho/internal/slack"
 )
@@ -310,5 +313,69 @@ func TestChannelRecordLink(t *testing.T) {
 	rec, _, _ := channelRecord(slack.Channel{ID: "C123", Name: "billing"}, nil, nil, "https://acme.slack.com/")
 	if want := "https://acme.slack.com/archives/C123"; rec.Link != want {
 		t.Errorf("channel Link = %q, want %q", rec.Link, want)
+	}
+}
+
+// TestSlackFetchDMLinks verifies person records carry the direct message link
+// when auth.test names the workspace, and that an auth.test failure costs the
+// links but not the read.
+func TestSlackFetchDMLinks(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		AuthBody  string
+		WantLinks map[string]string
+		WantLog   string
+	}{{ // Test 0: Workspace known, a listed user and an unlisted author both link.
+		AuthBody: `{"ok":true,"user_id":"UBOT","url":"https://acme.slack.com/","team_id":"T0"}`,
+		WantLinks: map[string]string{
+			"slack:U1":   "slack://user?team=T0&id=U1",
+			"slack:U9":   "slack://user?team=T0&id=U9",
+			"jane@x.com": "",
+		},
+	}, { // Test 1: auth.test fails, every link is empty and the read goes on.
+		AuthBody:  `{"ok":false,"error":"ratelimited"}`,
+		WantLinks: map[string]string{"slack:U1": "", "slack:U9": "", "jane@x.com": ""},
+		WantLog:   "person, channel, and episode links unavailable",
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			mux := http.NewServeMux()
+			mux.HandleFunc("/auth.test", func(w http.ResponseWriter, _ *http.Request) {
+				io.WriteString(w, test.AuthBody)
+			})
+			mux.HandleFunc("/users.list", func(w http.ResponseWriter, _ *http.Request) {
+				io.WriteString(w, `{"ok":true,"members":[`+
+					`{"id":"U1","profile":{"real_name":"Jane Roe","email":"jane@x.com"}}]}`)
+			})
+			mux.HandleFunc("/conversations.list", func(w http.ResponseWriter, _ *http.Request) {
+				io.WriteString(w, `{"ok":true,"channels":[{"id":"C1","name":"billing","is_member":true}]}`)
+			})
+			mux.HandleFunc("/conversations.history", func(w http.ResponseWriter, _ *http.Request) {
+				io.WriteString(w, `{"ok":true,"has_more":false,"messages":[`+
+					`{"type":"message","user":"U1","text":"retries","ts":"1.0"},`+
+					`{"type":"message","user":"U9","text":"ledger","ts":"2.0"}]}`)
+			})
+			srv := httptest.NewServer(mux)
+			t.Cleanup(srv.Close)
+			var log strings.Builder
+			client := slack.New("xoxb-test", slack.WithBaseURL(srv.URL))
+			recs, err := NewSlackWithClient(client, SlackOptions{Log: &log}).Fetch(context.Background())
+			if err != nil {
+				t.Fatalf("Fetch: %v", err)
+			}
+			got := make(map[string]string)
+			for _, r := range recs {
+				if r.Kind == KindPerson {
+					got[r.PersonID] = r.Link
+				}
+			}
+			if diff := cmp.Diff(test.WantLinks, got); diff != "" {
+				t.Errorf("person links mismatch (-want +got):\n%s", diff)
+			}
+			if !strings.Contains(log.String(), test.WantLog) {
+				t.Errorf("log %q lacks %q", log.String(), test.WantLog)
+			}
+		})
 	}
 }

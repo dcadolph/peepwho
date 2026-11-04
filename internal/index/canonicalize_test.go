@@ -172,3 +172,68 @@ func TestAMergeKeepsBothSidesDirectWork(t *testing.T) {
 		t.Errorf("tsdb direct = %v, want 4", got)
 	}
 }
+
+// TestPersonLinksFoldPersistAndForget verifies a person seen in two Slack
+// workspaces keeps both direct message links sorted through the email join,
+// a save and load keeps them, and forgetting the person takes them along.
+func TestPersonLinksFoldPersistAndForget(t *testing.T) {
+	t.Parallel()
+	ix := New()
+	ix.Build([]connector.Record{{
+		Kind: connector.KindPerson, Source: "slack", PersonID: "slack:U2", Name: "Jane Roe",
+		Email: "jane@corp.com", Link: "slack://user?team=T1&id=U2",
+	}, {
+		Kind: connector.KindPerson, Source: "slack", PersonID: "slack:U1", Name: "Jane Roe",
+		Email: "jane@corp.com", Link: "slack://user?team=T0&id=U1",
+	}, {
+		Kind: connector.KindPerson, Source: "slack", PersonID: "slack:U1", Text: "retries",
+		Link: "slack://user?team=T0&id=U1",
+	}, {
+		Kind: connector.KindPerson, Source: "git", Name: "Ada Lane", Email: "ada@corp.com",
+	}})
+	ix.Canonicalize()
+	want := []string{"slack://user?team=T0&id=U1", "slack://user?team=T1&id=U2"}
+	jane := ix.Graph.People["jane@corp.com"]
+	if jane == nil {
+		t.Fatal("missing canonical person jane@corp.com")
+		return
+	}
+	if diff := cmp.Diff(want, jane.Links); diff != "" {
+		t.Errorf("links after build mismatch (-want +got):\n%s", diff)
+	}
+	if ada := ix.Graph.People["ada@corp.com"]; ada == nil || ada.Links != nil {
+		t.Errorf("a person with no Slack identity has links: %+v", ada)
+	}
+
+	path := filepath.Join(t.TempDir(), "index.json")
+	if err := ix.Save(path); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if diff := cmp.Diff(want, loaded.Graph.People["jane@corp.com"].Links); diff != "" {
+		t.Errorf("links after load mismatch (-want +got):\n%s", diff)
+	}
+
+	loaded.Forget(loaded.Graph.People["jane@corp.com"])
+	for id, p := range loaded.Graph.People {
+		if len(p.Links) != 0 {
+			t.Errorf("%s still holds links after the purge: %v", id, p.Links)
+		}
+	}
+}
+
+// TestMergePersonUnionsLinks verifies a merge keeps both sides' deep links once
+// each, sorted, so a handle absorbed into an email keeps its direct message.
+func TestMergePersonUnionsLinks(t *testing.T) {
+	t.Parallel()
+	dst := &model.Person{ID: "a@x.com", Links: []string{"slack://user?team=T1&id=U2"}}
+	src := &model.Person{ID: "slack:U1", Links: []string{"slack://user?team=T0&id=U1", "slack://user?team=T1&id=U2"}}
+	mergePerson(dst, src)
+	want := []string{"slack://user?team=T0&id=U1", "slack://user?team=T1&id=U2"}
+	if diff := cmp.Diff(want, dst.Links); diff != "" {
+		t.Errorf("links mismatch (-want +got):\n%s", diff)
+	}
+}

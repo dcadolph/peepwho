@@ -938,6 +938,13 @@ empty. The core never reads the environment or a keychain, and `make
 core-deps` fails the build when it links the command line or a keychain
 package.
 
+A person read from the Slack API carries `links` in the profile JSON: a
+`slack://user?team=<workspace id>&id=<user id>` link per workspace that opens
+a direct message with them in the Slack app, sorted. The field is absent for
+anyone with no Slack identity, and for a Slack export, which has no workspace
+id. When `auth.test` fails during an index, the read goes on without links
+and logs that they are unavailable; the next index that reaches it adds them.
+
 `ChangesSince(sinceUnix)` merges the change log entries written after
 `sinceUnix` into `{"as_of", "entries", "changes"}`: the newest counted run's
 time, how many runs it merged, and the people, teams, and channels that joined
@@ -950,7 +957,7 @@ means the whole log. The app keeps its own last-look time.
 | `Handle.SetSecrets(s)`           | Nothing. Sets where source tokens are read from.            |
 | `Handle.Ask(q, limit)`           | The `ask --json` answer, keyword ranking only.              |
 | `Handle.Search(q, limit)`        | The `search --json` results.                                |
-| `Handle.Person(id)`              | The full profile of one person, as JSON.                    |
+| `Handle.Person(id)`              | The full profile of one person, as JSON, with `links`.      |
 | `Handle.Recall(who, q, limit)`   | The `recall --json` answer for one person.                  |
 | `Handle.Status(nowUnix)`         | Counts, seal state, and index age at the host's clock.      |
 | `Handle.ChangesSince(sinceUnix)` | Who and what joined or left after the host's last look.     |

@@ -47,6 +47,8 @@ type authTestResp struct {
 	URL string `json:"url"`
 	// Team is the workspace name.
 	Team string `json:"team"`
+	// TeamID is the workspace ID.
+	TeamID string `json:"team_id"`
 }
 
 // Auth describes the authenticated identity and the workspace it belongs to.
@@ -58,6 +60,9 @@ type Auth struct {
 	URL string
 	// Team is the workspace name.
 	Team string
+	// TeamID is the workspace ID, such as "T0123", which a slack:// deep link
+	// needs to open a direct message in the right workspace.
+	TeamID string
 }
 
 // AuthTest returns the authenticated identity and workspace. The bot uses the
@@ -68,7 +73,7 @@ func (c *Client) AuthTest(ctx context.Context) (Auth, error) {
 	if err := c.do(ctx, "auth.test", url.Values{}, &resp); err != nil {
 		return Auth{}, err
 	}
-	return Auth{UserID: resp.UserID, URL: resp.URL, Team: resp.Team}, nil
+	return Auth{UserID: resp.UserID, URL: resp.URL, Team: resp.Team, TeamID: resp.TeamID}, nil
 }
 
 // responseURLPrefix is the only host slash-command response URLs may name, so

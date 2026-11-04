@@ -348,6 +348,9 @@ func (ix *Index) buildPerson(rec connector.Record) {
 		p.Identities = append(p.Identities, raw)
 	}
 	fillIdentity(p, rec)
+	if rec.Link != "" {
+		addLinks(p, rec.Link)
+	}
 	if p.ManagerID != "" {
 		p.ManagerID = r.Canonical(p.ManagerID)
 	}
@@ -440,6 +443,16 @@ func (ix *Index) buildPerson(rec connector.Record) {
 			addKey(term, weightText)
 		}
 	}
+}
+
+// addLinks adds each link to the person's deep links once, keeping them sorted.
+func addLinks(p *model.Person, links ...string) {
+	for _, l := range links {
+		if l != "" && !slices.Contains(p.Links, l) {
+			p.Links = append(p.Links, l)
+		}
+	}
+	slices.Sort(p.Links)
 }
 
 // buildChannel merges one channel record into the graph and channel postings.
