@@ -1,0 +1,7 @@
+Unlinked owners  2 of 5 have no work recorded against them
+  Each may have left, or may simply commit under an address this handle was never tied to.
+
+  kim-doe  a, b, c, d, e and 2 more
+  lee-roe  x
+
+  Tie one to its person by adding "person@example.com": ["the-handle"] to the alias file, then re-index.

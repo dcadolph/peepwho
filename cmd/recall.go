@@ -14,6 +14,7 @@ import (
 	"github.com/dcadolph/peepwho/internal/model"
 	"github.com/dcadolph/peepwho/internal/policy"
 	"github.com/dcadolph/peepwho/internal/recall"
+	"github.com/dcadolph/peepwho/internal/render"
 )
 
 // meEnv names the environment variable identifying who is asking, so the
@@ -95,7 +96,7 @@ Examples:
 			warnEmptyRecall(cmd, res, ans, person)
 			warnUnexplained(cmd, ans, explain)
 			return opts.render(cmd.OutOrStdout(), ans, func(w io.Writer, s style) {
-				renderRecall(w, ans, s)
+				render.RenderRecall(w, ans, s)
 			})
 		},
 	}

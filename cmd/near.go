@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/dcadolph/peepwho/internal/render"
 )
 
 // newNearCmd builds the near command, which ranks the people who work nearest a
@@ -40,7 +42,7 @@ id, or an exact name.
 				"near":   nearList,
 			}
 			return opts.render(cmd.OutOrStdout(), view, func(w io.Writer, s style) {
-				renderNear(w, p.Name, nearList, s)
+				render.RenderNear(w, p.Name, nearList, s)
 			})
 		},
 	}

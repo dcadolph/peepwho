@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dcadolph/peepwho/internal/index"
+	"github.com/dcadolph/peepwho/internal/render"
 	"github.com/dcadolph/peepwho/internal/report"
 	"github.com/dcadolph/peepwho/internal/resolve"
 )
@@ -60,7 +61,7 @@ Examples:
 				who := strings.Join(args, " ")
 				imp := resolve.Departure(ix, who)
 				return opts.render(cmd.OutOrStdout(), imp, func(w io.Writer, s style) {
-					renderDeparture(w, who, imp, s)
+					render.RenderDeparture(w, who, imp, s)
 					renderNotFor(w, s)
 				})
 			}
@@ -69,9 +70,9 @@ Examples:
 			spans := resolve.SoleSpans(ix, spansShown)
 			view := map[string]any{"topics": report, "regions": regions, "spans": spans}
 			return opts.render(cmd.OutOrStdout(), view, func(w io.Writer, s style) {
-				renderRisk(w, report, s)
-				renderRegions(w, regions, s)
-				renderSpans(w, spans, s)
+				render.RenderRisk(w, report, s)
+				render.RenderRegions(w, regions, s)
+				render.RenderSpans(w, spans, s)
 				renderNotFor(w, s)
 			})
 		},

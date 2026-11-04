@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dcadolph/peepwho/internal/eval"
+	"github.com/dcadolph/peepwho/internal/render"
 )
 
 // newEvalCmd builds the eval command, which measures the current index and
@@ -75,13 +76,13 @@ Examples:
 				view["sameQuestions"] = sameQuestions
 			}
 			return opts.render(cmd.OutOrStdout(), view, func(w io.Writer, s style) {
-				renderEval(w, now, s)
+				render.RenderEval(w, now, s)
 				if baseline != "" {
-					renderEvalHead(w, head, sameQuestions, s)
-					renderEvalChanges(w, changes, comparable, s)
+					render.RenderEvalHead(w, head, sameQuestions, s)
+					render.RenderEvalChanges(w, changes, comparable, s)
 				}
 				if save != "" {
-					fmt.Fprintf(w, "\n%s\n", s.dim("Saved to "+save))
+					fmt.Fprintf(w, "\n%s\n", s.Dim("Saved to "+save))
 				}
 			})
 		},

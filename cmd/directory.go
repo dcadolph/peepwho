@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/dcadolph/peepwho/internal/render"
 	"github.com/dcadolph/peepwho/internal/resolve"
 )
 
@@ -53,7 +54,7 @@ Examples:
 					"%w: unknown section %q; use people, channels, teams, or topics", ErrBadArgs, section)
 			}
 			return opts.render(cmd.OutOrStdout(), v, func(w io.Writer, s style) {
-				renderDirectory(w, dir, section, s)
+				render.RenderDirectory(w, dir, section, s)
 			})
 		},
 	}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/dcadolph/peepwho/internal/render"
 	"github.com/dcadolph/peepwho/internal/resolve"
 )
 
@@ -45,7 +46,7 @@ Examples:
 				"trailing": report.Trailing,
 			}
 			return opts.render(cmd.OutOrStdout(), view, func(w io.Writer, s style) {
-				renderOwnership(w, report, s)
+				render.RenderOwnership(w, report, s)
 			})
 		},
 	}

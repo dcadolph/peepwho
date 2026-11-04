@@ -11,6 +11,7 @@ import (
 	"github.com/dcadolph/peepwho/internal/engine"
 	"github.com/dcadolph/peepwho/internal/fact"
 	"github.com/dcadolph/peepwho/internal/index"
+	"github.com/dcadolph/peepwho/internal/render"
 	"github.com/dcadolph/peepwho/internal/resolve"
 	"github.com/dcadolph/peepwho/internal/util"
 )
@@ -64,7 +65,7 @@ Examples:
 			warnEmptyAsk(cmd, ix, query, ans)
 			view := ans.View(query)
 			if err := opts.render(cmd.OutOrStdout(), view, func(w io.Writer, s style) {
-				renderAsk(w, query, view, s)
+				render.RenderAsk(w, query, view, s)
 			}); err != nil {
 				return err
 			}

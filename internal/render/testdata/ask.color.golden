@@ -1,0 +1,24 @@
+
+[1mWho knows about "billing"[0m
+[2mTwo people and one channel know about billing.[0m
+
+  [2mPEOPLE[0m
+
+  [2m 1[0m  [1mKim Doe[0m  [2mStaff Engineer, Payments[0m
+      [38;5;42m▰▰▰▰▰▰▰▰▰[0m[2m▱[0m [38;5;42m 92%[0m   [2mcommits to billing · answers in #payments[0m
+
+  [2m 2[0m  [1mLee Roe[0m  [2mPayments[0m
+      [38;5;42m▰▰▰▰[0m[2m▱▱▱▱▱▱[0m [38;5;42m 40%[0m   [2mmentioned in docs[0m
+
+  [2m 3[0m  [1mSam Poe[0m  [2mManager[0m
+      [2m▱▱▱▱▱▱▱▱▱▱[0m [38;5;42m   ~[0m   
+
+  [2mCHANNELS[0m
+
+  [2m 1[0m  [1m#payments[0m
+      [38;5;42m▰▰▰▰▰▰▰[0m[2m▱▱▱[0m [38;5;42m 70%[0m   [2mactive on billing[0m
+      [38;5;42m→[0m [2mhttps://chat.example.com/payments[0m
+
+  [2m 2[0m  [1m#billing-alerts[0m
+      [38;5;42m▰▰[0m[2m▱▱▱▱▱▱▱▱[0m [38;5;42m 20%[0m   
+

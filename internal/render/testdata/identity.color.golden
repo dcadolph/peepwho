@@ -1,0 +1,8 @@
+[1mIdentity joins  3 inferred across 2 people[0m
+
+  [1mKim Doe[0m  [2mkim@example.com[0m
+    [38;5;42m▰▰▰▰▰▰▰▰▰[0m[2m▱[0m  90%  [38;5;141mgithub:kim-doe[0m  [2munique name match[0m
+    [38;5;42m▰▰▰▰▰[0m[2m▱▱▱▱▱[0m  50%  [38;5;197mslack:U1[0m        [2mname and shared team[0m
+
+  [1mlee[0m
+    [2m▱▱▱▱▱▱▱▱▱▱[0m    ~  [38;5;245mplain-alias[0m     [2mguess[0m

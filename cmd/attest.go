@@ -58,8 +58,8 @@ with peepwho verify --key.`,
 			view := sealSummary{Dir: outDir, KeyID: m.KeyID, Files: len(m.Files)}
 			return opts.render(cmd.OutOrStdout(), view, func(w io.Writer, s style) {
 				fmt.Fprintf(w, "%s %d file%s into %s with key %s\n",
-					s.accent("sealed:"), view.Files, plural(view.Files), view.Dir, view.KeyID)
-				fmt.Fprintf(w, "%s\n", s.dim("check it with: peepwho verify "+view.Dir))
+					s.Accent("sealed:"), view.Files, plural(view.Files), view.Dir, view.KeyID)
+				fmt.Fprintf(w, "%s\n", s.Dim("check it with: peepwho verify "+view.Dir))
 				renderNotFor(w, s)
 			})
 		},
@@ -107,7 +107,7 @@ peepwho.`,
 			}{KeyID: seal.KeyID(pub), PublicKey: base64.StdEncoding.EncodeToString(pub)}
 			return opts.render(cmd.OutOrStdout(), view, func(w io.Writer, s style) {
 				fmt.Fprintf(w, "%s  %s\n%s  %s\n",
-					s.dim("key id    "), view.KeyID, s.dim("public key"), view.PublicKey)
+					s.Dim("key id    "), view.KeyID, s.Dim("public key"), view.PublicKey)
 			})
 		},
 	}

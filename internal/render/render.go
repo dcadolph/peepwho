@@ -1,4 +1,6 @@
-package cmd
+// Package render writes the human-readable terminal form of peepwho answers to
+// an io.Writer, coloring only when its Style says so.
+package render
 
 import (
 	"fmt"
@@ -17,6 +19,59 @@ import (
 	"github.com/dcadolph/peepwho/internal/text"
 	"github.com/dcadolph/peepwho/internal/util"
 )
+
+// IdentityView is the audit of inferred identity merges, grouped by person.
+type IdentityView struct {
+	// Merges is how many inferred joins the index holds.
+	Merges int `json:"merges"`
+	// People are the people with at least one inferred join, in name order.
+	People []IdentityPerson `json:"people"`
+}
+
+// IdentityPerson is one person and the aliases inferred to be them.
+type IdentityPerson struct {
+	// ID is the person's canonical identifier.
+	ID string `json:"id"`
+	// Name is the person's display name.
+	Name string `json:"name,omitempty"`
+	// Email is the person's work email.
+	Email string `json:"email,omitempty"`
+	// Joins are the aliases inferred to be this person, in alias order.
+	Joins []IdentityJoin `json:"joins"`
+}
+
+// IdentityJoin is one inferred alias with its confidence and evidence.
+type IdentityJoin struct {
+	// Alias is the identifier that was folded in, such as "github:kim-doe".
+	Alias string `json:"alias"`
+	// Confidence is how sure the merge is, from 0 to 1.
+	Confidence float64 `json:"confidence"`
+	// Reason names the evidence, such as "unique name match".
+	Reason string `json:"reason"`
+}
+
+// UnlinkedView is the worklist of declared owners with nothing recorded
+// against them: the people a source of record names but whose work peepwho
+// cannot find, almost always because their handle was never tied to the address
+// they commit under.
+type UnlinkedView struct {
+	// Unlinked is how many declared owners have no recorded work.
+	Unlinked int `json:"unlinked"`
+	// Declared is how many declared owners there are in total.
+	Declared int `json:"declared"`
+	// Owners are those without work, the ones owning most first.
+	Owners []UnlinkedOwner `json:"owners"`
+}
+
+// UnlinkedOwner is one declared owner with nothing recorded against them.
+type UnlinkedOwner struct {
+	// ID is the identifier the source of record knows them by.
+	ID string `json:"id"`
+	// Name is their display name, when a source gave one.
+	Name string `json:"name,omitempty"`
+	// Owns are the areas they are the owner of record for.
+	Owns []string `json:"owns"`
+}
 
 // rank formats a one-based position in a result list, right-aligned so single
 // and double digits line up.
@@ -37,55 +92,55 @@ func nameWidth(people []resolve.JSONPerson) int {
 	return width
 }
 
-// renderAsk prints an answer as ranked, aligned rows: each match numbered, with
+// RenderAsk prints an answer as ranked, aligned rows: each match numbered, with
 // a strength bar and the reasons it surfaced dimmed beneath. Every indexed
 // string is escaped on its way to the terminal, since names and reasons come
 // from sources third parties control.
-func renderAsk(w io.Writer, query string, view resolve.JSONAnswer, s style) {
-	fmt.Fprintf(w, "\n%s\n", s.bold("Who knows about "+strconv.Quote(query)))
+func RenderAsk(w io.Writer, query string, view resolve.JSONAnswer, s Style) {
+	fmt.Fprintf(w, "\n%s\n", s.Bold("Who knows about "+strconv.Quote(query)))
 	if view.Summary != "" {
-		fmt.Fprintf(w, "%s\n", s.dim(escapeControls(view.Summary)))
+		fmt.Fprintf(w, "%s\n", s.Dim(EscapeControls(view.Summary)))
 	}
 	if len(view.People) == 0 && len(view.Channels) == 0 {
-		fmt.Fprintf(w, "\n  %s\n\n", s.dim(
+		fmt.Fprintf(w, "\n  %s\n\n", s.Dim(
 			"Nothing matched. Try the words your team would use, or `peepwho directory` to see what is indexed."))
 		return
 	}
 	if len(view.People) > 0 {
-		fmt.Fprintf(w, "\n  %s\n\n", s.dim("PEOPLE"))
+		fmt.Fprintf(w, "\n  %s\n\n", s.Dim("PEOPLE"))
 		width := nameWidth(view.People)
 		for i, p := range view.People {
-			name := escapeControls(p.Name)
+			name := EscapeControls(p.Name)
 			fmt.Fprintf(w, "  %s  %s  %s\n",
-				s.dim(rank(i+1)), pad(s.bold(name), name, width),
-				s.dim(escapeControls(joinRole(p.Title, p.Team))))
+				s.Dim(rank(i+1)), pad(s.Bold(name), name, width),
+				s.Dim(EscapeControls(joinRole(p.Title, p.Team))))
 			fmt.Fprintf(w, "      %s %s   %s\n",
-				s.confBar(p.Strength), s.accent(pct(p.Strength)),
-				s.dim(strings.Join(escapeControlsList(p.Reasons), " · ")))
+				s.ConfBar(p.Strength), s.Accent(pct(p.Strength)),
+				s.Dim(strings.Join(EscapeControlsList(p.Reasons), " · ")))
 			fmt.Fprintln(w)
 		}
 	}
 	if len(view.Channels) > 0 {
-		fmt.Fprintf(w, "  %s\n\n", s.dim("CHANNELS"))
+		fmt.Fprintf(w, "  %s\n\n", s.Dim("CHANNELS"))
 		for i, ch := range view.Channels {
-			fmt.Fprintf(w, "  %s  %s\n", s.dim(rank(i+1)), s.bold("#"+escapeControls(ch.Name)))
+			fmt.Fprintf(w, "  %s  %s\n", s.Dim(rank(i+1)), s.Bold("#"+EscapeControls(ch.Name)))
 			fmt.Fprintf(w, "      %s %s   %s\n",
-				s.confBar(ch.Strength), s.accent(pct(ch.Strength)),
-				s.dim(strings.Join(escapeControlsList(ch.Reasons), " · ")))
+				s.ConfBar(ch.Strength), s.Accent(pct(ch.Strength)),
+				s.Dim(strings.Join(EscapeControlsList(ch.Reasons), " · ")))
 			if ch.URL != "" {
-				fmt.Fprintf(w, "      %s %s\n", s.accent("\u2192"), s.dim(escapeControls(ch.URL)))
+				fmt.Fprintf(w, "      %s %s\n", s.Accent("\u2192"), s.Dim(EscapeControls(ch.URL)))
 			}
 			fmt.Fprintln(w)
 		}
 	}
 }
 
-// renderNear prints who works near a person as a ranked list, each with the
+// RenderNear prints who works near a person as a ranked list, each with the
 // shared teams and topics that put them close.
-func renderNear(w io.Writer, name string, near []index.Adjacent, s style) {
-	fmt.Fprintf(w, "\n%s\n", s.bold("Near "+escapeControls(name)))
+func RenderNear(w io.Writer, name string, near []index.Adjacent, s Style) {
+	fmt.Fprintf(w, "\n%s\n", s.Bold("Near "+EscapeControls(name)))
 	if len(near) == 0 {
-		fmt.Fprintf(w, "\n  %s\n\n", s.dim("No one indexed shares a team or topic with them yet."))
+		fmt.Fprintf(w, "\n  %s\n\n", s.Dim("No one indexed shares a team or topic with them yet."))
 		return
 	}
 	fmt.Fprintln(w)
@@ -99,24 +154,24 @@ func renderNear(w io.Writer, name string, near []index.Adjacent, s style) {
 		width = 26
 	}
 	for i, a := range near {
-		aName := escapeControls(a.Name)
+		aName := EscapeControls(a.Name)
 		fmt.Fprintf(w, "  %s  %s  %s\n",
-			s.dim(rank(i+1)), pad(s.bold(aName), aName, width),
-			s.dim(strings.Join(escapeControlsList(a.Reasons), " · ")))
+			s.Dim(rank(i+1)), pad(s.Bold(aName), aName, width),
+			s.Dim(strings.Join(EscapeControlsList(a.Reasons), " · ")))
 	}
 	fmt.Fprintln(w)
 }
 
-// renderStatus prints the index summary as a clean labeled block, with a
+// RenderStatus prints the index summary as a clean labeled block, with a
 // friendly build time and the index path shortened to the home directory.
-func renderStatus(w io.Writer, v map[string]any, s style) {
+func RenderStatus(w io.Writer, v map[string]any, s Style) {
 	geti := func(k string) int { n, _ := v[k].(int); return n }
 	gets := func(k string) string { str, _ := v[k].(string); return str }
-	line := func(label, val string) { fmt.Fprintf(w, "  %s  %s\n", pad(s.dim(label), label, 8), val) }
+	line := func(label, val string) { fmt.Fprintf(w, "  %s  %s\n", pad(s.Dim(label), label, 8), val) }
 
-	fmt.Fprintf(w, "\n%s\n\n", s.bold("peepwho index"))
-	line("People", s.bold(fmt.Sprintf("%d", geti("people")))+"  "+
-		s.dim(fmt.Sprintf("%d teams · %d subjects · %d channels",
+	fmt.Fprintf(w, "\n%s\n\n", s.Bold("peepwho index"))
+	line("People", s.Bold(fmt.Sprintf("%d", geti("people")))+"  "+
+		s.Dim(fmt.Sprintf("%d teams · %d subjects · %d channels",
 			geti("teams"), geti("subjects"), geti("channels"))))
 	if bt := gets("built_at"); bt != "" {
 		when := bt
@@ -126,9 +181,9 @@ func renderStatus(w io.Writer, v map[string]any, s style) {
 		if age := gets("age"); age != "" {
 			when += "  (" + humanAge(age) + " ago)"
 		}
-		line("Built", s.dim(when))
+		line("Built", s.Dim(when))
 	} else if age := gets("age"); age != "" {
-		line("Built", s.dim(humanAge(age)+" ago"))
+		line("Built", s.Dim(humanAge(age)+" ago"))
 	}
 	if src, ok := v["sources"].(map[string]int); ok && len(src) > 0 {
 		parts := make([]string, 0, len(src))
@@ -145,12 +200,12 @@ func renderStatus(w io.Writer, v map[string]any, s style) {
 	if e, _ := v["embeddings"].(bool); e {
 		emb = "on"
 	}
-	line("At rest", s.dim("encryption "+enc+" · embeddings "+emb))
+	line("At rest", s.Dim("encryption "+enc+" · embeddings "+emb))
 	if idx := gets("index"); idx != "" {
 		if home, err := os.UserHomeDir(); err == nil && home != "" && strings.HasPrefix(idx, home) {
 			idx = "~" + idx[len(home):]
 		}
-		line("File", s.dim(idx))
+		line("File", s.Dim(idx))
 	}
 	fmt.Fprintln(w)
 }
@@ -165,18 +220,18 @@ func humanAge(d string) string {
 	return d
 }
 
-// renderRecall prints the conversations a person took part in, each card led by
+// RenderRecall prints the conversations a person took part in, each card led by
 // its source in the source's own color, then where it happened, who was there,
 // any retained solution, and a link back.
-func renderRecall(w io.Writer, ans recall.Answer, s style) {
-	fmt.Fprintf(w, "\n%s\n", s.bold("Your recall"))
+func RenderRecall(w io.Writer, ans recall.Answer, s Style) {
+	fmt.Fprintf(w, "\n%s\n", s.Bold("Your recall"))
 	if ans.Query != "" {
-		fmt.Fprintf(w, "%s\n", s.dim("matching "+strconv.Quote(ans.Query)))
+		fmt.Fprintf(w, "%s\n", s.Dim("matching "+strconv.Quote(ans.Query)))
 	}
 	if len(ans.Episodes) == 0 {
-		fmt.Fprintf(w, "\n  %s\n", s.dim("Nothing found in the conversations you took part in."))
+		fmt.Fprintf(w, "\n  %s\n", s.Dim("Nothing found in the conversations you took part in."))
 		if ans.Scope.Note != "" {
-			fmt.Fprintf(w, "  %s\n", s.dim(ans.Scope.Note))
+			fmt.Fprintf(w, "  %s\n", s.Dim(ans.Scope.Note))
 		}
 		fmt.Fprintln(w)
 		return
@@ -188,42 +243,42 @@ func renderRecall(w io.Writer, ans recall.Answer, s style) {
 		if !ep.When.IsZero() {
 			date = ep.When.Format("Jan 2, 2006")
 		}
-		fmt.Fprintf(w, "  %s   %s\n", s.color256(code, "● "+strings.ToUpper(label)), s.dim(date))
-		place := escapeControls(ep.Place)
+		fmt.Fprintf(w, "  %s   %s\n", s.Color256(code, "● "+strings.ToUpper(label)), s.Dim(date))
+		place := EscapeControls(ep.Place)
 		if place != "" && (ep.Kind == "thread" || ep.Kind == "window") {
 			place = "#" + place
 		}
 		if place != "" {
-			fmt.Fprintf(w, "  %s\n", s.bold(place))
+			fmt.Fprintf(w, "  %s\n", s.Bold(place))
 		}
-		fmt.Fprintf(w, "  %s\n", s.dim(escapeControls(recallWith(ep.People))))
+		fmt.Fprintf(w, "  %s\n", s.Dim(EscapeControls(recallWith(ep.People))))
 		// Every other answer peepwho gives says why it surfaced, and a recalled
 		// conversation needs it most: without the matched words, a thread from
 		// an unrelated-looking channel reads as a random result rather than the
 		// one place the asked-about word was actually said.
 		if words := recallMatchedWords(ans.Query, ep.Matched); len(words) > 0 {
-			fmt.Fprintf(w, "  %s\n", s.dim("matched "+strings.Join(escapeControlsList(words), ", ")))
+			fmt.Fprintf(w, "  %s\n", s.Dim("matched "+strings.Join(EscapeControlsList(words), ", ")))
 		}
 		if ep.Solution != nil {
 			if ep.Solution.Summary != "" {
-				fmt.Fprintf(w, "  %s\n", escapeControls(ep.Solution.Summary))
+				fmt.Fprintf(w, "  %s\n", EscapeControls(ep.Solution.Summary))
 			}
 			for _, n := range ep.Solution.Notes {
 				fmt.Fprintf(w, "    %s %s\n",
-					s.dim(escapeControls(n.Author)+":"), escapeControls(n.Text))
+					s.Dim(EscapeControls(n.Author)+":"), EscapeControls(n.Text))
 			}
 		}
 		if ep.Permalink != "" {
 			fmt.Fprintf(w, "  %s %s\n",
-				s.color256(code, "→ open in "+label), s.dim(escapeControls(ep.Permalink)))
+				s.Color256(code, "→ open in "+label), s.Dim(EscapeControls(ep.Permalink)))
 		}
 		if ep.LinkMayHaveExpired {
-			fmt.Fprintf(w, "  %s\n", s.dim("link may be stale"))
+			fmt.Fprintf(w, "  %s\n", s.Dim("link may be stale"))
 		}
 		fmt.Fprintln(w)
 	}
 	if ans.Scope.Note != "" {
-		fmt.Fprintf(w, "  %s\n\n", s.dim(ans.Scope.Note))
+		fmt.Fprintf(w, "  %s\n\n", s.Dim(ans.Scope.Note))
 	}
 }
 
@@ -291,14 +346,14 @@ func recallWith(people []recall.Person) string {
 // counts the rest.
 const recallNamesShown = 3
 
-// renderDirectory prints the requested directory section, or every section when
+// RenderDirectory prints the requested directory section, or every section when
 // none was named, each as a titled, counted list.
-func renderDirectory(w io.Writer, dir resolve.Directory, section string, s style) {
+func RenderDirectory(w io.Writer, dir resolve.Directory, section string, s Style) {
 	show := func(name string) bool { return section == "" || section == name }
 	any := false
 	head := func(title string, n int) {
 		any = true
-		fmt.Fprintf(w, "\n%s  %s\n\n", s.bold(title), s.dim(strconv.Itoa(n)))
+		fmt.Fprintf(w, "\n%s  %s\n\n", s.Bold(title), s.Dim(strconv.Itoa(n)))
 	}
 	if show("people") && len(dir.People) > 0 {
 		head("People", len(dir.People))
@@ -312,9 +367,9 @@ func renderDirectory(w io.Writer, dir resolve.Directory, section string, s style
 			width = 26
 		}
 		for _, p := range dir.People {
-			name := escapeControls(p.Name)
-			fmt.Fprintf(w, "  %s  %s\n", pad(s.bold(name), name, width),
-				s.dim(escapeControls(joinRole(p.Title, p.Team))))
+			name := EscapeControls(p.Name)
+			fmt.Fprintf(w, "  %s  %s\n", pad(s.Bold(name), name, width),
+				s.Dim(EscapeControls(joinRole(p.Title, p.Team))))
 		}
 	}
 	if show("channels") && len(dir.Channels) > 0 {
@@ -322,29 +377,29 @@ func renderDirectory(w io.Writer, dir resolve.Directory, section string, s style
 		for _, ch := range dir.Channels {
 			meta := peopleCount(ch.Members)
 			if ch.Topic != "" {
-				meta = escapeControls(ch.Topic) + " · " + meta
+				meta = EscapeControls(ch.Topic) + " · " + meta
 			}
-			fmt.Fprintf(w, "  %s  %s\n", s.bold("#"+escapeControls(ch.Name)), s.dim(meta))
+			fmt.Fprintf(w, "  %s  %s\n", s.Bold("#"+EscapeControls(ch.Name)), s.Dim(meta))
 		}
 	}
 	if show("teams") && len(dir.Teams) > 0 {
 		head("Teams", len(dir.Teams))
 		width := teamWidth(dir.Teams)
 		for _, t := range dir.Teams {
-			name := escapeControls(t.Name)
-			fmt.Fprintf(w, "  %s  %s\n", pad(s.bold(name), name, width), s.dim(peopleCount(t.People)))
+			name := EscapeControls(t.Name)
+			fmt.Fprintf(w, "  %s  %s\n", pad(s.Bold(name), name, width), s.Dim(peopleCount(t.People)))
 		}
 	}
 	if show("topics") && len(dir.Topics) > 0 {
 		head("Topics", len(dir.Topics))
 		width := topicWidth(dir.Topics)
 		for _, t := range dir.Topics {
-			name := escapeControls(t.Name)
-			fmt.Fprintf(w, "  %s  %s\n", pad(s.bold(name), name, width), s.dim(peopleCount(t.People)))
+			name := EscapeControls(t.Name)
+			fmt.Fprintf(w, "  %s  %s\n", pad(s.Bold(name), name, width), s.Dim(peopleCount(t.People)))
 		}
 	}
 	if !any {
-		fmt.Fprintf(w, "\n  %s\n", s.dim("Nothing indexed yet. Run `peepwho index` against a source."))
+		fmt.Fprintf(w, "\n  %s\n", s.Dim("Nothing indexed yet. Run `peepwho index` against a source."))
 	}
 	fmt.Fprintln(w)
 }
@@ -385,65 +440,65 @@ func peopleCount(n int) string {
 	return fmt.Sprintf("%d people", n)
 }
 
-// renderFeedback prints recorded votes, each marked helpful or wrong, with the
+// RenderFeedback prints recorded votes, each marked helpful or wrong, with the
 // question it was cast on and any note.
-func renderFeedback(w io.Writer, entries []feedback.Entry, s style) {
-	fmt.Fprintf(w, "\n%s  %s\n", s.bold("Feedback"), s.dim(strconv.Itoa(len(entries))))
+func RenderFeedback(w io.Writer, entries []feedback.Entry, s Style) {
+	fmt.Fprintf(w, "\n%s  %s\n", s.Bold("Feedback"), s.Dim(strconv.Itoa(len(entries))))
 	if len(entries) == 0 {
-		fmt.Fprintf(w, "\n  %s\n\n", s.dim("No votes recorded yet."))
+		fmt.Fprintf(w, "\n  %s\n\n", s.Dim("No votes recorded yet."))
 		return
 	}
 	fmt.Fprintln(w)
 	for _, e := range entries {
-		mark := s.accent("✓ helpful")
+		mark := s.Accent("✓ helpful")
 		if e.Vote < 0 {
-			mark = s.bad("✗ wrong")
+			mark = s.Bad("✗ wrong")
 		}
-		target := escapeControls(e.Person)
+		target := EscapeControls(e.Person)
 		if e.Channel != "" {
-			target = "#" + escapeControls(e.Channel)
+			target = "#" + EscapeControls(e.Channel)
 		}
-		fmt.Fprintf(w, "  %s  %s  %s\n", mark, s.bold(target), s.dim("on "+strconv.Quote(e.Query)))
+		fmt.Fprintf(w, "  %s  %s  %s\n", mark, s.Bold(target), s.Dim("on "+strconv.Quote(e.Query)))
 		if e.Comment != "" {
 			// The comment arrives through the web feedback endpoint, so it is
 			// user-supplied text like any indexed field.
-			fmt.Fprintf(w, "      %s\n", s.dim("“"+escapeControls(e.Comment)+"”"))
+			fmt.Fprintf(w, "      %s\n", s.Dim("“"+EscapeControls(e.Comment)+"”"))
 		}
 	}
 	fmt.Fprintln(w)
 }
 
-// renderIdentity prints the inferred identity merges grouped by person, each
+// RenderIdentity prints the inferred identity merges grouped by person, each
 // alias with a confidence bar, the confidence, and the evidence.
-func renderIdentity(w io.Writer, v identityView, s style) {
+func RenderIdentity(w io.Writer, v IdentityView, s Style) {
 	if v.Merges == 0 {
-		fmt.Fprintln(w, s.dim(
+		fmt.Fprintln(w, s.Dim(
 			"No inferred identity merges. Joins by email or provider id are certain and are not shown here."))
 		return
 	}
-	fmt.Fprintln(w, s.bold(fmt.Sprintf("Identity joins  %d inferred across %d people", v.Merges, len(v.People))))
+	fmt.Fprintln(w, s.Bold(fmt.Sprintf("Identity joins  %d inferred across %d people", v.Merges, len(v.People))))
 	width := aliasWidth(v.People)
 	for _, p := range v.People {
-		who := s.bold(escapeControls(p.Name))
+		who := s.Bold(EscapeControls(p.Name))
 		if p.Name == "" {
-			who = s.bold(escapeControls(p.ID))
+			who = s.Bold(EscapeControls(p.ID))
 		}
 		if p.Email != "" {
-			who += "  " + s.dim(escapeControls(p.Email))
+			who += "  " + s.Dim(EscapeControls(p.Email))
 		}
 		fmt.Fprintf(w, "\n  %s\n", who)
 		for _, j := range p.Joins {
 			_, code := sourceColor(handleSource(j.Alias))
-			jAlias := escapeControls(j.Alias)
-			alias := pad(s.color256(code, jAlias), jAlias, width)
+			jAlias := EscapeControls(j.Alias)
+			alias := pad(s.Color256(code, jAlias), jAlias, width)
 			fmt.Fprintf(w, "    %s %s  %s  %s\n",
-				s.confBar(j.Confidence), pct(j.Confidence), alias, s.dim(escapeControls(j.Reason)))
+				s.ConfBar(j.Confidence), pct(j.Confidence), alias, s.Dim(EscapeControls(j.Reason)))
 		}
 	}
 }
 
 // aliasWidth is the longest alias across all joins, for column alignment.
-func aliasWidth(people []identityPerson) int {
+func aliasWidth(people []IdentityPerson) int {
 	w := 0
 	for _, p := range people {
 		for _, j := range p.Joins {
@@ -464,27 +519,27 @@ func handleSource(id string) string {
 	return ""
 }
 
-// renderSearch prints ranked search results: people in bold, channels prefixed
+// RenderSearch prints ranked search results: people in bold, channels prefixed
 // with a hash, each with a context line and the fields the query matched.
-func renderSearch(w io.Writer, query string, results []resolve.SearchResult, s style) {
+func RenderSearch(w io.Writer, query string, results []resolve.SearchResult, s Style) {
 	if len(results) == 0 {
-		fmt.Fprintln(w, s.dim(
+		fmt.Fprintln(w, s.Dim(
 			"No people or channels match “"+query+"”. Try `peepwho directory` to see what is indexed."))
 		return
 	}
-	fmt.Fprintln(w, s.bold(fmt.Sprintf("%d result%s for “%s”", len(results), plural(len(results)), query)))
+	fmt.Fprintln(w, s.Bold(fmt.Sprintf("%d result%s for “%s”", len(results), Plural(len(results)), query)))
 	width := searchNameWidth(results)
 	for i, r := range results {
-		name := escapeControls(r.Name)
-		raw, label := name, s.bold(name)
+		name := EscapeControls(r.Name)
+		raw, label := name, s.Bold(name)
 		if r.Kind == "channel" {
 			raw = "#" + name
-			label = s.color256(197, raw)
+			label = s.Color256(197, raw)
 		}
 		fmt.Fprintf(w, "  %s  %s  %s",
-			s.dim(rank(i+1)), pad(label, raw, width), s.dim(escapeControls(searchContext(r))))
+			s.Dim(rank(i+1)), pad(label, raw, width), s.Dim(EscapeControls(searchContext(r))))
 		if len(r.Matched) > 0 {
-			fmt.Fprintf(w, "  %s", s.dim("· "+strings.Join(escapeControlsList(r.Matched), ", ")))
+			fmt.Fprintf(w, "  %s", s.Dim("· "+strings.Join(EscapeControlsList(r.Matched), ", ")))
 		}
 		fmt.Fprintln(w)
 	}
@@ -524,19 +579,14 @@ func searchNameWidth(results []resolve.SearchResult) int {
 	return width
 }
 
-// plural returns "s" unless n is one.
-func plural(n int) string {
-	if n == 1 {
-		return ""
-	}
-	return "s"
-}
+// Plural returns "s" unless n is one.
+func Plural(n int) string { return Plural2(n, "", "s") }
 
-// renderRisk prints the knowledge-concentration report, most at-risk first, with
+// RenderRisk prints the knowledge-concentration report, most at-risk first, with
 // each topic's bus factor and the people who hold it.
-func renderRisk(w io.Writer, topics []resolve.TopicRisk, s style) {
+func RenderRisk(w io.Writer, topics []resolve.TopicRisk, s Style) {
 	if len(topics) == 0 {
-		fmt.Fprintln(w, s.dim("No topics scored yet. Index a source with expertise signal first."))
+		fmt.Fprintln(w, s.Dim("No topics scored yet. Index a source with expertise signal first."))
 		return
 	}
 	crit, gone := 0, 0
@@ -555,7 +605,7 @@ func renderRisk(w io.Writer, topics []resolve.TopicRisk, s style) {
 	if gone > 0 {
 		head += fmt.Sprintf(", %d whose strongest expert has moved on", gone)
 	}
-	fmt.Fprintln(w, s.bold(head))
+	fmt.Fprintln(w, s.Bold(head))
 	width := riskTopicWidth(topics)
 	last := ""
 	for _, t := range topics {
@@ -563,33 +613,33 @@ func renderRisk(w io.Writer, topics []resolve.TopicRisk, s style) {
 			fmt.Fprintf(w, "\n%s\n", riskLevelLabel(t.Level, s))
 			last = t.Level
 		}
-		topic := escapeControls(t.Topic)
+		topic := EscapeControls(t.Topic)
 		fmt.Fprintf(w, "  %s  %s  %s\n",
-			pad(s.bold(topic), topic, width), pct(t.Concentration), s.dim(fmt.Sprintf("bus factor %d", t.BusFactor)))
+			pad(s.Bold(topic), topic, width), pct(t.Concentration), s.Dim(fmt.Sprintf("bus factor %d", t.BusFactor)))
 		if len(t.Includes) > 0 {
-			fmt.Fprintf(w, "      %s\n", s.dim("also called "+strings.Join(escapeControlsList(t.Includes), ", ")))
+			fmt.Fprintf(w, "      %s\n", s.Dim("also called "+strings.Join(EscapeControlsList(t.Includes), ", ")))
 		}
 		for _, e := range t.Experts {
 			// Whether the person holding a subject is still in it changes what
 			// the finding means, so it is said on the same line as their share.
 			note := ""
 			if e.Quiet {
-				note = s.dim("  not lately")
+				note = s.Dim("  not lately")
 			}
-			fmt.Fprintf(w, "      %s %s%s\n", pct(e.Share), s.dim(escapeControls(e.Name)), note)
+			fmt.Fprintf(w, "      %s %s%s\n", pct(e.Share), s.Dim(EscapeControls(e.Name)), note)
 		}
 	}
 }
 
 // riskLevelLabel colors a risk level for its section header.
-func riskLevelLabel(level string, s style) string {
+func riskLevelLabel(level string, s Style) string {
 	switch level {
 	case "critical":
-		return s.bad("CRITICAL")
+		return s.Bad("CRITICAL")
 	case "elevated":
-		return s.warn("ELEVATED")
+		return s.Warn("ELEVATED")
 	default:
-		return s.dim("OK")
+		return s.Dim("OK")
 	}
 }
 
@@ -607,48 +657,46 @@ func riskTopicWidth(topics []resolve.TopicRisk) int {
 	return w
 }
 
-// renderDeparture prints the knowledge that would leave with a person.
-func renderDeparture(w io.Writer, query string, imp resolve.DepartureImpact, s style) {
+// RenderDeparture prints the knowledge that would leave with a person.
+func RenderDeparture(w io.Writer, query string, imp resolve.DepartureImpact, s Style) {
 	if imp.Person == "" {
-		fmt.Fprintln(w, s.dim("No one matches “"+query+"”."))
+		fmt.Fprintln(w, s.Dim("No one matches “"+query+"”."))
 		return
 	}
 	name := imp.Name
 	if name == "" {
 		name = imp.Person
 	}
-	fmt.Fprintln(w, s.bold("If "+escapeControls(name)+" leaves"))
+	fmt.Fprintln(w, s.Bold("If "+EscapeControls(name)+" leaves"))
 	if len(imp.Sole) == 0 && len(imp.Top) == 0 && len(imp.Regions) == 0 {
-		fmt.Fprintln(w, s.dim("  No topic depends on them as the top expert."))
+		fmt.Fprintln(w, s.Dim("  No topic depends on them as the top expert."))
 		return
 	}
 	// The joined work goes first because it is the heaviest thing they take
 	// with them: a region has to be picked up whole, not a subject at a time.
 	for _, r := range imp.Regions {
-		fmt.Fprintf(w, "\n  %s\n", s.bad(fmt.Sprintf(
+		fmt.Fprintf(w, "\n  %s\n", s.Bad(fmt.Sprintf(
 			"A joined body of work goes with them (%d subjects)", r.Size())))
-		fmt.Fprintf(w, "    %s\n", strings.Join(escapeControlsList(r.Topics), ", "))
+		fmt.Fprintf(w, "    %s\n", strings.Join(EscapeControlsList(r.Topics), ", "))
 	}
 	if len(imp.Sole) > 0 {
-		fmt.Fprintf(w, "\n  %s\n", s.bad(fmt.Sprintf("Sole expert, nobody else knows (%d)", len(imp.Sole))))
+		fmt.Fprintf(w, "\n  %s\n", s.Bad(fmt.Sprintf("Sole expert, nobody else knows (%d)", len(imp.Sole))))
 		for _, t := range imp.Sole {
-			fmt.Fprintf(w, "    %s %s\n", s.bad("•"), escapeControls(t))
+			fmt.Fprintf(w, "    %s %s\n", s.Bad("•"), EscapeControls(t))
 		}
 	}
 	if len(imp.Top) > 0 {
-		fmt.Fprintf(w, "\n  %s\n", s.warn(fmt.Sprintf("Strongest expert, others remain (%d)", len(imp.Top))))
+		fmt.Fprintf(w, "\n  %s\n", s.Warn(fmt.Sprintf("Strongest expert, others remain (%d)", len(imp.Top))))
 		for _, t := range imp.Top {
-			fmt.Fprintf(w, "    %s %s\n", s.warn("•"), escapeControls(t))
+			fmt.Fprintf(w, "    %s %s\n", s.Warn("•"), EscapeControls(t))
 		}
 	}
 }
 
-// renderOwnership prints where declared ownership has drifted from the person
-// who actually does the work.
-// renderRelated prints the topics that share a topic's experts.
-func renderRelated(w io.Writer, topic string, rel []resolve.TopicRelation, s style) {
+// RenderRelated prints the topics that share a topic's experts.
+func RenderRelated(w io.Writer, topic string, rel []resolve.TopicRelation, s Style) {
 	if len(rel) == 0 {
-		fmt.Fprintln(w, s.dim(
+		fmt.Fprintln(w, s.Dim(
 			"No related topics found. Either the topic is not indexed, or nobody holds it alongside another."))
 		return
 	}
@@ -658,9 +706,9 @@ func renderRelated(w io.Writer, topic string, rel []resolve.TopicRelation, s sty
 			together++
 		}
 	}
-	fmt.Fprintln(w, s.bold(fmt.Sprintf(
+	fmt.Fprintln(w, s.Bold(fmt.Sprintf(
 		"Related to %s  %d topic%s, %d of them worked on alongside it",
-		escapeControls(topic), len(rel), plural(len(rel)), together)))
+		EscapeControls(topic), len(rel), Plural(len(rel)), together)))
 	width := 0
 	for _, r := range rel {
 		if n := len([]rune(r.Topic)); n > width {
@@ -686,68 +734,68 @@ func renderRelated(w io.Writer, topic string, rel []resolve.TopicRelation, s sty
 		if r.Together > 0 {
 			strength = fmt.Sprintf("%3.0f%% together", r.Together*100)
 		}
-		why := kind + ", " + escapeControls(r.Because)
+		why := kind + ", " + EscapeControls(r.Because)
 		// A connection only one person has ever made is worth saying out loud:
 		// both subjects may be well covered while the fact that they belong
 		// together has nobody but them.
 		if r.Spanned == 1 && r.SoleName != "" {
-			why = kind + ", only " + escapeControls(r.SoleName) + " has worked across both"
+			why = kind + ", only " + EscapeControls(r.SoleName) + " has worked across both"
 		}
-		rTopic := escapeControls(r.Topic)
+		rTopic := EscapeControls(r.Topic)
 		fmt.Fprintf(w, "  %s  %s  %s\n",
-			pad(s.bold(rTopic), rTopic, width),
-			s.accent(strength),
-			s.dim(why))
+			pad(s.Bold(rTopic), rTopic, width),
+			s.Accent(strength),
+			s.Dim(why))
 	}
 }
 
-// renderSpans lists the connections between subjects that rest on one person.
+// RenderSpans lists the connections between subjects that rest on one person.
 // Counting experts per subject cannot find these: both areas can be well
 // covered while the work crossing between them has only ever been done once, by
 // one person, and what rests on them is the knowledge that the two belong
 // together at all.
-func renderSpans(w io.Writer, spans []resolve.Span, s style) {
+func RenderSpans(w io.Writer, spans []resolve.Span, s Style) {
 	if len(spans) == 0 {
 		return
 	}
 	fmt.Fprintln(w)
-	fmt.Fprintln(w, s.bold(fmt.Sprintf(
+	fmt.Fprintln(w, s.Bold(fmt.Sprintf(
 		"One-person connections  %d %s only one person has done focused work across",
-		len(spans), plural2(len(spans), "crossing", "crossings"))))
-	fmt.Fprintf(w, "  %s\n\n", s.dim(
+		len(spans), Plural2(len(spans), "crossing", "crossings"))))
+	fmt.Fprintf(w, "  %s\n\n", s.Dim(
 		"The subjects have their own experts. The links between them do not."))
 	for _, sp := range spans {
 		// Two subjects is one crossing and reads as a pair. More than two means
 		// the crossings join up and the whole group rests on one person, which
 		// is the heavier finding and is said as one.
 		fmt.Fprintf(w, "  %s  %s\n",
-			s.bold(strings.Join(escapeControlsList(sp.Topics), s.dim(" + "))),
-			s.dim(fmt.Sprintf("only %s, across %d people holding %s",
-				escapeControls(sp.Person), sp.Experts,
-				plural2(sp.Size(), "the two", "them"))))
+			s.Bold(strings.Join(EscapeControlsList(sp.Topics), s.Dim(" + "))),
+			s.Dim(fmt.Sprintf("only %s, across %d people holding %s",
+				EscapeControls(sp.Person), sp.Experts,
+				Plural2(sp.Size(), "the two", "them"))))
 	}
 }
 
-// renderUnlinked prints the declared owners with nothing recorded against them.
+// RenderUnlinked prints the declared owners with nothing recorded against them.
 // It is a worklist rather than a finding: a source of record names people by
 // handle and an activity source names them by address, so an owner whose two
 // were never tied together is indistinguishable from one who has left, and
 // every area they own reads as drifted until somebody says which is which.
-func renderUnlinked(w io.Writer, view unlinkedView, s style) {
+func RenderUnlinked(w io.Writer, view UnlinkedView, s Style) {
 	if view.Declared == 0 {
-		fmt.Fprintln(w, s.dim(
+		fmt.Fprintln(w, s.Dim(
 			"No declared ownership indexed. Add a CODEOWNERS source to compare it against the work."))
 		return
 	}
 	if view.Unlinked == 0 {
-		fmt.Fprintf(w, "%s\n", s.dim(fmt.Sprintf(
+		fmt.Fprintf(w, "%s\n", s.Dim(fmt.Sprintf(
 			"All %d declared owners have work recorded against them.", view.Declared)))
 		return
 	}
-	fmt.Fprintln(w, s.bold(fmt.Sprintf(
+	fmt.Fprintln(w, s.Bold(fmt.Sprintf(
 		"Unlinked owners  %d of %d have no work recorded against them",
 		view.Unlinked, view.Declared)))
-	fmt.Fprintf(w, "  %s\n\n", s.dim(
+	fmt.Fprintf(w, "  %s\n\n", s.Dim(
 		"Each may have left, or may simply commit under an address this handle was never tied to."))
 	width := 0
 	for _, o := range view.Owners {
@@ -766,28 +814,28 @@ func renderUnlinked(w io.Writer, view unlinkedView, s style) {
 			tail = fmt.Sprintf(" and %d more", len(owns)-most)
 			owns = owns[:most]
 		}
-		id := escapeControls(o.ID)
+		id := EscapeControls(o.ID)
 		fmt.Fprintf(w, "  %s  %s%s\n",
-			pad(s.bold(id), id, width),
-			strings.Join(escapeControlsList(owns), ", "), s.dim(tail))
+			pad(s.Bold(id), id, width),
+			strings.Join(EscapeControlsList(owns), ", "), s.Dim(tail))
 	}
-	fmt.Fprintf(w, "\n  %s\n", s.dim(
+	fmt.Fprintf(w, "\n  %s\n", s.Dim(
 		"Tie one to its person by adding \"person@example.com\": [\"the-handle\"] to the alias file, then re-index."))
 }
 
-// renderRegions lists the connected bodies of work that rest on one person.
+// RenderRegions lists the connected bodies of work that rest on one person.
 // This is a different finding from a concentrated subject and a worse one: ten
 // unrelated subjects held by one person are ten small risks, while ten that are
 // changed together and led by the same person are one large one, because
 // whoever picks the work up has to learn the whole region at once.
-func renderRegions(w io.Writer, regions []resolve.Region, s style) {
+func RenderRegions(w io.Writer, regions []resolve.Region, s Style) {
 	if len(regions) == 0 {
 		return
 	}
 	fmt.Fprintln(w)
-	fmt.Fprintln(w, s.bold(fmt.Sprintf(
+	fmt.Fprintln(w, s.Bold(fmt.Sprintf(
 		"Joined work  %d %s where subjects worked on together all rest on one person",
-		len(regions), plural2(len(regions), "body", "bodies"))))
+		len(regions), Plural2(len(regions), "body", "bodies"))))
 	for _, r := range regions {
 		shown := r.Topics
 		const most = 6
@@ -796,46 +844,48 @@ func renderRegions(w io.Writer, regions []resolve.Region, s style) {
 			tail = fmt.Sprintf(" and %d more", len(shown)-most)
 			shown = shown[:most]
 		}
-		fmt.Fprintf(w, "  %s  %s\n", s.bold(escapeControls(r.Lead)),
-			s.dim(fmt.Sprintf("%d joined subjects", r.Size())))
-		fmt.Fprintf(w, "      %s%s\n", strings.Join(escapeControlsList(shown), ", "), s.dim(tail))
+		fmt.Fprintf(w, "  %s  %s\n", s.Bold(EscapeControls(r.Lead)),
+			s.Dim(fmt.Sprintf("%d joined subjects", r.Size())))
+		fmt.Fprintf(w, "      %s%s\n", strings.Join(EscapeControlsList(shown), ", "), s.Dim(tail))
 	}
 }
 
-// plural2 picks between two spellings of a word.
-func plural2(n int, one, many string) string {
+// Plural2 picks between two spellings of a word.
+func Plural2(n int, one, many string) string {
 	if n == 1 {
 		return one
 	}
 	return many
 }
 
-func renderOwnership(w io.Writer, report resolve.OwnershipReport, s style) {
+// RenderOwnership prints where declared ownership has drifted from the person
+// who actually does the work.
+func RenderOwnership(w io.Writer, report resolve.OwnershipReport, s Style) {
 	drift := report.Drift
 	if report.Declared == 0 {
-		fmt.Fprintln(w, s.dim(
+		fmt.Fprintln(w, s.Dim(
 			"No declared ownership indexed. Add a CODEOWNERS source to compare it against the work."))
 		return
 	}
 	if len(drift) == 0 {
-		fmt.Fprintln(w, s.dim(fmt.Sprintf(
-			"All %d declared area%s is led by its owner of record.", report.Declared, plural(report.Declared))))
+		fmt.Fprintln(w, s.Dim(fmt.Sprintf(
+			"All %d declared area%s is led by its owner of record.", report.Declared, Plural(report.Declared))))
 		return
 	}
 	// The share is the finding. A list on its own reads as a handful of
 	// exceptions, and it never is one.
-	fmt.Fprintln(w, s.bold(fmt.Sprintf(
+	fmt.Fprintln(w, s.Bold(fmt.Sprintf(
 		"Ownership drift  %d of %d judged areas (%.0f%%) are not led by their owner of record",
 		len(drift), report.Declared-report.GroupOwned, 100*report.Share())))
 	if report.GroupOwned > 0 {
-		fmt.Fprintf(w, "  %s\n", s.dim(fmt.Sprintf(
+		fmt.Fprintf(w, "  %s\n", s.Dim(fmt.Sprintf(
 			"%d more area%s owned only by teams or automation, which drift cannot judge",
-			report.GroupOwned, plural(report.GroupOwned))))
+			report.GroupOwned, Plural(report.GroupOwned))))
 	}
 	// The three are different problems: somebody who has left, somebody who
 	// owns an area on paper only, and somebody merely out-worked in their own
 	// area. Only the last is a judgement call.
-	fmt.Fprintf(w, "  %s\n\n", s.dim(fmt.Sprintf(
+	fmt.Fprintf(w, "  %s\n\n", s.Dim(fmt.Sprintf(
 		"%d with no recorded work at all, %d who work elsewhere but never here, %d out-worked in their own area",
 		report.Silent, report.Unworked, report.Trailing)))
 	width := 0
@@ -848,78 +898,78 @@ func renderOwnership(w io.Writer, report resolve.OwnershipReport, s style) {
 		width = 24
 	}
 	for _, d := range drift {
-		topic := escapeControls(d.Topic)
+		topic := EscapeControls(d.Topic)
 		fmt.Fprintf(w, "  %s  %s %s  %s %s\n",
-			pad(s.bold(topic), topic, width),
-			s.dim("declared"), s.warn(strings.Join(escapeControlsList(d.Declared), ", ")),
-			s.dim("→ actual"), s.accent(escapeControls(d.Actual)))
+			pad(s.Bold(topic), topic, width),
+			s.Dim("declared"), s.Warn(strings.Join(EscapeControlsList(d.Declared), ", ")),
+			s.Dim("→ actual"), s.Accent(EscapeControls(d.Actual)))
 	}
 }
 
-// renderEval prints a measurement: the score first, then the numbers that say
+// RenderEval prints a measurement: the score first, then the numbers that say
 // how much to trust it.
-func renderEval(w io.Writer, r eval.Result, s style) {
+func RenderEval(w io.Writer, r eval.Result, s Style) {
 	if r.Declared == 0 {
-		fmt.Fprintln(w, s.dim(
+		fmt.Fprintln(w, s.Dim(
 			"Nothing declares ownership in this index, so there is nothing to score against."))
-		fmt.Fprintln(w, s.dim(
+		fmt.Fprintln(w, s.Dim(
 			"Add a CODEOWNERS source, or a source of record that assigns areas to people."))
 	} else {
 		// Ranked leads because it is the number a change to ranking moves.
 		// Agreement is mostly a statement about how much of the organization
 		// was indexed, and reading it as a score has misled every time.
-		fmt.Fprintln(w, s.bold(fmt.Sprintf(
+		fmt.Fprintln(w, s.Bold(fmt.Sprintf(
 			"Ranked     %.1f%%   %d of %d areas where the declared owner has work here at all",
 			100*r.Ranked, r.Held, r.Answerable)))
-		fmt.Fprintln(w, s.dim(fmt.Sprintf(
+		fmt.Fprintln(w, s.Dim(fmt.Sprintf(
 			"Agreement  %.1f%%   %d of %d declared areas, counting owners who never appear in what was indexed",
 			100*r.Agreement, r.Held, r.Declared)))
 		// The three buckets are three different problems, and only the last is
 		// a judgement call about ranking.
-		fmt.Fprintf(w, "  %s\n", s.dim(fmt.Sprintf(
+		fmt.Fprintf(w, "  %s\n", s.Dim(fmt.Sprintf(
 			"of the %d that disagree: %d have no recorded work at all, %d work elsewhere but never here, %d are out-worked in their own area",
 			r.Declared-r.Held, r.Silent, r.Unworked, r.Trailing)))
 	}
 
-	fmt.Fprintf(w, "\n%s\n", s.bold("Identity"))
+	fmt.Fprintf(w, "\n%s\n", s.Bold("Identity"))
 	fmt.Fprintf(w, "  %d records resolve to %d people, %d of them by inference\n", r.Records, r.People, r.Joins)
 	if r.Unlinked > 0 {
 		// This is the ceiling on the score above, not a footnote: work under an
 		// unjoined handle is attributed to nobody, and its owner cannot agree.
-		fmt.Fprintf(w, "  %s\n", s.warn(fmt.Sprintf(
+		fmt.Fprintf(w, "  %s\n", s.Warn(fmt.Sprintf(
 			"%d handles never found a person, so their work counts for no one", r.Unlinked)))
 	}
 
-	fmt.Fprintf(w, "\n%s\n", s.bold("Coverage"))
+	fmt.Fprintf(w, "\n%s\n", s.Bold("Coverage"))
 	fmt.Fprintf(w, "  %d subjects, %d of them real; %d connections between them\n", r.Topics, r.Salient, r.Ties)
 	fmt.Fprintf(w, "  %d connection%s rest on one person, in %d bod%s of work led by one person\n",
-		r.Spans, plural(r.Spans), r.Regions, map[bool]string{true: "y", false: "ies"}[r.Regions == 1])
+		r.Spans, Plural(r.Spans), r.Regions, map[bool]string{true: "y", false: "ies"}[r.Regions == 1])
 	if len(r.Sources) > 0 {
-		fmt.Fprintf(w, "  %s\n", s.dim("from "+strings.Join(r.Sources, ", ")))
+		fmt.Fprintf(w, "  %s\n", s.Dim("from "+strings.Join(r.Sources, ", ")))
 	}
 }
 
-// renderEvalChanges prints what moved since a saved measurement, regressions
+// RenderEvalChanges prints what moved since a saved measurement, regressions
 // first. A change that bought one number by quietly spending another is the
 // thing this exists to catch, so nothing is summarized away.
-func renderEvalChanges(w io.Writer, changes []eval.Change, comparable bool, s style) {
-	fmt.Fprintf(w, "\n%s\n", s.bold("Against the baseline"))
+func RenderEvalChanges(w io.Writer, changes []eval.Change, comparable bool, s Style) {
+	fmt.Fprintf(w, "\n%s\n", s.Bold("Against the baseline"))
 	if !comparable {
-		fmt.Fprintf(w, "  %s\n", s.warn(
+		fmt.Fprintf(w, "  %s\n", s.Warn(
 			"Different sources were indexed, so these two runs are not comparable."))
 		return
 	}
 	if len(changes) == 0 {
-		fmt.Fprintf(w, "  %s\n", s.dim("Nothing moved."))
+		fmt.Fprintf(w, "  %s\n", s.Dim("Nothing moved."))
 		return
 	}
 	for _, c := range changes {
-		mark, paint := "·", s.dim
+		mark, paint := "·", s.Dim
 		if c.Scored {
 			if c.Better {
-				mark, paint = "+", s.accent
+				mark, paint = "+", s.Accent
 			} else {
-				mark, paint = "-", s.bad
+				mark, paint = "-", s.Bad
 			}
 		}
 		delta := c.Delta()
@@ -939,35 +989,35 @@ func renderEvalChanges(w io.Writer, changes []eval.Change, comparable bool, s st
 	}
 }
 
-// renderEvalHead prints the comparison over the areas both runs could answer,
+// RenderEvalHead prints the comparison over the areas both runs could answer,
 // which is the one that survives a difference in coverage. It leads, because
 // the overall scores below it move for reasons that are not about quality.
-func renderEvalHead(w io.Writer, h eval.Head, ok bool, s style) {
-	fmt.Fprintf(w, "\n%s\n", s.bold("On the same questions"))
+func RenderEvalHead(w io.Writer, h eval.Head, ok bool, s Style) {
+	fmt.Fprintf(w, "\n%s\n", s.Bold("On the same questions"))
 	if !ok {
-		fmt.Fprintf(w, "  %s\n", s.dim(
+		fmt.Fprintf(w, "  %s\n", s.Dim(
 			"The baseline recorded no per-area verdicts, so only the totals below can be compared."))
 		return
 	}
 	delta := h.AfterHeld - h.BeforeHeld
-	sign, paint := "+", s.accent
+	sign, paint := "+", s.Accent
 	switch {
 	case delta < 0:
-		sign, paint = "", s.bad
+		sign, paint = "", s.Bad
 	case delta == 0:
-		paint = s.dim
+		paint = s.Dim
 	}
 	fmt.Fprintf(w, "  %s   %d of %d correct, was %d (%s%d)\n",
 		paint(fmt.Sprintf("%.1f%%", 100*h.Rate())), h.AfterHeld, h.Areas, h.BeforeHeld,
 		sign, delta)
-	fmt.Fprintf(w, "  %s\n", s.dim(fmt.Sprintf("was %.1f%% over the same %d areas", 100*h.Was(), h.Areas)))
+	fmt.Fprintf(w, "  %s\n", s.Dim(fmt.Sprintf("was %.1f%% over the same %d areas", 100*h.Was(), h.Areas)))
 	// Which areas moved matters more than the count. A change that wins ten and
 	// loses ten has not improved anything, and the total alone hides it.
 	if len(h.Won) > 0 {
-		fmt.Fprintf(w, "  %s %s\n", s.accent("won "), evalSample(h.Won))
+		fmt.Fprintf(w, "  %s %s\n", s.Accent("won "), evalSample(h.Won))
 	}
 	if len(h.Lost) > 0 {
-		fmt.Fprintf(w, "  %s %s\n", s.bad("lost"), evalSample(h.Lost))
+		fmt.Fprintf(w, "  %s %s\n", s.Bad("lost"), evalSample(h.Lost))
 	}
 }
 
@@ -975,7 +1025,7 @@ func renderEvalHead(w io.Writer, h eval.Head, ok bool, s style) {
 // list stays readable without pretending it was short.
 func evalSample(areas []string) string {
 	const show = 6
-	areas = escapeControlsList(areas)
+	areas = EscapeControlsList(areas)
 	if len(areas) <= show {
 		return strings.Join(areas, ", ")
 	}

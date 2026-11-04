@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/dcadolph/peepwho/internal/render"
 	"github.com/dcadolph/peepwho/internal/resolve"
 )
 
@@ -36,7 +37,7 @@ Examples:
 			return opts.render(cmd.OutOrStdout(),
 				map[string]any{"topic": args[0], "related": rel},
 				func(w io.Writer, s style) {
-					renderRelated(w, args[0], rel, s)
+					render.RenderRelated(w, args[0], rel, s)
 				})
 		},
 	}

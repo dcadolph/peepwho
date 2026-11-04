@@ -1,0 +1,24 @@
+
+Who knows about "billing"
+Two people and one channel know about billing.
+
+  PEOPLE
+
+   1  Kim Doe  Staff Engineer, Payments
+      ▰▰▰▰▰▰▰▰▰▱  92%   commits to billing · answers in #payments
+
+   2  Lee Roe  Payments
+      ▰▰▰▰▱▱▱▱▱▱  40%   mentioned in docs
+
+   3  Sam Poe  Manager
+      ▱▱▱▱▱▱▱▱▱▱    ~   
+
+  CHANNELS
+
+   1  #payments
+      ▰▰▰▰▰▰▰▱▱▱  70%   active on billing
+      → https://chat.example.com/payments
+
+   2  #billing-alerts
+      ▰▰▱▱▱▱▱▱▱▱  20%   
+

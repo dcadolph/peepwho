@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dcadolph/peepwho/internal/engine"
+	"github.com/dcadolph/peepwho/internal/render"
 )
 
 // newStatusCmd builds the status command: one view of what the index holds and
@@ -46,7 +47,7 @@ embeddings, and whether a key is set to encrypt it at rest.`,
 				view["age"] = st.Age.Round(time.Minute).String()
 			}
 			return opts.render(cmd.OutOrStdout(), view, func(w io.Writer, s style) {
-				renderStatus(w, view, s)
+				render.RenderStatus(w, view, s)
 			})
 		},
 	}

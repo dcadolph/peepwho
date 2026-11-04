@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/dcadolph/peepwho/internal/render"
 	"github.com/dcadolph/peepwho/internal/seal"
 )
 
@@ -52,20 +53,20 @@ A failed check exits non-zero, so this can be chained in a script.`,
 // renderVerify writes the verdict on a sealed directory for a person.
 func renderVerify(w io.Writer, r seal.Report, pinned bool, s style) {
 	for _, p := range r.Altered {
-		fmt.Fprintf(w, "%s %s\n", s.warn("altered:"), p)
+		fmt.Fprintf(w, "%s %s\n", s.Warn("altered:"), p)
 	}
 	for _, p := range r.Missing {
-		fmt.Fprintf(w, "%s %s\n", s.warn("missing:"), p)
+		fmt.Fprintf(w, "%s %s\n", s.Warn("missing:"), p)
 	}
 	signer := "the key it names, " + r.KeyID
 	if pinned {
 		signer = "the key you gave, " + r.KeyID
 	}
 	if r.OK() {
-		fmt.Fprintf(w, "%s %d file%s %s the seal, signed by %s\n", s.accent("verified:"),
-			len(r.Verified), plural(len(r.Verified)), plural2(len(r.Verified), "matches", "match"), signer)
+		fmt.Fprintf(w, "%s %d file%s %s the seal, signed by %s\n", s.Accent("verified:"),
+			len(r.Verified), plural(len(r.Verified)), render.Plural2(len(r.Verified), "matches", "match"), signer)
 		return
 	}
 	fmt.Fprintf(w, "%s %d verified, %d altered, %d missing, signed by %s\n",
-		s.warn("failed:"), len(r.Verified), len(r.Altered), len(r.Missing), signer)
+		s.Warn("failed:"), len(r.Verified), len(r.Altered), len(r.Missing), signer)
 }

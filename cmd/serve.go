@@ -23,6 +23,7 @@ import (
 	"github.com/dcadolph/peepwho/internal/index"
 	"github.com/dcadolph/peepwho/internal/policy"
 	"github.com/dcadolph/peepwho/internal/recall"
+	"github.com/dcadolph/peepwho/internal/render"
 	"github.com/dcadolph/peepwho/internal/report"
 	"github.com/dcadolph/peepwho/internal/resolve"
 	"github.com/dcadolph/peepwho/internal/seal"
@@ -328,17 +329,17 @@ func cliFn(ix *index.Index, ask web.AskFunc, sealer web.AttestFunc) web.CLIFunc 
 			if err != nil {
 				return "", false
 			}
-			renderAsk(&b, cliAskQuery, answer.View(cliAskQuery), plain)
+			render.RenderAsk(&b, cliAskQuery, answer.View(cliAskQuery), plain)
 		case "risk":
-			renderRisk(&b, resolve.Risk(ix, 12), plain)
+			render.RenderRisk(&b, resolve.Risk(ix, 12), plain)
 		case "ownership":
-			renderOwnership(&b, resolve.Ownership(ix), plain)
+			render.RenderOwnership(&b, resolve.Ownership(ix), plain)
 		case "related":
 			topic := "billing"
 			if top := resolve.Risk(ix, 1); len(top) > 0 {
 				topic = top[0].Topic
 			}
-			renderRelated(&b, topic, resolve.Related(ix, topic, 8), plain)
+			render.RenderRelated(&b, topic, resolve.Related(ix, topic, 8), plain)
 		case "attest":
 			if sealer == nil {
 				return "", false

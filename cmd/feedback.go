@@ -11,6 +11,7 @@ import (
 
 	"github.com/dcadolph/peepwho/internal/engine"
 	"github.com/dcadolph/peepwho/internal/feedback"
+	"github.com/dcadolph/peepwho/internal/render"
 )
 
 // newFeedbackCmd builds the feedback command group: record a vote, review
@@ -98,7 +99,7 @@ func newFeedbackListCmd(opts *options) *cobra.Command {
 				entries = []feedback.Entry{}
 			}
 			return opts.render(cmd.OutOrStdout(), entries, func(w io.Writer, s style) {
-				renderFeedback(w, entries, s)
+				render.RenderFeedback(w, entries, s)
 			})
 		},
 	}
@@ -199,11 +200,11 @@ policy file.`,
 				return fmt.Errorf("%w: write %s: %w", ErrFeedback, out, err)
 			}
 			return opts.render(cmd.OutOrStdout(), b, func(w io.Writer, s style) {
-				fmt.Fprintln(w, s.bold("Wrote "+out))
+				fmt.Fprintln(w, s.Bold("Wrote "+out))
 				fmt.Fprintf(w, "  %d vote%s, %d comment%s. Queries appear only as word counts.\n",
 					b.Votes.Total, plural(b.Votes.Total), len(b.Comments), plural(len(b.Comments)))
-				fmt.Fprintln(w, s.dim("  Read the whole file, then attach it to a GitHub issue or an email"))
-				fmt.Fprintln(w, s.dim("  yourself. It sends nothing on its own."))
+				fmt.Fprintln(w, s.Dim("  Read the whole file, then attach it to a GitHub issue or an email"))
+				fmt.Fprintln(w, s.Dim("  yourself. It sends nothing on its own."))
 			})
 		},
 	}
@@ -226,14 +227,14 @@ func newFeedbackSummaryCmd(opts *options) *cobra.Command {
 			b := feedback.NewBundle(version, store.All())
 			return opts.render(cmd.OutOrStdout(), b, func(w io.Writer, s style) {
 				if b.Votes.Total == 0 {
-					fmt.Fprintln(w, s.dim("No feedback recorded yet. Votes on answers land here."))
+					fmt.Fprintln(w, s.Dim("No feedback recorded yet. Votes on answers land here."))
 					return
 				}
-				fmt.Fprintln(w, s.bold(fmt.Sprintf("%d votes  %d helpful, %d not",
+				fmt.Fprintln(w, s.Bold(fmt.Sprintf("%d votes  %d helpful, %d not",
 					b.Votes.Total, b.Votes.Helpful, b.Votes.NotHelpful)))
 				fmt.Fprintf(w, "  %d on people, %d on channels\n", b.Votes.OnPeople, b.Votes.OnChannels)
 				for _, c := range b.Comments {
-					fmt.Fprintf(w, "  %s %s\n", s.dim("["+c.Vote+"]"), c.Comment)
+					fmt.Fprintf(w, "  %s %s\n", s.Dim("["+c.Vote+"]"), c.Comment)
 				}
 			})
 		},

@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dcadolph/peepwho/internal/engine"
+	"github.com/dcadolph/peepwho/internal/render"
 )
 
 // newSearchCmd builds the search command, a direct lookup of people and channels
@@ -35,7 +36,7 @@ Examples:
 			results := engine.New(ix, opts.pol).Search(query, limit)
 			v := map[string]any{"query": query, "results": results}
 			return opts.render(cmd.OutOrStdout(), v, func(w io.Writer, s style) {
-				renderSearch(w, query, results, s)
+				render.RenderSearch(w, query, results, s)
 			})
 		},
 	}

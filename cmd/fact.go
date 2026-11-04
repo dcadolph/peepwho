@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dcadolph/peepwho/internal/fact"
+	"github.com/dcadolph/peepwho/internal/render"
 )
 
 // newFactCmd builds the fact command group: record a typed statement a crawl
@@ -168,8 +169,8 @@ import is the whole of what that source currently asserts.
 func writeFactLines(w io.Writer, facts []fact.Fact) {
 	for _, f := range facts {
 		line := fmt.Sprintf("%s %s %s",
-			escapeControls(f.Subject), escapeControls(f.Relation), escapeControls(f.Object))
-		meta := escapeControls(f.Source)
+			render.EscapeControls(f.Subject), render.EscapeControls(f.Relation), render.EscapeControls(f.Object))
+		meta := render.EscapeControls(f.Source)
 		if !f.Time.IsZero() {
 			if meta != "" {
 				meta += " "
@@ -180,7 +181,7 @@ func writeFactLines(w io.Writer, facts []fact.Fact) {
 			line += fmt.Sprintf("  [%s]", meta)
 		}
 		if f.Detail != "" {
-			line += "  " + escapeControls(f.Detail)
+			line += "  " + render.EscapeControls(f.Detail)
 		}
 		fmt.Fprintln(w, line)
 	}

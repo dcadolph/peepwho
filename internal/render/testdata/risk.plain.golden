@@ -1,0 +1,13 @@
+Knowledge risk  3 topics scored, 1 critical, 1 whose strongest expert has moved on
+
+CRITICAL
+  billing   95%  bus factor 1
+      also called invoicing
+       95% Kim Doe  not lately
+
+ELEVATED
+  kafka     60%  bus factor 2
+       60% Lee Roe
+
+OK
+  docs        ~  bus factor 4

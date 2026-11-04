@@ -7,6 +7,7 @@ import (
 
 	"github.com/dcadolph/peepwho/internal/connector"
 	"github.com/dcadolph/peepwho/internal/index"
+	"github.com/dcadolph/peepwho/internal/render"
 )
 
 // joinFixture builds an index whose AutoJoin infers a unique-name join and a
@@ -49,7 +50,7 @@ func TestBuildIdentityView(t *testing.T) {
 func TestRenderIdentity(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	renderIdentity(&buf, buildIdentityView(joinFixture(t)), style{})
+	render.RenderIdentity(&buf, buildIdentityView(joinFixture(t)), style{})
 	out := buf.String()
 	for _, want := range []string{"Identity joins", "2 inferred across 2 people",
 		"github:kevinnovak", "unique name match", "pagerduty:angela-malone", "name and shared team"} {
@@ -58,7 +59,7 @@ func TestRenderIdentity(t *testing.T) {
 		}
 	}
 	var empty bytes.Buffer
-	renderIdentity(&empty, identityView{}, style{})
+	render.RenderIdentity(&empty, render.IdentityView{}, style{})
 	if !strings.Contains(empty.String(), "No inferred identity merges") {
 		t.Errorf("empty output = %q, want the no-merges message", empty.String())
 	}

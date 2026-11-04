@@ -1,18 +1,18 @@
-package cmd
+package render
 
 import (
 	"strconv"
 	"strings"
 )
 
-// escapeControls returns s with every terminal control character replaced by
+// EscapeControls returns s with every terminal control character replaced by
 // its visible escape, e.g. an ESC byte by the four characters \x1b. Names,
 // comments, and topics come from sources third parties control, and a git
 // author name or web comment carrying an escape sequence can retitle the
 // window, hide output, or forge rows in the middle of a report. Escaping
 // rather than stripping keeps the tampering visible, so what reaches the
 // terminal is exactly what is on the screen.
-func escapeControls(s string) string {
+func EscapeControls(s string) string {
 	if !strings.ContainsFunc(s, isTerminalControl) {
 		return s
 	}
@@ -36,12 +36,12 @@ func isTerminalControl(r rune) bool {
 	return r < 0x20 || r == 0x7f || (r >= 0x80 && r <= 0x9f)
 }
 
-// escapeControlsList escapes every element of items, for the slices renderers
+// EscapeControlsList escapes every element of items, for the slices renderers
 // join into one line.
-func escapeControlsList(items []string) []string {
+func EscapeControlsList(items []string) []string {
 	out := make([]string, len(items))
 	for i, s := range items {
-		out[i] = escapeControls(s)
+		out[i] = EscapeControls(s)
 	}
 	return out
 }
