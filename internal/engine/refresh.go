@@ -139,33 +139,115 @@ func (x *Indexer) Refresh(ctx context.Context, sources []string, now time.Time) 
 	return results, nil
 }
 
-// replay parses one recorded flag list and indexes the source with it as a
-// merge. The recorded --policy, or its absence, picks the policy through
-// PolicyFor, as it did when each scope ran as its own process. --json and
-// --human are accepted and change nothing, since an index run prints no
-// result.
-func (x *Indexer) replay(ctx context.Context, source string, args []string) error {
+// IndexRun is one index run parsed from a flag list, the form the refresh
+// config records an index run in.
+type IndexRun struct {
+	// Request is the source and every index flag value the list sets.
+	Request IndexRequest
+	// Policy is the --policy value the list carries, empty when it has none.
+	Policy string
+	// Replay is the list as a refresh replays it: each flag the list set, in
+	// flag name order, a repeatable flag as one name and value pair per value
+	// and any other as name=value, with the flags that steer only this run
+	// (--merge, --full, --allow-shrink, --changes-file) and the output flags
+	// left out. It is the shape the command line records.
+	Replay []string
+}
+
+// replaySkipFlags are flags a recorded run leaves out: they steer one run or
+// its output, not what a source reads.
+//
+//nolint:gochecknoglobals // Read-only lookup table.
+var replaySkipFlags = map[string]bool{
+	"merge": true, "full": true, "allow-shrink": true, "changes-file": true, "json": true, "human": true,
+}
+
+// IndexFromFlags parses an index flag list for source with the flags the
+// index command takes, plus --policy, --json, and --human, which a recorded
+// command line run may carry. --json and --human change nothing, since an
+// index run prints no result. A refresh replays recorded lists through the
+// same parse, so an app indexing through it and a refresh cannot read a flag
+// differently. A bare argument that is not a flag is refused.
+func IndexFromFlags(source string, args []string) (IndexRun, error) {
+	run, rest, err := parseIndexFlags(source, args, "flags")
+	if err != nil {
+		return IndexRun{}, err
+	}
+	if len(rest) > 0 {
+		return IndexRun{}, fmt.Errorf("%w: flags: unexpected argument %q", ErrBadArgs, rest[0])
+	}
+	return run, nil
+}
+
+// parseIndexFlags parses args for source and returns the run and any bare
+// arguments left over. label names the list in a parse error.
+func parseIndexFlags(source string, args []string, label string) (IndexRun, []string, error) {
 	fs := pflag.NewFlagSet("index", pflag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	req := IndexRequest{Source: source}
-	RegisterIndexFlags(fs, &req.IndexArgs)
-	recordedPolicy := fs.String("policy", "", "")
+	run := IndexRun{Request: IndexRequest{Source: source}}
+	RegisterIndexFlags(fs, &run.Request.IndexArgs)
+	fs.StringVar(&run.Policy, "policy", "", "")
 	fs.Bool("json", false, "")
 	fs.Bool("human", false, "")
 	if err := fs.Parse(args); err != nil {
-		return fmt.Errorf("%w: recorded flags: %w", ErrBadArgs, err)
+		return IndexRun{}, nil, fmt.Errorf("%w: %s: %w", ErrBadArgs, label, err)
 	}
+	fs.Visit(func(f *pflag.Flag) {
+		if replaySkipFlags[f.Name] {
+			return
+		}
+		if sv, ok := f.Value.(pflag.SliceValue); ok {
+			for _, v := range sv.GetSlice() {
+				run.Replay = append(run.Replay, "--"+f.Name, v)
+			}
+			return
+		}
+		run.Replay = append(run.Replay, "--"+f.Name+"="+f.Value.String())
+	})
+	return run, fs.Args(), nil
+}
+
+// replay parses one recorded flag list and indexes the source with it as a
+// merge. The recorded --policy, or its absence, picks the policy through
+// PolicyFor, as it did when each scope ran as its own process.
+func (x *Indexer) replay(ctx context.Context, source string, args []string) error {
+	parsed, _, err := parseIndexFlags(source, args, "recorded flags")
+	if err != nil {
+		return err
+	}
+	req := parsed.Request
 	req.Merge = true
 	run := *x
 	run.Record = nil
 	if x.PolicyFor != nil {
-		pol, err := x.PolicyFor(*recordedPolicy)
+		pol, err := x.PolicyFor(parsed.Policy)
 		if err != nil {
 			return err
 		}
 		run.Policy = pol
 	}
-	err := run.Index(ctx, req)
+	err = run.Index(ctx, req)
 	x.unlocked = run.unlocked
 	return err
+}
+
+// RecordInvocation saves flags as what source was indexed with under scope,
+// replacing any earlier flags for the same scope. The read-modify-write runs
+// under a cross-process lock so two concurrent index runs keep each other's
+// entries.
+func (s *Store) RecordInvocation(source, scope string, flags []string) error {
+	unlock, err := util.LockFile(s.dir.Refresh() + util.LockSuffix)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	inv, err := s.LoadInvocations()
+	if err != nil {
+		return err
+	}
+	if inv[source] == nil {
+		inv[source] = map[string][]string{}
+	}
+	inv[source][scope] = flags
+	return s.SaveInvocations(inv)
 }

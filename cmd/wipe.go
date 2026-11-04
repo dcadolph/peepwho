@@ -5,14 +5,13 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/dcadolph/peepwho/internal/engine"
 	"github.com/dcadolph/peepwho/internal/keyring"
-	"github.com/dcadolph/peepwho/internal/util"
 )
 
 // wipeWord is what a person types to confirm a wipe. A word rather than a y/n
@@ -79,29 +78,14 @@ scheduled refresh are outside its reach, and it names any that remain.`,
 	return cmd
 }
 
-// planWipe lists the files and credentials present now that a wipe removes:
-// each file peepwho keeps, its lock, and any temporary file an interrupted
-// atomic write left beside it.
+// planWipe lists the files and credentials present now that a wipe removes.
+// The file half is the engine's, so an app wipes the same files.
 func planWipe(opts *options) (wipePlan, error) {
-	var plan wipePlan
-	for _, path := range opts.dir().Files() {
-		candidates := []string{path, path + util.LockSuffix}
-		temps, err := filepath.Glob(path + ".tmp-*")
-		if err != nil {
-			return wipePlan{}, fmt.Errorf("wipe: list temporary files: %w", err)
-		}
-		candidates = append(candidates, temps...)
-		for _, c := range candidates {
-			info, err := os.Lstat(c)
-			if err != nil {
-				continue
-			}
-			if !info.Mode().IsRegular() {
-				return wipePlan{}, fmt.Errorf("%w: %s is not a regular file; remove it yourself", ErrBadArgs, c)
-			}
-			plan.Files = append(plan.Files, c)
-		}
+	files, err := engine.PlanWipe(opts.dir())
+	if err != nil {
+		return wipePlan{}, err
 	}
+	plan := wipePlan{Files: files}
 	keychain := opts.secrets()
 	for _, name := range credentialNames() {
 		if keychain.Stored(name) {
@@ -146,25 +130,18 @@ func confirmWipe(in io.Reader, w io.Writer) bool {
 	return strings.TrimSpace(answer) == wipeWord
 }
 
-// runWipe removes every planned file and credential, then the data directory
-// itself when nothing else is left in it. It removes everything it can before
-// reporting, so one stuck file does not leave the rest behind.
+// runWipe removes every planned file, then the data directory itself when
+// nothing else is left in it, then every planned credential. It removes
+// everything it can before reporting, so one stuck file does not leave the
+// rest behind.
 func runWipe(opts *options, plan wipePlan) error {
-	var errs []error
-	for _, f := range plan.Files {
-		if err := os.Remove(f); err != nil && !errors.Is(err, os.ErrNotExist) {
-			errs = append(errs, fmt.Errorf("wipe: remove %s: %w", f, err))
-		}
-	}
+	errs := []error{engine.Wipe(opts.dir(), plan.Files)}
 	keychain := opts.secrets()
 	for _, name := range plan.Credentials {
 		if err := keychain.Delete(name); err != nil {
 			errs = append(errs, fmt.Errorf("wipe: remove keychain entry %s: %w", name, err))
 		}
 	}
-	// os.Remove refuses a directory that still holds anything, which is the
-	// point: only a directory peepwho emptied goes.
-	_ = os.Remove(opts.dataDir) //nolint:errcheck // A non-empty or missing directory stays as it is.
 	return errors.Join(errs...)
 }
 

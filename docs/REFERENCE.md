@@ -951,6 +951,33 @@ time, how many runs it merged, and the people, teams, and channels that joined
 or left, where a later run wins over an earlier one for the same name. Zero
 means the whole log. The app keeps its own last-look time.
 
+A directory with no index yet, or none at all, opens unbuilt. Questions return
+a "no index yet" error, `Status` reports zero counts and no build time, and
+`Index` or `Refresh` builds the index.
+
+`Index(source, flags, nowUnix)` reads one source and merges it into the index.
+`flags` holds the flags `peepwho index` takes, one argument per line, so a
+path with a space needs no quoting: `--repo-path`, then the path on the next
+line, or `--file=/path/people.csv` on one. Every run merges, so to start over
+call `Wipe` and index again. `--policy` is refused, since the core runs only
+under the strict policy, and so is a source that would read standard input.
+The run is recorded in `refresh.json` the way the command line records it,
+and the answer is `{"source", "scope", "log"}`, the log being the last 64 KiB
+of progress output.
+
+`Refresh(sources, nowUnix)` replays every recorded run of the comma-separated
+sources, or of all of them when `sources` is empty. One run failing, such as
+on an expired token, does not stop the others: the answer is `{"ok",
+"results", "log"}`, each result naming its source, scope, time, and error,
+and `ok` is false when any failed. The call returns an error only when nothing
+could run, such as when nothing was ever indexed. Questions asked while either
+call runs answer from the index as it was until the new one is loaded.
+
+`Wipe(dir)` is a function, not a handle method, so a lost key never blocks
+it. It deletes the files `peepwho wipe` deletes and then the directory when it
+is left empty, and returns `{"removed": [...]}`. Credentials in the app's own
+Keychain are the app's to delete.
+
 | Call                             | Returns                                                     |
 | -------------------------------- | ----------------------------------------------------------- |
 | `Open(dir, key)`                 | A handle on the data directory, or an error naming the key. |
@@ -961,6 +988,9 @@ means the whole log. The app keeps its own last-look time.
 | `Handle.Recall(who, q, limit)`   | The `recall --json` answer for one person.                  |
 | `Handle.Status(nowUnix)`         | Counts, seal state, and index age at the host's clock.      |
 | `Handle.ChangesSince(sinceUnix)` | Who and what joined or left after the host's last look.     |
+| `Handle.Index(src, flags, now)`  | The source, its refresh scope, and the progress log.        |
+| `Handle.Refresh(srcs, now)`      | Each replayed run with its result, and the progress log.    |
+| `Wipe(dir)`                      | The files it removed from the data directory.               |
 
 ## Files
 
