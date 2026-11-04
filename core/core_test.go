@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -20,6 +21,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	"github.com/dcadolph/peepwho/internal/connector"
 	"github.com/dcadolph/peepwho/internal/engine"
 	"github.com/dcadolph/peepwho/internal/fakeapi"
 	"github.com/dcadolph/peepwho/internal/index"
@@ -573,6 +575,61 @@ func TestHandleIndexAndRefresh(t *testing.T) {
 	}
 	if !strings.Contains(st, `"built_at":"`+later.Format(time.RFC3339)+`"`) {
 		t.Errorf("status after refresh %s, want built_at %s from the reloaded index", st, later.Format(time.RFC3339))
+	}
+}
+
+// TestHandleLostRepo verifies a recorded repository the app can no longer read
+// fails its scope instead of passing as an empty refresh, and leaves the index
+// it already had untouched.
+func TestHandleLostRepo(t *testing.T) {
+	t.Parallel()
+	repo := newGitRepo(t)
+	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	dir := t.TempDir()
+	h, err := Open(dir, testKeyB64)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	if _, err := h.Index("git", "--repo-path\n"+repo+"\n--git-since-days=10000\n", now.Unix()); err != nil {
+		t.Fatalf("Index: %v", err)
+	}
+	before, err := os.ReadFile(engine.Dir(dir).Index())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(repo); err != nil {
+		t.Fatal(err)
+	}
+	later := now.Add(time.Hour)
+	raw, err := h.Refresh("", later.Unix())
+	if err != nil {
+		t.Fatalf("Refresh = %v, want the failure reported per scope", err)
+	}
+	var rv refreshView
+	if err := json.Unmarshal([]byte(raw), &rv); err != nil {
+		t.Fatalf("unmarshal %s: %v", raw, err)
+	}
+	if rv.OK || len(rv.Results) != 1 || rv.Results[0].OK ||
+		!strings.Contains(rv.Results[0].Error, "none of the repository paths could be read") {
+		t.Errorf("refresh = %s, want the git scope failed as unreadable", raw)
+	}
+	_, err = h.Index("git", "--repo-path\n"+repo+"\n--git-since-days=10000\n", later.Unix())
+	if !errors.Is(err, connector.ErrNoReadableRepo) {
+		t.Errorf("Index error = %v, want ErrNoReadableRepo", err)
+	}
+	after, err := os.ReadFile(engine.Dir(dir).Index())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Error("a failed scope rewrote the index")
+	}
+	st, err := h.Status(later.Unix())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(st, `"people":2`) || !strings.Contains(st, `"built_at":"`+now.Format(time.RFC3339)+`"`) {
+		t.Errorf("status after the failed refresh %s, want the original two-person index", st)
 	}
 }
 

@@ -5,6 +5,9 @@ import "errors"
 // ErrNoRepoPaths indicates no repository paths were given to the git connector.
 var ErrNoRepoPaths = errors.New("git: no repository paths")
 
+// ErrNoReadableRepo indicates every repository path given to the git connector was skipped.
+var ErrNoReadableRepo = errors.New("git: none of the repository paths could be read")
+
 // ErrNoHeader indicates the CSV had no header row.
 var ErrNoHeader = errors.New("org csv: missing header row")
 

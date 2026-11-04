@@ -43,6 +43,10 @@ Dated sources decay: see [recency](#recency). Undated sources describe the
 present and keep full weight. Bot accounts (dependabot and friends) are
 skipped in the git and github sources.
 
+A `--repo-path` that cannot be read is logged and skipped. When every path is
+skipped the git source fails, even under `--merge`, and the existing index is
+left as it was.
+
 With `--episodes`, four of them also record the past work behind the graph, which
 is what [`peepwho recall`](#peepwho-recall) points back at: Slack threads and runs
 of channel conversation, merged GitHub pull requests, resolved Jira issues, and

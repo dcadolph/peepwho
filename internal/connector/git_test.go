@@ -118,8 +118,8 @@ func TestGitHistoryErrors(t *testing.T) {
 	dir := t.TempDir()
 	var log strings.Builder
 	recs, err := NewGitHistory(GitOptions{Paths: []string{dir}, Log: &log}).Fetch(context.Background())
-	if err != nil {
-		t.Errorf("Fetch = %v, want a non-repository directory skipped without error", err)
+	if !errors.Is(err, ErrNoReadableRepo) {
+		t.Errorf("Fetch = %v, want ErrNoReadableRepo when every path is skipped", err)
 	}
 	if len(recs) != 0 {
 		t.Errorf("records = %+v, want none from a non-repository directory", recs)

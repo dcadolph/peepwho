@@ -231,6 +231,7 @@ func (g *GitHistory) Fetch(ctx context.Context) ([]Record, error) {
 	// Which subjects appeared, which appeared together, and who worked across
 	// each pairing.
 	ties := newTogether()
+	unreadable := 0
 	for _, path := range g.opts.Paths {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -241,6 +242,7 @@ func (g *GitHistory) Fetch(ctx context.Context) ([]Record, error) {
 				return nil, err
 			}
 			fmt.Fprintf(g.opts.Log, "git: skipping %s: %v\n", path, err)
+			unreadable++
 			continue
 		}
 		fmt.Fprintf(g.opts.Log, "git: %s: %d commits\n", path, read)
@@ -275,6 +277,13 @@ func (g *GitHistory) Fetch(ctx context.Context) ([]Record, error) {
 				"git: %s: %d commits could not be read, most likely a partial clone missing objects\n",
 				path, skipped)
 		}
+	}
+	// A run where every path was skipped read nothing at all. Reporting that as
+	// an empty success would let a moved folder or a lost permission pass as a
+	// clean refresh, so it fails and leaves the existing index alone.
+	if unreadable == len(g.opts.Paths) {
+		return nil, fmt.Errorf("%w: see the skip lines above "+
+			"(a moved folder or a lost permission looks like this)", ErrNoReadableRepo)
 	}
 
 	names := pickNames(nameCounts)

@@ -1,10 +1,13 @@
 package cmd
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/dcadolph/peepwho/internal/connector"
 )
 
 // TestDemoRepoRefusesANonRepository verifies the demo says what is wrong
@@ -21,7 +24,7 @@ func TestDemoRepoRefusesANonRepository(t *testing.T) {
 	if err == nil {
 		t.Fatal("demo --repo on a directory with no history served instead of failing")
 	}
-	if !strings.Contains(err.Error(), "no people") {
-		t.Errorf("error = %v, want it to name the empty result", err)
+	if !errors.Is(err, connector.ErrNoReadableRepo) || !strings.Contains(err.Error(), "could be read") {
+		t.Errorf("error = %v, want it to say the path could not be read", err)
 	}
 }
