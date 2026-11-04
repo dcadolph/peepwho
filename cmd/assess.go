@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -29,23 +31,84 @@ const assessMinPlaceWork = 30
 // assessPlacesListed caps how many systems the deliverable lists.
 const assessPlacesListed = 40
 
+// assessArgs holds the flags of the assess command.
+type assessArgs struct {
+	// RepoPaths are the local repository roots to read.
+	RepoPaths []string
+	// SlackExport is a Slack export zip or its unzipped folder.
+	SlackExport string
+	// OrgCSV is the org chart CSV.
+	OrgCSV string
+	// Codeowners is a CODEOWNERS file or a repo root holding one.
+	Codeowners string
+	// OutDir is the output directory, named by date when empty.
+	OutDir string
+	// AliasesFile is the alias file applied before the inferred joins.
+	AliasesFile string
+	// GithubRepos are the owner/name repositories whose reviews to read.
+	GithubRepos []string
+	// GithubURL is the API root for GitHub Enterprise Server.
+	GithubURL string
+	// GithubPages is how many hundreds of pull requests to read per repository.
+	GithubPages int
+	// Top is how many people the departure file covers.
+	Top int
+	// GitSinceDays is how far back to read git history.
+	GitSinceDays int
+	// MaxCommits is the commit cap per repository.
+	MaxCommits int
+}
+
+// hasInput reports whether the arguments name at least one source to read.
+func (a *assessArgs) hasInput() bool {
+	return len(a.RepoPaths) > 0 || a.SlackExport != "" || a.OrgCSV != "" ||
+		a.Codeowners != "" || len(a.GithubRepos) > 0
+}
+
+// assessSources is the index an assessment builds and the connectors whose
+// side tallies the systems view reads after the fetch.
+type assessSources struct {
+	// Index holds every record the inputs yielded.
+	Index *index.Index
+	// Git is the git history connector, nil when no repository was named.
+	Git *connector.GitHistory
+	// GitHub is the review connector, nil when no GitHub repository was named.
+	GitHub *connector.GitHub
+}
+
+// assessment is every result an assessment computes before it renders.
+type assessment struct {
+	// Findings are the scored subjects.
+	Findings []resolve.TopicRisk
+	// Regions are the bodies of work that change together under one lead.
+	Regions []resolve.Region
+	// Ownership compares declared owners with the observed work.
+	Ownership resolve.OwnershipReport
+	// Departures are what the record shows resting on each key person.
+	Departures []resolve.DepartureImpact
+	// Spans are the crossings between subjects only one person has made.
+	Spans []resolve.Span
+	// Places are the significant directories and who their work rests on.
+	Places []resolve.Place
+	// Checks are the git commands that recount each place.
+	Checks []resolve.CheckCommand
+	// Ramp is what moving into a new area has cost in this history.
+	Ramp resolve.Ramp
+	// Split are the display names still held by more than one record.
+	Split []resolve.SplitName
+	// Aliases are the joins the rules declined to make alone.
+	Aliases []resolve.AliasSuggestion
+	// Successors is who stands nearest to what rests on each key person.
+	Successors []personSuccession
+	// Systems reports whether git history was read, so the systems and checks
+	// files are written even when no place clears the floor.
+	Systems bool
+}
+
 // newAssessCmd builds the assess command, which turns a directory of exports
 // into a sealed knowledge-risk assessment: the deliverable, not the app.
 func newAssessCmd(opts *options) *cobra.Command {
-	var (
-		repoPaths    []string
-		slackExport  string
-		orgCSV       string
-		codeowners   string
-		outDir       string
-		aliasesFile  string
-		githubRepos  []string
-		githubURL    string
-		githubPages  int
-		top          int
-		gitSinceDays int
-		maxCommits   int
-	)
+	var a assessArgs
 	cmd := &cobra.Command{
 		Use:   "assess",
 		Short: "Produce a sealed knowledge-risk assessment from local exports",
@@ -85,215 +148,262 @@ Examples:
   peepwho assess --repo-path ./target-repo --aliases acme-assessment/aliases.json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if len(repoPaths) == 0 && slackExport == "" && orgCSV == "" && codeowners == "" &&
-				len(githubRepos) == 0 {
-				return fmt.Errorf("%w: name at least one input: --repo-path, --slack-export, "+
-					"--org-csv, or --codeowners", ErrBadArgs)
-			}
-			if outDir == "" {
-				outDir = "peepwho-assessment-" + opts.now().Format("20060102")
-			}
-			if err := os.MkdirAll(outDir, 0o755); err != nil {
-				return fmt.Errorf("assess: %w", err)
-			}
-			log := cmd.ErrOrStderr()
-
-			ix := index.New(index.WithNow(opts.clock))
-			if orgCSV != "" {
-				oc := connector.NewOrgCSV(orgCSV)
-				oc.Log = log
-				recs, err := oc.Fetch(cmd.Context())
-				if err != nil {
-					return err
-				}
-				ix.Add(recs)
-			}
-			var git *connector.GitHistory
-			if len(repoPaths) > 0 {
-				git = connector.NewGitHistory(connector.GitOptions{
-					Paths: repoPaths, SinceDays: gitSinceDays, MaxCommits: maxCommits, Log: log,
-				})
-				recs, err := git.Fetch(cmd.Context())
-				if err != nil {
-					return err
-				}
-				ix.Add(recs)
-			}
-			if codeowners != "" {
-				recs, err := connector.NewCodeOwners(codeowners).Fetch(cmd.Context())
-				if err != nil {
-					return err
-				}
-				ix.Add(recs)
-			}
-			var gh *connector.GitHub
-			if len(githubRepos) > 0 {
-				token := secret.Resolve(githubTokenEnv)
-				if token == "" {
-					return fmt.Errorf("%w: --github-repo needs %s", ErrBadArgs, githubTokenEnv)
-				}
-				gh = connector.NewGitHub(token, connector.GitHubOptions{
-					Repos: githubRepos, MaxPages: githubPages, BaseURL: githubURL, Log: log,
-				})
-				recs, err := gh.Fetch(cmd.Context())
-				if err != nil {
-					return explainSourceError("GitHub", githubTokenEnv, err)
-				}
-				ix.Add(recs)
-			}
-			if slackExport != "" {
-				se := connector.NewSlackExport(slackExport, connector.SlackExportOptions{
-					IncludePrivate: true, SinceDays: 36500, Log: log,
-				})
-				recs, err := se.Fetch(cmd.Context())
-				if err != nil {
-					return err
-				}
-				ix.Add(recs)
-			}
-			// Aliases before the inferred joins, so a stated identity is a
-			// premise the rules reason from rather than a correction applied
-			// after they have already decided. The report names the splits it
-			// could not join and tells the reader to fix them here; until this
-			// flag existed that advice could not be followed.
-			if aliasesFile != "" {
-				if err := ix.LoadAliases(aliasesFile); err != nil {
-					return err
-				}
-			}
-			ix.AutoJoin()
-			ix.Canonicalize()
-			if len(ix.Graph.People) == 0 {
-				return fmt.Errorf("%w: the inputs yielded no people; check the paths", ErrBadArgs)
-			}
-
-			// Everything is scored once and passed down. Risk walks every person
-			// and every subject and folds the compound names together, and the
-			// departure view needs it per person: recomputing it there made the
-			// cost of an assessment grow with the square of the organization.
-			findings := resolve.Risk(ix, 0)
-			regions := resolve.Regions(ix, 0)
-			ownership := resolve.Ownership(ix)
-			departures := assessDepartures(ix, findings, regions, top)
-			spans := resolve.SoleSpans(ix, 0)
-
-			var places []resolve.Place
-			var checks []resolve.CheckCommand
-			var ramp resolve.Ramp
-			var reviewers map[string]map[model.ID]bool
-			if git != nil {
-				// Systems are places, not words: the per-directory tally
-				// answers who a system rests on without pooling every path
-				// that shares its name.
-				dirWork, totals := git.DirWork(), git.WorkTotals()
-				if gh != nil {
-					// A review is evidence of holding the place it reviewed.
-					// The merges name their pull requests, so the link needs
-					// no extra request, and without it a reviewer is credited
-					// with the words of a title instead of the code.
-					warnUnmatchedRepos(log, githubRepos, git.RepoIDs())
-					dirWork = resolve.AddReviewCredit(dirWork, totals,
-						git.PullDirs(), gh.PullPeople())
-					reviewers = reviewersByDir(ix, git.PullDirs(), gh.PullPeople())
-				}
-				places = resolve.PlaceLeads(ix, dirWork, totals,
-					assessMinPlaceWork, 3)
-				if len(places) > assessPlacesListed {
-					places = places[:assessPlacesListed]
-				}
-				checks = resolve.PlaceChecks(places, git.PlaceLabels(), gitSinceDays)
-				ramp = resolve.MeasureRamp(git.Ramps(), places)
-			}
-			split := resolve.SplitNames(ix)
-			aliases := resolve.SuggestAliases(ix, split)
-			successors := assessSuccessors(ix, departures, places, reviewers)
-
-			del := newDeliverable(outDir)
-			del.json("findings.json", "findings", findings)
-			del.json("ownership.json", "ownership", ownership)
-			del.json("departures.json", "departures", departures)
-			del.json("crossings.json", "crossings", spans)
-			del.json("joined-work.json", "joined work", regions)
-			del.json("identity.json", "identity", identityRecord{
-				People: len(ix.Graph.People), Merged: ix.Joins(), Split: split,
-				Suggested: aliases,
-			})
-			if len(aliases) > 0 {
-				// Written in the format --aliases reads, so reviewing this file
-				// and passing it back is the whole fix. A report that names a
-				// problem and hands over the correction is doing the reader's
-				// next step for them; one that only names it is a complaint.
-				del.json("aliases.json", "aliases", resolve.AliasFile(aliases))
-			}
-			if git != nil {
-				del.json("systems.json", "systems", places)
-				del.json("checks.json", "checks", checks)
-			}
-			if len(successors) > 0 {
-				del.json("successors.json", "successors", successors)
-			}
-			if ramp.Arrivals > 0 {
-				del.json("ramp.json", "ramp", ramp)
-			}
-			del.text("summary.md", "summary", "text/markdown",
-				assessSummary(ix, findings, ownership, departures, spans, regions,
-					places, split, successors, checks, ramp))
-			html, err := riskHTML(ix, findings, regions, spans, briefFindings{
-				Systems: places, Checks: checks, Ramp: ramp, Split: split,
-				Aliases: aliases, Successors: successors, Merged: len(ix.Joins()),
-			}, briefRows, opts.now())
-			if err != nil {
-				return err
-			}
-			del.file("report.html", "report", "text/html", html)
-			del.text("README.txt", "readme", "text/plain", assessReadme(del.names()))
-			if err := del.write(); err != nil {
-				return err
-			}
-
-			// The seal is taken over the bytes that were just written, read back
-			// from disk, so a verifier pointed at this directory checks the
-			// reader's own copy rather than a copy held in memory.
-			priv, err := opts.attestKey()
-			if err != nil {
-				return err
-			}
-			if _, err := sealFinding(outDir, priv, ix, findings, del.sealed, opts.now()); err != nil {
-				return err
-			}
-
-			reportAssess(log, ix, findings, departures, split, outDir)
-			return nil
+			return runAssess(cmd, opts, &a)
 		},
 	}
+	a.register(cmd)
+	return cmd
+}
+
+// register binds the assess flags to the arguments.
+func (a *assessArgs) register(cmd *cobra.Command) {
 	f := cmd.Flags()
-	f.StringArrayVar(&repoPaths, "repo-path", nil, "Local repository root, repeatable.")
-	f.StringVar(&slackExport, "slack-export", "", "Slack export zip or its unzipped folder.")
-	f.StringVar(&orgCSV, "org-csv", "", "Org chart CSV.")
-	f.StringVar(&codeowners, "codeowners", "", "CODEOWNERS file or a repo root holding one.")
-	f.StringArrayVar(&githubRepos, "github-repo", nil,
+	f.StringArrayVar(&a.RepoPaths, "repo-path", nil, "Local repository root, repeatable.")
+	f.StringVar(&a.SlackExport, "slack-export", "", "Slack export zip or its unzipped folder.")
+	f.StringVar(&a.OrgCSV, "org-csv", "", "Org chart CSV.")
+	f.StringVar(&a.Codeowners, "codeowners", "", "CODEOWNERS file or a repo root holding one.")
+	f.StringArrayVar(&a.GithubRepos, "github-repo", nil,
 		"Repository as owner/name whose reviews to read, repeatable. Needs "+
 			githubTokenEnv+". Reviews are credited to the places they reviewed, "+
 			"which is what finds the people who approve rather than commit.")
-	f.StringVar(&githubURL, "github-url", "",
+	f.StringVar(&a.GithubURL, "github-url", "",
 		"API root, for GitHub Enterprise Server. Empty uses github.com.")
-	f.IntVar(&githubPages, "github-pages", 20,
+	f.IntVar(&a.GithubPages, "github-pages", 20,
 		"Pages of pull requests to read per repository, in hundreds.")
-	f.StringVar(&aliasesFile, "aliases", "",
+	f.StringVar(&a.AliasesFile, "aliases", "",
 		"Alias file joining identifiers that belong to one person, applied before "+
 			"the inferred joins. The deliverable's aliases.json is written in this "+
 			"format, so reviewing it and passing it back is the fix for a split "+
 			"identity.")
-	f.StringVar(&outDir, "out", "", "Output directory (default peepwho-assessment-<date>).")
-	f.IntVar(&top, "top", assessDeparturesListed, "People to cover in the departure file.")
-	f.IntVar(&gitSinceDays, "git-since-days", 730,
+	f.StringVar(&a.OutDir, "out", "", "Output directory (default peepwho-assessment-<date>).")
+	f.IntVar(&a.Top, "top", assessDeparturesListed, "People to cover in the departure file.")
+	f.IntVar(&a.GitSinceDays, "git-since-days", 730,
 		"How far back to read git history. Two years, because an assessment is about "+
 			"what the company knows, not what it did this quarter.")
-	f.IntVar(&maxCommits, "max-commits", 100000,
+	f.IntVar(&a.MaxCommits, "max-commits", 100000,
 		"Commit cap per repository. Far above the indexing default: a cap that "+
 			"truncates history silently drops the people who built the older half of "+
 			"a system, which is exactly what an assessment is asked to find.")
-	return cmd
+}
+
+// runAssess reads the inputs, scores them, writes the deliverable, and seals it.
+func runAssess(cmd *cobra.Command, opts *options, a *assessArgs) error {
+	if !a.hasInput() {
+		return fmt.Errorf("%w: name at least one input: --repo-path, --slack-export, "+
+			"--org-csv, or --codeowners", ErrBadArgs)
+	}
+	if a.OutDir == "" {
+		a.OutDir = "peepwho-assessment-" + opts.now().Format("20060102")
+	}
+	if err := os.MkdirAll(a.OutDir, 0o755); err != nil {
+		return fmt.Errorf("assess: %w", err)
+	}
+	log := cmd.ErrOrStderr()
+
+	src, err := readAssessSources(cmd.Context(), opts, a, log)
+	if err != nil {
+		return err
+	}
+	ix := src.Index
+	if err := joinAssessIndex(ix, a.AliasesFile); err != nil {
+		return err
+	}
+	res := scoreAssessment(src, a, log)
+	del, err := renderAssessment(ix, res, a.OutDir, opts.now())
+	if err != nil {
+		return err
+	}
+	if err := del.write(); err != nil {
+		return err
+	}
+
+	// The seal is taken over the bytes that were just written, read back
+	// from disk, so a verifier pointed at this directory checks the
+	// reader's own copy rather than a copy held in memory.
+	priv, err := opts.attestKey()
+	if err != nil {
+		return err
+	}
+	if _, err := sealFinding(a.OutDir, priv, ix, res.Findings, del.sealed, opts.now()); err != nil {
+		return err
+	}
+
+	reportAssess(log, ix, res.Findings, res.Departures, res.Split, a.OutDir)
+	return nil
+}
+
+// readAssessSources fetches every named input into a fresh in-memory index.
+func readAssessSources(ctx context.Context, opts *options, a *assessArgs, log io.Writer) (assessSources, error) {
+	src := assessSources{Index: index.New(index.WithNow(opts.clock))}
+	ix := src.Index
+	if a.OrgCSV != "" {
+		oc := connector.NewOrgCSV(a.OrgCSV)
+		oc.Log = log
+		recs, err := oc.Fetch(ctx)
+		if err != nil {
+			return src, err
+		}
+		ix.Add(recs)
+	}
+	if len(a.RepoPaths) > 0 {
+		src.Git = connector.NewGitHistory(connector.GitOptions{
+			Paths: a.RepoPaths, SinceDays: a.GitSinceDays, MaxCommits: a.MaxCommits, Log: log,
+		})
+		recs, err := src.Git.Fetch(ctx)
+		if err != nil {
+			return src, err
+		}
+		ix.Add(recs)
+	}
+	if a.Codeowners != "" {
+		recs, err := connector.NewCodeOwners(a.Codeowners).Fetch(ctx)
+		if err != nil {
+			return src, err
+		}
+		ix.Add(recs)
+	}
+	if len(a.GithubRepos) > 0 {
+		token := secret.Resolve(githubTokenEnv)
+		if token == "" {
+			return src, fmt.Errorf("%w: --github-repo needs %s", ErrBadArgs, githubTokenEnv)
+		}
+		src.GitHub = connector.NewGitHub(token, connector.GitHubOptions{
+			Repos: a.GithubRepos, MaxPages: a.GithubPages, BaseURL: a.GithubURL, Log: log,
+		})
+		recs, err := src.GitHub.Fetch(ctx)
+		if err != nil {
+			return src, explainSourceError("GitHub", githubTokenEnv, err)
+		}
+		ix.Add(recs)
+	}
+	if a.SlackExport != "" {
+		se := connector.NewSlackExport(a.SlackExport, connector.SlackExportOptions{
+			IncludePrivate: true, SinceDays: 36500, Log: log,
+		})
+		recs, err := se.Fetch(ctx)
+		if err != nil {
+			return src, err
+		}
+		ix.Add(recs)
+	}
+	return src, nil
+}
+
+// joinAssessIndex applies the alias file and the inferred joins, and refuses
+// an index that holds nobody.
+func joinAssessIndex(ix *index.Index, aliasesFile string) error {
+	// Aliases before the inferred joins, so a stated identity is a
+	// premise the rules reason from rather than a correction applied
+	// after they have already decided. The report names the splits it
+	// could not join and tells the reader to fix them here; until this
+	// flag existed that advice could not be followed.
+	if aliasesFile != "" {
+		if err := ix.LoadAliases(aliasesFile); err != nil {
+			return err
+		}
+	}
+	ix.AutoJoin()
+	ix.Canonicalize()
+	if len(ix.Graph.People) == 0 {
+		return fmt.Errorf("%w: the inputs yielded no people; check the paths", ErrBadArgs)
+	}
+	return nil
+}
+
+// scoreAssessment computes every finding the deliverable reports.
+func scoreAssessment(src assessSources, a *assessArgs, log io.Writer) *assessment {
+	ix := src.Index
+	// Everything is scored once and passed down. Risk walks every person
+	// and every subject and folds the compound names together, and the
+	// departure view needs it per person: recomputing it there made the
+	// cost of an assessment grow with the square of the organization.
+	res := &assessment{
+		Findings: resolve.Risk(ix, 0),
+		Regions:  resolve.Regions(ix, 0),
+	}
+	res.Ownership = resolve.Ownership(ix)
+	res.Departures = assessDepartures(ix, res.Findings, res.Regions, a.Top)
+	res.Spans = resolve.SoleSpans(ix, 0)
+	reviewers := assessPlaces(res, src, a, log)
+	res.Split = resolve.SplitNames(ix)
+	res.Aliases = resolve.SuggestAliases(ix, res.Split)
+	res.Successors = assessSuccessors(ix, res.Departures, res.Places, reviewers)
+	return res
+}
+
+// assessPlaces fills the systems view from the git connector's per-directory
+// tally and returns who reviewed each directory. It does nothing without git.
+func assessPlaces(res *assessment, src assessSources, a *assessArgs, log io.Writer) map[string]map[model.ID]bool {
+	git, gh := src.Git, src.GitHub
+	if git == nil {
+		return nil
+	}
+	res.Systems = true
+	var reviewers map[string]map[model.ID]bool
+	// Systems are places, not words: the per-directory tally
+	// answers who a system rests on without pooling every path
+	// that shares its name.
+	dirWork, totals := git.DirWork(), git.WorkTotals()
+	if gh != nil {
+		// A review is evidence of holding the place it reviewed.
+		// The merges name their pull requests, so the link needs
+		// no extra request, and without it a reviewer is credited
+		// with the words of a title instead of the code.
+		warnUnmatchedRepos(log, a.GithubRepos, git.RepoIDs())
+		dirWork = resolve.AddReviewCredit(dirWork, totals,
+			git.PullDirs(), gh.PullPeople())
+		reviewers = reviewersByDir(src.Index, git.PullDirs(), gh.PullPeople())
+	}
+	res.Places = resolve.PlaceLeads(src.Index, dirWork, totals,
+		assessMinPlaceWork, 3)
+	if len(res.Places) > assessPlacesListed {
+		res.Places = res.Places[:assessPlacesListed]
+	}
+	res.Checks = resolve.PlaceChecks(res.Places, git.PlaceLabels(), a.GitSinceDays)
+	res.Ramp = resolve.MeasureRamp(git.Ramps(), res.Places)
+	return reviewers
+}
+
+// renderAssessment renders every file of the deliverable, unwritten.
+func renderAssessment(ix *index.Index, res *assessment, outDir string, now time.Time) (*deliverable, error) {
+	del := newDeliverable(outDir)
+	del.json("findings.json", "findings", res.Findings)
+	del.json("ownership.json", "ownership", res.Ownership)
+	del.json("departures.json", "departures", res.Departures)
+	del.json("crossings.json", "crossings", res.Spans)
+	del.json("joined-work.json", "joined work", res.Regions)
+	del.json("identity.json", "identity", identityRecord{
+		People: len(ix.Graph.People), Merged: ix.Joins(), Split: res.Split,
+		Suggested: res.Aliases,
+	})
+	if len(res.Aliases) > 0 {
+		// Written in the format --aliases reads, so reviewing this file
+		// and passing it back is the whole fix. A report that names a
+		// problem and hands over the correction is doing the reader's
+		// next step for them; one that only names it is a complaint.
+		del.json("aliases.json", "aliases", resolve.AliasFile(res.Aliases))
+	}
+	if res.Systems {
+		del.json("systems.json", "systems", res.Places)
+		del.json("checks.json", "checks", res.Checks)
+	}
+	if len(res.Successors) > 0 {
+		del.json("successors.json", "successors", res.Successors)
+	}
+	if res.Ramp.Arrivals > 0 {
+		del.json("ramp.json", "ramp", res.Ramp)
+	}
+	del.text("summary.md", "summary", "text/markdown", assessSummary(ix, res))
+	html, err := riskHTML(ix, res.Findings, res.Regions, res.Spans, briefFindings{
+		Systems: res.Places, Checks: res.Checks, Ramp: res.Ramp, Split: res.Split,
+		Aliases: res.Aliases, Successors: res.Successors, Merged: len(ix.Joins()),
+	}, briefRows, now)
+	if err != nil {
+		return nil, err
+	}
+	del.file("report.html", "report", "text/html", html)
+	del.text("README.txt", "readme", "text/plain", assessReadme(del.names()))
+	return del, nil
 }
 
 // assessDepartures reports, for the people who lead the most subjects, what

@@ -116,7 +116,13 @@ func registerRecallTool(srv *mcp.Server, res *recall.Resolver) {
 // registerMCPTools wires the ask, person, and directory tools over the engine.
 func registerMCPTools(srv *mcp.Server, eng *engine.Engine, embedModel, ollamaURL string) {
 	dir := resolve.BuildDirectory(eng.Index())
+	registerMCPAsk(srv, eng, embedModel, ollamaURL)
+	registerMCPPerson(srv, eng)
+	registerMCPDirectory(srv, &dir)
+}
 
+// registerMCPAsk wires the ask tool, keyword or semantic, over the engine.
+func registerMCPAsk(srv *mcp.Server, eng *engine.Engine, embedModel, ollamaURL string) {
 	srv.AddTool(mcp.Tool{
 		Name: "peepwho_ask",
 		Description: "Find who to talk to and which channel to ask in about a topic, " +
@@ -159,7 +165,10 @@ func registerMCPTools(srv *mcp.Server, eng *engine.Engine, embedModel, ollamaURL
 		}
 		return marshalMCP(ans.View(in.Question))
 	})
+}
 
+// registerMCPPerson wires the tool that returns one person's profile.
+func registerMCPPerson(srv *mcp.Server, eng *engine.Engine) {
 	srv.AddTool(mcp.Tool{
 		Name: "peepwho_person",
 		Description: "Everything peepwho knows about one person: title, team, org, manager, " +
@@ -186,7 +195,10 @@ func registerMCPTools(srv *mcp.Server, eng *engine.Engine, embedModel, ollamaURL
 		}
 		return marshalMCP(profile)
 	})
+}
 
+// registerMCPDirectory wires the tool that lists one directory of the index.
+func registerMCPDirectory(srv *mcp.Server, dir *resolve.Directory) {
 	srv.AddTool(mcp.Tool{
 		Name: "peepwho_directory",
 		Description: "Browse everything indexed: people with teams and topics, channels with " +

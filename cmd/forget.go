@@ -38,98 +38,119 @@ Examples:
   peepwho forget "Jane Roe" --yes`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Taking the lock creates the data directory, so a purge with no
-			// index to purge from would leave a directory and a lock file
-			// behind on a machine that had neither. Nothing can be purged in
-			// that case anyway, so say so before touching the disk.
-			if _, err := os.Stat(opts.indexPath()); err != nil {
-				return noIndexError(err)
-			}
-			// The same lock every index write takes, so a purge cannot interleave
-			// with a scheduled refresh and leave the person half-removed.
-			unlock, err := util.LockFile(opts.indexPath() + util.LockSuffix)
-			if err != nil {
-				return err
-			}
-			defer unlock()
-			ix, err := opts.loadIndex(cmd)
-			if err != nil {
-				return noIndexError(err)
-			}
-			if err := opts.loadSources(ix); err != nil {
-				return err
-			}
-			people := ix.FindPeople(args[0])
-			if len(people) == 0 {
-				return fmt.Errorf("%w: no person matches %q", ErrBadArgs, args[0])
-			}
-			// A purge must never pick among namesakes: resolving "Jane Roe" to
-			// an arbitrary one of two Jane Roes deletes somebody nobody named.
-			if len(people) > 1 {
-				lines := make([]string, 0, len(people))
-				for _, p := range people {
-					line := "  " + string(p.ID)
-					if p.Email != "" && !strings.EqualFold(p.Email, string(p.ID)) {
-						line += " <" + p.Email + ">"
-					}
-					lines = append(lines, line)
-				}
-				return fmt.Errorf(
-					"%w: %q names %d people; purge one by email or id:\n%s",
-					ErrBadArgs, args[0], len(people), strings.Join(lines, "\n"))
-			}
-			person := people[0]
-			out := cmd.ErrOrStderr()
-			label := person.Name
-			if person.Email != "" {
-				label += " <" + person.Email + ">"
-			}
-			if !yes {
-				fmt.Fprintf(out, "This purges %s and %d linked identities from the index, "+
-					"remembered conversations, and recorded facts.\nProceed? [y/N]: ",
-					label, len(person.Identities))
-				var answer string
-				if _, err := fmt.Fscanln(cmd.InOrStdin(), &answer); err != nil ||
-					!strings.EqualFold(strings.TrimSpace(answer), "y") {
-					fmt.Fprintln(out, "left everything as it was")
-					return nil
-				}
-			}
-
-			// Collect the identity set before the purge rewrites the graph.
-			purgeIDs := append([]model.ID{person.ID}, person.Identities...)
-
-			res := ix.Forget(person)
-			if err := opts.saveIndex(ix); err != nil {
-				return err
-			}
-
-			store, err := opts.loadEpisodes(cmd)
-			if err != nil {
-				return err
-			}
-			// One pass over the whole identity set. Passing the identities one at
-			// a time let a later pass read an episode already edited by an earlier
-			// one as a one-person conversation, and drop a bystander with it.
-			dropped, edited := store.ForgetPerson(purgeIDs)
-			if err := opts.saveEpisodes(store); err != nil {
-				return err
-			}
-
-			facts, err := forgetFacts(opts, purgeIDs)
-			if err != nil {
-				return err
-			}
-
-			fmt.Fprintf(out,
-				"forgot %s: %d records removed, %d mentions stripped, "+
-					"%d conversations dropped, %d edited, %d facts removed\n",
-				label, res.Records, res.Mentions, dropped, edited, facts)
-			return nil
+			return runForgetPerson(cmd, opts, args[0], yes)
 		},
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "Purge without asking.")
 	return cmd
+}
+
+// runForgetPerson purges the one person query names from the index, the remembered
+// conversations, and the recorded facts, asking first unless yes is set.
+func runForgetPerson(cmd *cobra.Command, opts *options, query string, yes bool) error {
+	// Taking the lock creates the data directory, so a purge with no
+	// index to purge from would leave a directory and a lock file
+	// behind on a machine that had neither. Nothing can be purged in
+	// that case anyway, so say so before touching the disk.
+	if _, err := os.Stat(opts.indexPath()); err != nil {
+		return noIndexError(err)
+	}
+	// The same lock every index write takes, so a purge cannot interleave
+	// with a scheduled refresh and leave the person half-removed.
+	unlock, err := util.LockFile(opts.indexPath() + util.LockSuffix)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	ix, err := opts.loadIndex(cmd)
+	if err != nil {
+		return noIndexError(err)
+	}
+	if err := opts.loadSources(ix); err != nil {
+		return err
+	}
+	person, err := forgetTarget(ix.FindPeople(query), query)
+	if err != nil {
+		return err
+	}
+	out := cmd.ErrOrStderr()
+	label := person.Name
+	if person.Email != "" {
+		label += " <" + person.Email + ">"
+	}
+	if !yes && !confirmForget(cmd, label, len(person.Identities)) {
+		fmt.Fprintln(out, "left everything as it was")
+		return nil
+	}
+
+	// Collect the identity set before the purge rewrites the graph.
+	purgeIDs := append([]model.ID{person.ID}, person.Identities...)
+
+	res := ix.Forget(person)
+	if err := opts.saveIndex(ix); err != nil {
+		return err
+	}
+
+	store, err := opts.loadEpisodes(cmd)
+	if err != nil {
+		return err
+	}
+	// One pass over the whole identity set. Passing the identities one at
+	// a time let a later pass read an episode already edited by an earlier
+	// one as a one-person conversation, and drop a bystander with it.
+	dropped, edited := store.ForgetPerson(purgeIDs)
+	if err := opts.saveEpisodes(store); err != nil {
+		return err
+	}
+
+	facts, err := forgetFacts(opts, purgeIDs)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(out,
+		"forgot %s: %d records removed, %d mentions stripped, "+
+			"%d conversations dropped, %d edited, %d facts removed\n",
+		label, res.Records, res.Mentions, dropped, edited, facts)
+	return nil
+}
+
+// forgetTarget returns the single person a purge names, refusing no match
+// and refusing namesakes.
+func forgetTarget(people []*model.Person, query string) (*model.Person, error) {
+	if len(people) == 0 {
+		return nil, fmt.Errorf("%w: no person matches %q", ErrBadArgs, query)
+	}
+	// A purge must never pick among namesakes: resolving "Jane Roe" to
+	// an arbitrary one of two Jane Roes deletes somebody nobody named.
+	if len(people) > 1 {
+		lines := make([]string, 0, len(people))
+		for _, p := range people {
+			line := "  " + string(p.ID)
+			if p.Email != "" && !strings.EqualFold(p.Email, string(p.ID)) {
+				line += " <" + p.Email + ">"
+			}
+			lines = append(lines, line)
+		}
+		return nil, fmt.Errorf(
+			"%w: %q names %d people; purge one by email or id:\n%s",
+			ErrBadArgs, query, len(people), strings.Join(lines, "\n"))
+	}
+	return people[0], nil
+}
+
+// confirmForget asks on stderr whether to purge label and reports whether
+// the answer read from stdin was yes.
+func confirmForget(cmd *cobra.Command, label string, identities int) bool {
+	fmt.Fprintf(cmd.ErrOrStderr(), "This purges %s and %d linked identities from the index, "+
+		"remembered conversations, and recorded facts.\nProceed? [y/N]: ",
+		label, identities)
+	var answer string
+	if _, err := fmt.Fscanln(cmd.InOrStdin(), &answer); err != nil ||
+		!strings.EqualFold(strings.TrimSpace(answer), "y") {
+		return false
+	}
+	return true
 }
 
 // forgetFacts removes every recorded fact naming one of the purged identities

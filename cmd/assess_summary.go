@@ -65,51 +65,13 @@ func countAssess(findings []resolve.TopicRisk) assessCounts {
 // should put to management, and the actions the findings suggest. Every
 // number in it is computed from the same data the JSON files carry; nothing
 // is asserted that a reader cannot trace.
-func assessSummary(
-	ix *index.Index, findings []resolve.TopicRisk, ownership resolve.OwnershipReport,
-	departures []resolve.DepartureImpact, spans []resolve.Span, regions []resolve.Region,
-	places []resolve.Place, split []resolve.SplitName, successors []personSuccession,
-	checks []resolve.CheckCommand, ramp resolve.Ramp,
-) string {
+func assessSummary(ix *index.Index, res *assessment) string {
 	var b strings.Builder
-	c := countAssess(findings)
-
-	fmt.Fprintf(&b, "# Knowledge continuity summary\n\n")
-	fmt.Fprintf(&b, "Scope: %d %s, %d subjects scored, sources: %s.\n\n",
-		len(ix.Graph.People), people(len(ix.Graph.People)), len(findings),
-		strings.Join(ix.SourceNames(), ", "))
-	b.WriteString(concentrationLine(c))
-	if c.Quiet > 0 {
-		fmt.Fprintf(&b,
-			"Sharper than any of those: %d subjects rest on somebody who has already "+
-				"stopped working on them.\n", c.Quiet)
-	}
-	if ownership.Declared > 0 {
-		fmt.Fprintf(&b,
-			"Declared ownership: %d areas have an owner of record; the evidence agrees "+
-				"in %d and points elsewhere in %d.\n", ownership.Declared, ownership.Held,
-			len(ownership.Drift))
-	}
-	if len(regions) > 0 {
-		fmt.Fprintf(&b,
-			"Joined work: %d %s of subjects change together under a single lead, "+
-				"so each would be picked up whole rather than a subject at a time.\n",
-			len(regions), pick(len(regions), "body", "bodies"))
-	}
-	if len(spans) > 0 {
-		fmt.Fprintf(&b,
-			"Crossings: %d %s between subjects have only ever been made by one person.%s\n",
-			len(spans), pick(len(spans), "connection", "connections"), coveredSpans(spans))
-	}
-	b.WriteString("\nThe language throughout is deliberate: peepwho measures observed work, " +
-		"not competence. A finding says what the record shows and who it points to, " +
-		"and every one traces to the evidence in the data files beside this summary.\n")
-	b.WriteString(rampParagraph(ramp))
-	b.WriteString(assessLimits(split))
-
-	if len(places) > 0 {
-		writeSystems(&b, places)
-		if len(checks) > 0 {
+	c := countAssess(res.Findings)
+	writeSummaryScope(&b, ix, res, c)
+	if len(res.Places) > 0 {
+		writeSystems(&b, res.Places)
+		if len(res.Checks) > 0 {
 			b.WriteString(
 				"\nEvery system above is checkable without peepwho: checks.json carries " +
 					"one paste-ready git command per system, counting the same window " +
@@ -117,12 +79,67 @@ func assessSummary(
 					"command rather than arguing with the report.\n")
 		}
 	}
+	writeSummaryDepartures(&b, res.Departures, res.Successors)
+	writeSummaryDrift(&b, res.Ownership.Drift)
+	questions := assessQuestions(res.Ownership, res.Departures, res.Spans)
+	if len(questions) > 0 {
+		b.WriteString("\n## Questions for management\n\n")
+		b.WriteString("Findings are the start of a conversation, not the end of one. " +
+			"These are the questions the record raises; the answers belong to people.\n\n")
+		for i, q := range questions {
+			fmt.Fprintf(&b, "%d. %s\n", i+1, q)
+		}
+	}
+	writeSummaryActions(&b, res, c)
+	return b.String()
+}
 
+// writeSummaryScope writes the summary's opening: what was read, how
+// concentrated it is, and how the numbers are meant to be read.
+func writeSummaryScope(b *strings.Builder, ix *index.Index, res *assessment, c assessCounts) {
+	ownership, regions, spans := res.Ownership, res.Regions, res.Spans
+	fmt.Fprintf(b, "# Knowledge continuity summary\n\n")
+	fmt.Fprintf(b, "Scope: %d %s, %d subjects scored, sources: %s.\n\n",
+		len(ix.Graph.People), people(len(ix.Graph.People)), len(res.Findings),
+		strings.Join(ix.SourceNames(), ", "))
+	b.WriteString(concentrationLine(c))
+	if c.Quiet > 0 {
+		fmt.Fprintf(b,
+			"Sharper than any of those: %d subjects rest on somebody who has already "+
+				"stopped working on them.\n", c.Quiet)
+	}
+	if ownership.Declared > 0 {
+		fmt.Fprintf(b,
+			"Declared ownership: %d areas have an owner of record; the evidence agrees "+
+				"in %d and points elsewhere in %d.\n", ownership.Declared, ownership.Held,
+			len(ownership.Drift))
+	}
+	if len(regions) > 0 {
+		fmt.Fprintf(b,
+			"Joined work: %d %s of subjects change together under a single lead, "+
+				"so each would be picked up whole rather than a subject at a time.\n",
+			len(regions), pick(len(regions), "body", "bodies"))
+	}
+	if len(spans) > 0 {
+		fmt.Fprintf(b,
+			"Crossings: %d %s between subjects have only ever been made by one person.%s\n",
+			len(spans), pick(len(spans), "connection", "connections"), coveredSpans(spans))
+	}
+	b.WriteString("\nThe language throughout is deliberate: peepwho measures observed work, " +
+		"not competence. A finding says what the record shows and who it points to, " +
+		"and every one traces to the evidence in the data files beside this summary.\n")
+	b.WriteString(rampParagraph(res.Ramp))
+	b.WriteString(assessLimits(res.Split))
+}
+
+// writeSummaryDepartures lists the people who are the whole record of
+// something, each with who stands nearest to it.
+func writeSummaryDepartures(b *strings.Builder, departures []resolve.DepartureImpact, successors []personSuccession) {
 	if len(departures) > 0 {
 		b.WriteString("\n## Where one person is the whole record\n\n")
 		for i, d := range departures {
 			if i == summaryListed {
-				fmt.Fprintf(&b, "- and %d more in departures.json\n", len(departures)-i)
+				fmt.Fprintf(b, "- and %d more in departures.json\n", len(departures)-i)
 				break
 			}
 			line := fmt.Sprintf("- %s: ", d.Name)
@@ -139,68 +156,66 @@ func assessSummary(
 			b.WriteString(successionLine(d.Person, successors))
 		}
 	}
-
 	if len(successors) > 0 {
 		b.WriteString("\nNearest is a statement about the record, not about ability: " +
 			"of everyone indexed, this person starts closest to the work. The evidence " +
 			"for each is in successors.json.\n")
 	}
+}
 
-	if len(ownership.Drift) > 0 {
-		b.WriteString("\n## Where the record and the declared owner disagree\n\n")
-		drift := append([]resolve.OwnerDrift(nil), ownership.Drift...)
-		sort.SliceStable(drift, func(i, j int) bool { return drift[i].Topic < drift[j].Topic })
-		for i, d := range drift {
-			if i == summaryListed {
-				fmt.Fprintf(&b, "- and %d more in ownership.json\n", len(drift)-i)
-				break
-			}
-			fmt.Fprintf(&b, "- %s: declared %s, observed work concentrates around %s (%s)\n",
-				d.Topic, strings.Join(d.Declared, ", "), d.Actual, d.Why)
-		}
+// writeSummaryDrift lists the areas where the declared owner and the observed
+// work disagree, ordered by subject.
+func writeSummaryDrift(b *strings.Builder, ownerDrift []resolve.OwnerDrift) {
+	if len(ownerDrift) == 0 {
+		return
 	}
-
-	questions := assessQuestions(ownership, departures, spans)
-	if len(questions) > 0 {
-		b.WriteString("\n## Questions for management\n\n")
-		b.WriteString("Findings are the start of a conversation, not the end of one. " +
-			"These are the questions the record raises; the answers belong to people.\n\n")
-		for i, q := range questions {
-			fmt.Fprintf(&b, "%d. %s\n", i+1, q)
+	b.WriteString("\n## Where the record and the declared owner disagree\n\n")
+	drift := append([]resolve.OwnerDrift(nil), ownerDrift...)
+	sort.SliceStable(drift, func(i, j int) bool { return drift[i].Topic < drift[j].Topic })
+	for i, d := range drift {
+		if i == summaryListed {
+			fmt.Fprintf(b, "- and %d more in ownership.json\n", len(drift)-i)
+			break
 		}
+		fmt.Fprintf(b, "- %s: declared %s, observed work concentrates around %s (%s)\n",
+			d.Topic, strings.Join(d.Declared, ", "), d.Actual, d.Why)
 	}
+}
 
+// writeSummaryActions writes the suggested actions, or says plainly that the
+// findings demand none.
+func writeSummaryActions(b *strings.Builder, res *assessment, c assessCounts) {
+	ownership, regions, spans := res.Ownership, res.Regions, res.Spans
 	b.WriteString("\n## Suggested actions\n\n")
 	if c.Sole == 0 && c.Critical == 0 && len(ownership.Drift) == 0 && len(spans) == 0 {
 		b.WriteString("Nothing here demands action. No significant subject rests on a " +
 			"single person, and declared ownership matches the observed work. A report " +
 			"that can say this is the same report worth believing when it cannot.\n")
-		return b.String()
+		return
 	}
 	if c.Sole > 0 {
-		fmt.Fprintf(&b, "- Confirm retention and transition plans for the people "+
+		fmt.Fprintf(b, "- Confirm retention and transition plans for the people "+
 			"named under sole holdings; %d subjects have nobody else in the record at all.\n",
 			c.Sole)
 	}
 	if c.Quiet > 0 {
-		fmt.Fprintf(&b, "- Start with the %d subjects whose lead has already stopped "+
+		fmt.Fprintf(b, "- Start with the %d subjects whose lead has already stopped "+
 			"working on them; there the handover has happened without anybody arranging it.\n",
 			c.Quiet)
 	}
 	if len(ownership.Drift) > 0 {
-		fmt.Fprintf(&b, "- Reconcile the %d drifted areas: either the declaration "+
+		fmt.Fprintf(b, "- Reconcile the %d drifted areas: either the declaration "+
 			"or the staffing is out of date, and which one it is changes the fix.\n",
 			len(ownership.Drift))
 	}
 	if len(regions) > 0 {
-		fmt.Fprintf(&b, "- Treat each body of joined work as one handover rather than "+
+		fmt.Fprintf(b, "- Treat each body of joined work as one handover rather than "+
 			"several; the largest spans %d subjects under one lead.\n", regions[0].Size())
 	}
 	if len(spans) > 0 {
 		b.WriteString("- For each crossing, have a second person walk the joined " +
 			"work end to end; the risk is not either area but knowing they belong together.\n")
 	}
-	return b.String()
 }
 
 // writeSystems lists the largest places and says plainly how well covered each

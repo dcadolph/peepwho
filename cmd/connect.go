@@ -56,6 +56,13 @@ type sourceSpec struct {
 // connectSpecs returns the source descriptions in setup order: the no-credential
 // sources first, then everything that needs a token, matching the cookbook.
 func connectSpecs() []sourceSpec {
+	return append(fileSourceSpecs(),
+		slackSpec(), githubSpec(), jiraSpec(), confluenceSpec(), pagerdutySpec(), graphSpec())
+}
+
+// fileSourceSpecs returns the sources read from local files and clones, which
+// need no credentials.
+func fileSourceSpecs() []sourceSpec {
 	return []sourceSpec{
 		{
 			id:      "org-csv",
@@ -87,115 +94,139 @@ func connectSpecs() []sourceSpec {
 			summary: "Who actually commits to what, read from local clones. Works for any repo you can clone.",
 			steps:   []string{"Point this at one or more local repo roots. Bot accounts like dependabot are skipped."},
 		},
-		{
-			id:      "slack",
-			title:   "Slack",
-			summary: "The strongest single source: which channels exist, what they are about, and who is active on each topic.",
-			steps: []string{
-				"1. Go to https://api.slack.com/apps and choose Create New App, then From scratch.",
-				"2. Under OAuth & Permissions, add these Bot Token Scopes:",
-				"     channels:read  channels:history  users:read  users:read.email",
-				"3. Install to Workspace, then copy the Bot User OAuth Token (starts with xoxb-).",
-			},
-			creds: []credField{
-				{env: slackTokenEnv, label: "Slack bot token", secret: true, hint: "starts with xoxb-"},
-			},
-			authFix: "The token is wrong or missing a scope. Recreate it with the four scopes above, then re-enter.",
-			validate: func(ctx context.Context, c map[string]string) error {
-				return connector.NewSlack(c[slackTokenEnv], connector.SlackOptions{}).Ping(ctx)
-			},
+	}
+}
+
+// slackSpec describes the Slack source and its bot token.
+func slackSpec() sourceSpec {
+	return sourceSpec{
+		id:      "slack",
+		title:   "Slack",
+		summary: "The strongest single source: which channels exist, what they are about, and who is active on each topic.",
+		steps: []string{
+			"1. Go to https://api.slack.com/apps and choose Create New App, then From scratch.",
+			"2. Under OAuth & Permissions, add these Bot Token Scopes:",
+			"     channels:read  channels:history  users:read  users:read.email",
+			"3. Install to Workspace, then copy the Bot User OAuth Token (starts with xoxb-).",
 		},
-		{
-			id:      "github",
-			title:   "GitHub",
-			summary: "Contributors, PR authors, reviewers, assignees, labels, issues, repo topics, and CODEOWNERS.",
-			steps: []string{
-				"1. Go to https://github.com/settings/tokens and create a token.",
-				"2. Grant read access: a classic token needs the repo scope; a fine-grained token",
-				"   needs read-only Contents, Metadata, Pull requests, and Issues on the target repos.",
-				"3. Copy the token (ghp_... or github_pat_...).",
-			},
-			creds: []credField{
-				{env: githubTokenEnv, label: "GitHub token", secret: true, hint: "ghp_... or github_pat_..."},
-			},
-			authFix: "The token is wrong, expired, or lacks read access to the repos. Recreate it and re-enter.",
-			validate: func(ctx context.Context, c map[string]string) error {
-				return connector.NewGitHub(c[githubTokenEnv], connector.GitHubOptions{}).Ping(ctx)
-			},
+		creds: []credField{
+			{env: slackTokenEnv, label: "Slack bot token", secret: true, hint: "starts with xoxb-"},
 		},
-		{
-			id:      "jira",
-			title:   "Jira",
-			summary: "Issue assignees and reporters, weighted by components, labels, summary words, and project.",
-			steps: []string{
-				"1. Go to https://id.atlassian.com/manage-profile/security/api-tokens.",
-				"2. Click Create API token and copy it.",
-				"3. You will also need your site URL and the account email that owns the token.",
-			},
-			creds: []credField{
-				{env: jiraURLEnv, label: "Jira site URL", hint: "https://your-site.atlassian.net"},
-				{env: jiraEmailEnv, label: "Atlassian account email", hint: "you@example.com"},
-				{env: jiraTokenEnv, label: "Jira API token", secret: true},
-			},
-			authFix: "Check the email matches the account that owns the token, and the URL is the site root with no trailing path.",
-			validate: func(ctx context.Context, c map[string]string) error {
-				return connector.NewJira(c[jiraURLEnv], c[jiraEmailEnv], c[jiraTokenEnv], connector.JiraOptions{}).Ping(ctx)
-			},
+		authFix: "The token is wrong or missing a scope. Recreate it with the four scopes above, then re-enter.",
+		validate: func(ctx context.Context, c map[string]string) error {
+			return connector.NewSlack(c[slackTokenEnv], connector.SlackOptions{}).Ping(ctx)
 		},
-		{
-			id:      "confluence",
-			title:   "Confluence",
-			summary: "Page creators and last editors, weighted by labels, title words, and space.",
-			steps: []string{
-				"Confluence uses the same Atlassian site and token as Jira. If you set up Jira,",
-				"reuse those values below. Otherwise create a token at",
-				"https://id.atlassian.com/manage-profile/security/api-tokens.",
-			},
-			creds: []credField{
-				{env: confluenceURLEnv, label: "Confluence site URL", hint: "https://your-site.atlassian.net"},
-				{env: confluenceEmailEnv, label: "Atlassian account email", hint: "you@example.com"},
-				{env: confluenceTokenEnv, label: "Confluence API token", secret: true},
-			},
-			authFix: "Check the email matches the token owner, and the URL is the site root with no trailing path.",
-			validate: func(ctx context.Context, c map[string]string) error {
-				return connector.NewConfluence(
-					c[confluenceURLEnv], c[confluenceEmailEnv], c[confluenceTokenEnv], connector.ConfluenceOptions{}).Ping(ctx)
-			},
+	}
+}
+
+// githubSpec describes the GitHub source and its token.
+func githubSpec() sourceSpec {
+	return sourceSpec{
+		id:      "github",
+		title:   "GitHub",
+		summary: "Contributors, PR authors, reviewers, assignees, labels, issues, repo topics, and CODEOWNERS.",
+		steps: []string{
+			"1. Go to https://github.com/settings/tokens and create a token.",
+			"2. Grant read access: a classic token needs the repo scope; a fine-grained token",
+			"   needs read-only Contents, Metadata, Pull requests, and Issues on the target repos.",
+			"3. Copy the token (ghp_... or github_pat_...).",
 		},
-		{
-			id:      "pagerduty",
-			title:   "PagerDuty",
-			summary: "Every service and who is on call, so each on-call person gets the topics they answer for.",
-			steps: []string{
-				"1. In PagerDuty, go to Integrations > API Access Keys.",
-				"2. Create a read-only API key and copy it.",
-			},
-			creds: []credField{
-				{env: pagerdutyTokenEnv, label: "PagerDuty API token", secret: true, hint: "read-only key"},
-			},
-			authFix: "The token is wrong. Create a read-only API key and re-enter.",
-			validate: func(ctx context.Context, c map[string]string) error {
-				return connector.NewPagerDuty(c[pagerdutyTokenEnv], connector.PagerDutyOptions{}).Ping(ctx)
-			},
+		creds: []credField{
+			{env: githubTokenEnv, label: "GitHub token", secret: true, hint: "ghp_... or github_pat_..."},
 		},
-		{
-			id:      "graph",
-			title:   "Microsoft Graph",
-			summary: "The org chart from Entra ID: names, titles, and reporting lines, joined onto everything else by email.",
-			steps: []string{
-				"1. In Entra admin center, register an application and grant it User.Read.All (application).",
-				"2. Have an admin consent to the permission.",
-				"3. Acquire a bearer token for https://graph.microsoft.com and export it.",
-				"Tokens expire quickly, so mint one right before indexing, or wire your own refresh.",
-			},
-			creds: []credField{
-				{env: graphTokenEnv, label: "Microsoft Graph bearer token", secret: true},
-				{env: graphURLEnv, label: "Graph base URL (blank for public cloud)", hint: "only for sovereign clouds"},
-			},
-			authFix: "The token is expired or missing User.Read.All. Mint a fresh one and re-enter.",
-			validate: func(ctx context.Context, c map[string]string) error {
-				return graph.New(c[graphTokenEnv], graph.WithBaseURL(c[graphURLEnv])).Ping(ctx)
-			},
+		authFix: "The token is wrong, expired, or lacks read access to the repos. Recreate it and re-enter.",
+		validate: func(ctx context.Context, c map[string]string) error {
+			return connector.NewGitHub(c[githubTokenEnv], connector.GitHubOptions{}).Ping(ctx)
+		},
+	}
+}
+
+// jiraSpec describes the Jira source and its site, email, and API token.
+func jiraSpec() sourceSpec {
+	return sourceSpec{
+		id:      "jira",
+		title:   "Jira",
+		summary: "Issue assignees and reporters, weighted by components, labels, summary words, and project.",
+		steps: []string{
+			"1. Go to https://id.atlassian.com/manage-profile/security/api-tokens.",
+			"2. Click Create API token and copy it.",
+			"3. You will also need your site URL and the account email that owns the token.",
+		},
+		creds: []credField{
+			{env: jiraURLEnv, label: "Jira site URL", hint: "https://your-site.atlassian.net"},
+			{env: jiraEmailEnv, label: "Atlassian account email", hint: "you@example.com"},
+			{env: jiraTokenEnv, label: "Jira API token", secret: true},
+		},
+		authFix: "Check the email matches the account that owns the token, and the URL is the site root with no trailing path.",
+		validate: func(ctx context.Context, c map[string]string) error {
+			return connector.NewJira(c[jiraURLEnv], c[jiraEmailEnv], c[jiraTokenEnv], connector.JiraOptions{}).Ping(ctx)
+		},
+	}
+}
+
+// confluenceSpec describes the Confluence source, which shares the Atlassian token.
+func confluenceSpec() sourceSpec {
+	return sourceSpec{
+		id:      "confluence",
+		title:   "Confluence",
+		summary: "Page creators and last editors, weighted by labels, title words, and space.",
+		steps: []string{
+			"Confluence uses the same Atlassian site and token as Jira. If you set up Jira,",
+			"reuse those values below. Otherwise create a token at",
+			"https://id.atlassian.com/manage-profile/security/api-tokens.",
+		},
+		creds: []credField{
+			{env: confluenceURLEnv, label: "Confluence site URL", hint: "https://your-site.atlassian.net"},
+			{env: confluenceEmailEnv, label: "Atlassian account email", hint: "you@example.com"},
+			{env: confluenceTokenEnv, label: "Confluence API token", secret: true},
+		},
+		authFix: "Check the email matches the token owner, and the URL is the site root with no trailing path.",
+		validate: func(ctx context.Context, c map[string]string) error {
+			return connector.NewConfluence(
+				c[confluenceURLEnv], c[confluenceEmailEnv], c[confluenceTokenEnv], connector.ConfluenceOptions{}).Ping(ctx)
+		},
+	}
+}
+
+// pagerdutySpec describes the PagerDuty source and its read-only key.
+func pagerdutySpec() sourceSpec {
+	return sourceSpec{
+		id:      "pagerduty",
+		title:   "PagerDuty",
+		summary: "Every service and who is on call, so each on-call person gets the topics they answer for.",
+		steps: []string{
+			"1. In PagerDuty, go to Integrations > API Access Keys.",
+			"2. Create a read-only API key and copy it.",
+		},
+		creds: []credField{
+			{env: pagerdutyTokenEnv, label: "PagerDuty API token", secret: true, hint: "read-only key"},
+		},
+		authFix: "The token is wrong. Create a read-only API key and re-enter.",
+		validate: func(ctx context.Context, c map[string]string) error {
+			return connector.NewPagerDuty(c[pagerdutyTokenEnv], connector.PagerDutyOptions{}).Ping(ctx)
+		},
+	}
+}
+
+// graphSpec describes the Microsoft Graph source and its bearer token.
+func graphSpec() sourceSpec {
+	return sourceSpec{
+		id:      "graph",
+		title:   "Microsoft Graph",
+		summary: "The org chart from Entra ID: names, titles, and reporting lines, joined onto everything else by email.",
+		steps: []string{
+			"1. In Entra admin center, register an application and grant it User.Read.All (application).",
+			"2. Have an admin consent to the permission.",
+			"3. Acquire a bearer token for https://graph.microsoft.com and export it.",
+			"Tokens expire quickly, so mint one right before indexing, or wire your own refresh.",
+		},
+		creds: []credField{
+			{env: graphTokenEnv, label: "Microsoft Graph bearer token", secret: true},
+			{env: graphURLEnv, label: "Graph base URL (blank for public cloud)", hint: "only for sovereign clouds"},
+		},
+		authFix: "The token is expired or missing User.Read.All. Mint a fresh one and re-enter.",
+		validate: func(ctx context.Context, c map[string]string) error {
+			return graph.New(c[graphTokenEnv], graph.WithBaseURL(c[graphURLEnv])).Ping(ctx)
 		},
 	}
 }

@@ -287,13 +287,47 @@ func (x *Indexer) Fold(ctx context.Context, recs []connector.Record, p FoldParam
 		prev = existing.Graph
 	}
 
+	ix, err := x.foldBase(existing, p)
+	if err != nil {
+		return err
+	}
+	if err := foldRecords(ix, existing, recs, p); err != nil {
+		return err
+	}
+	x.joinIdentities(ix)
+	if p.Embed {
+		if err := x.embed(ctx, ix, p); err != nil {
+			return err
+		}
+	}
+
+	changes := index.Diff(prev, ix.Graph)
+	if err := x.saveIndex(ix); err != nil {
+		return err
+	}
+	if err := x.saveEpisodes(ctx, ix, p); err != nil {
+		return err
+	}
+	x.reportFold(ix, changes)
+	if p.ChangesFile != "" {
+		if err := writeChangesFile(p.ChangesFile, changes); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// foldBase returns the index a fold writes into: the existing one with every
+// source's records restored for a merge, or a fresh one, with the half-life
+// and alias file applied.
+func (x *Indexer) foldBase(existing *index.Index, p FoldParams) (*index.Index, error) {
 	ix := index.New(index.WithNow(x.Now))
 	if p.Merge && existing != nil {
 		// A merge rebuilds from every source, so the records for the sources
 		// already indexed must come back from the sidecar first; without them
 		// the rebuild would keep only the source being added.
 		if err := x.loadSources(existing); err != nil {
-			return fmt.Errorf(
+			return nil, fmt.Errorf(
 				"cannot merge: %w; run a full index once without --merge to rebuild the sources file", err)
 		}
 		ix = existing
@@ -301,9 +335,15 @@ func (x *Indexer) Fold(ctx context.Context, recs []connector.Record, p FoldParam
 	ix.SetHalfLife(time.Duration(p.HalfLifeDays) * 24 * time.Hour)
 	if p.AliasesFile != "" {
 		if err := ix.LoadAliases(p.AliasesFile); err != nil {
-			return err
+			return nil, err
 		}
 	}
+	return ix, nil
+}
+
+// foldRecords adds recs to ix as an incremental merge, a merge, or a full
+// replace, refusing a replace that would shrink or empty a good index.
+func foldRecords(ix, existing *index.Index, recs []connector.Record, p FoldParams) error {
 	// An incremental read returns only what changed, so it is legitimately far
 	// smaller than the last full read; the shrink guard, which protects a full
 	// replace from a truncated read, does not apply to it.
@@ -330,6 +370,12 @@ func (x *Indexer) Fold(ctx context.Context, recs []connector.Record, p FoldParam
 		}
 		ix.Build(recs)
 	}
+	return nil
+}
+
+// joinIdentities auto-joins handle identities, reports the joins and the
+// ambiguous handles, and canonicalizes the graph.
+func (x *Indexer) joinIdentities(ix *index.Index) {
 	res := ix.AutoJoin()
 	if res.Joined > 0 {
 		fmt.Fprintf(x.log(), "auto-joined %d handle identities\n", res.Joined)
@@ -340,29 +386,28 @@ func (x *Indexer) Fold(ctx context.Context, recs []connector.Record, p FoldParam
 			len(res.Ambiguous), strings.Join(res.Ambiguous, ", "))
 	}
 	ix.Canonicalize()
+}
 
-	if p.Embed {
-		if err := GuardLLMHost(x.Policy, p.OllamaURL); err != nil {
-			return err
-		}
-		total := len(ix.Graph.People) + len(ix.Graph.Channels)
-		fmt.Fprintf(x.log(),
-			"embedding %d people and %d channels via Ollama...\n",
-			len(ix.Graph.People), len(ix.Graph.Channels))
-		ix.SetEmbedProgress(util.ProgressWriter(x.log(), "embedded", embedProgressEvery(total)))
-		if err := ix.Embed(ctx, NewDocOllama(p.EmbedModel, p.OllamaURL)); err != nil {
-			return fmt.Errorf("embed: %w", err)
-		}
-	}
-
-	changes := index.Diff(prev, ix.Graph)
-	if err := x.saveIndex(ix); err != nil {
+// embed computes vectors for every person and channel through Ollama, behind
+// the egress policy guard.
+func (x *Indexer) embed(ctx context.Context, ix *index.Index, p FoldParams) error {
+	if err := GuardLLMHost(x.Policy, p.OllamaURL); err != nil {
 		return err
 	}
-	if err := x.saveEpisodes(ctx, ix, p); err != nil {
-		return err
+	total := len(ix.Graph.People) + len(ix.Graph.Channels)
+	fmt.Fprintf(x.log(),
+		"embedding %d people and %d channels via Ollama...\n",
+		len(ix.Graph.People), len(ix.Graph.Channels))
+	ix.SetEmbedProgress(util.ProgressWriter(x.log(), "embedded", embedProgressEvery(total)))
+	if err := ix.Embed(ctx, NewDocOllama(p.EmbedModel, p.OllamaURL)); err != nil {
+		return fmt.Errorf("embed: %w", err)
 	}
+	return nil
+}
 
+// reportFold writes what the saved index holds, warns when it is plaintext,
+// and lists the changes since the last run.
+func (x *Indexer) reportFold(ix *index.Index, changes index.Changes) {
 	out := x.log()
 	// Subjects and words are counted apart on purpose. A subject is something a
 	// source stated: a label, a component, a directory. A word is something
@@ -386,12 +431,6 @@ func (x *Indexer) Fold(ctx context.Context, recs []connector.Record, p FoldParam
 				"permissions. Set PEEPWHO_INDEX_KEY or PEEPWHO_INDEX_PASSPHRASE to encrypt it at rest.")
 	}
 	reportChanges(out, changes)
-	if p.ChangesFile != "" {
-		if err := writeChangesFile(p.ChangesFile, changes); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // guardArchive refuses to retain conversation content unless the

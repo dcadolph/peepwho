@@ -163,8 +163,17 @@ func serveWeb(cmd *cobra.Command, opts *options, eng *engine.Engine, store *feed
 	if err := eng.SetFeedbackStrength(cfg.fbStrength); err != nil {
 		return err
 	}
-	ix := eng.Index()
-	ask := func(ctx context.Context, query, reqMode, reqProvider string, limit int) (resolve.Answer, error) {
+	handler, err := webHandler(cmd, opts, eng, store, cfg, token)
+	if err != nil {
+		return err
+	}
+	return listenAndServe(cmd, handler, cfg.addr)
+}
+
+// webAskFn answers one web question, falling back to the server's mode and
+// provider when the request names none.
+func webAskFn(eng *engine.Engine, cfg webConfig) web.AskFunc {
+	return func(ctx context.Context, query, reqMode, reqProvider string, limit int) (resolve.Answer, error) {
 		if reqMode == "" {
 			reqMode = cfg.mode
 		}
@@ -184,18 +193,32 @@ func serveWeb(cmd *cobra.Command, opts *options, eng *engine.Engine, store *feed
 		}
 		return res.Resolve(ctx, query, limit)
 	}
+}
+
+// webVoteFn records a vote and re-ranks the index with it, or returns nil
+// when voting is off.
+func webVoteFn(eng *engine.Engine, store *feedback.Store, cfg webConfig) web.FeedbackFunc {
 	// A public server takes votes from anyone, and every vote re-ranks the
 	// shared index and lands on disk, so voting stays off there.
-	var vote web.FeedbackFunc
-	if store != nil && !cfg.public {
-		vote = func(e feedback.Entry) error {
-			if err := store.Add(e); err != nil {
-				return err
-			}
-			eng.SetFeedback(store)
-			return nil
-		}
+	if store == nil || cfg.public {
+		return nil
 	}
+	return func(e feedback.Entry) error {
+		if err := store.Add(e); err != nil {
+			return err
+		}
+		eng.SetFeedback(store)
+		return nil
+	}
+}
+
+// webHandler builds the web UI handler over the engine.
+func webHandler(
+	cmd *cobra.Command, opts *options, eng *engine.Engine, store *feedback.Store, cfg webConfig, token string,
+) (http.Handler, error) {
+	ix := eng.Index()
+	ask := webAskFn(eng, cfg)
+	vote := webVoteFn(eng, store, cfg)
 	person := eng.Person
 	dir := resolve.BuildDirectory(ix)
 	modes := func(ctx context.Context) web.ModesReport {
@@ -208,35 +231,13 @@ func serveWeb(cmd *cobra.Command, opts *options, eng *engine.Engine, store *feed
 	// command-line view, which is worse than not signing it.
 	sealer := attestFn(ix, opts, cfg.memoryKey, cmd.ErrOrStderr())
 
-	handler, err := web.Handler(web.Config{
+	return web.Handler(web.Config{
 		Ask: ask, Feedback: vote, Person: person, Version: version, AuthToken: token,
 		LocalOnly: localOnlyServe(token, cfg.public, cfg.addr),
 		Directory: &dir, Modes: modes, Recall: recallFn(eng, cfg, token), RecallMe: cfg.recallMe,
-		Search: eng.Search,
-		Exposure: func() web.Exposure {
-			return web.Exposure{
-				Places:  cfg.places,
-				Risk:    resolve.Risk(ix, 0),
-				Drift:   resolve.Ownership(ix).Drift,
-				Regions: resolve.Regions(ix, regionsShown),
-				Spans:   resolve.SoleSpans(ix, spansShown),
-			}
-		},
-		Brief: func() report.Brief {
-			all := resolve.Risk(ix, 0)
-			exposed := report.Exposures(all)
-			return report.Brief{
-				Generated: opts.now(),
-				People:    len(ix.Graph.People),
-				Scored:    len(all),
-				Sources:   ix.SourceNames(),
-				Risks:     all,
-				Regions:   resolve.Regions(ix, regionsShown),
-				Spans:     resolve.SoleSpans(ix, spansShown),
-				Totals:    report.Count(all, exposed),
-				Exposed:   exposed,
-			}
-		},
+		Search:   eng.Search,
+		Exposure: webExposureFn(ix, cfg.places),
+		Brief:    webBriefFn(ix, opts),
 		Departure: func(person string) resolve.DepartureImpact {
 			return resolve.Departure(ix, person)
 		},
@@ -248,9 +249,43 @@ func serveWeb(cmd *cobra.Command, opts *options, eng *engine.Engine, store *feed
 		Log:   cmd.ErrOrStderr(),
 		Ready: func() bool { return ix != nil && len(ix.Graph.People) > 0 },
 	})
-	if err != nil {
-		return err
+}
+
+// webExposureFn scores the exposure view fresh on every request.
+func webExposureFn(ix *index.Index, places []resolve.Place) web.ExposureFunc {
+	return func() web.Exposure {
+		return web.Exposure{
+			Places:  places,
+			Risk:    resolve.Risk(ix, 0),
+			Drift:   resolve.Ownership(ix).Drift,
+			Regions: resolve.Regions(ix, regionsShown),
+			Spans:   resolve.SoleSpans(ix, spansShown),
+		}
 	}
+}
+
+// webBriefFn builds the knowledge-risk brief fresh on every request.
+func webBriefFn(ix *index.Index, opts *options) web.BriefFunc {
+	return func() report.Brief {
+		all := resolve.Risk(ix, 0)
+		exposed := report.Exposures(all)
+		return report.Brief{
+			Generated: opts.now(),
+			People:    len(ix.Graph.People),
+			Scored:    len(all),
+			Sources:   ix.SourceNames(),
+			Risks:     all,
+			Regions:   resolve.Regions(ix, regionsShown),
+			Spans:     resolve.SoleSpans(ix, spansShown),
+			Totals:    report.Count(all, exposed),
+			Exposed:   exposed,
+		}
+	}
+}
+
+// listenAndServe binds addr and serves handler until the command's context
+// ends, then shuts down within shutdownTimeout.
+func listenAndServe(cmd *cobra.Command, handler http.Handler, addr string) error {
 	// The write timeout leaves room for llm-mode asks, which wait on a local
 	// model; the other bounds keep slow or idle clients from holding
 	// connections open on a shared box.
@@ -265,15 +300,15 @@ func serveWeb(cmd *cobra.Command, opts *options, eng *engine.Engine, store *feed
 	// Bind before announcing. Serving is not worth printing until the port is
 	// actually held, and a bind failure underneath a success line reads as a
 	// server that started and then died.
-	ln, err := net.Listen("tcp", cfg.addr)
+	ln, err := net.Listen("tcp", addr)
 	if err != nil {
-		return fmt.Errorf("%w: cannot bind %s: %w: pass --addr to use a free port", ErrServe, cfg.addr, err)
+		return fmt.Errorf("%w: cannot bind %s: %w: pass --addr to use a free port", ErrServe, addr, err)
 	}
 
 	ctx := cmd.Context()
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.Serve(ln) }()
-	fmt.Fprintf(cmd.ErrOrStderr(), "peepwho serving on http://%s (Ctrl-C to stop)\n", cfg.addr)
+	fmt.Fprintf(cmd.ErrOrStderr(), "peepwho serving on http://%s (Ctrl-C to stop)\n", addr)
 
 	select {
 	case err := <-errCh:
