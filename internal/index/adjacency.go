@@ -211,7 +211,7 @@ func (ix *Index) Near(focal model.ID, limit int) []Adjacent {
 	// overlap heavily with everybody, and whoever you ask about, the answer is
 	// the same handful of names.
 	fp := g.People[focal]
-	focalReach := math.Sqrt(reach(fp))
+	focalReach := math.Sqrt(fp.Reach())
 	for pid, p2 := range g.People {
 		if pid == focal || len(p2.Topics) == 0 {
 			continue
@@ -235,7 +235,7 @@ func (ix *Index) Near(focal model.ID, limit int) []Adjacent {
 			}
 		}
 		if overlap > 0 && focalReach > 0 {
-			if r := math.Sqrt(reach(p2)); r > 0 {
+			if r := math.Sqrt(p2.Reach()); r > 0 {
 				c := get(pid)
 				c.score += (overlap / (focalReach * r)) * topicAdjacencyWeight
 				c.topics = shared
@@ -274,16 +274,6 @@ func topicName(g *model.Graph, tid model.ID) string {
 		return t.Name
 	}
 	return string(tid)
-}
-
-// reach is how much of everything one person's expertise covers, used to keep
-// somebody who works on all of it from counting as near to all of it.
-func reach(p *model.Person) float64 {
-	var total float64
-	for _, w := range p.Topics {
-		total += w
-	}
-	return total
 }
 
 // rankAdjacent sorts the candidates by score and returns the top limit with

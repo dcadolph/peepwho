@@ -3,6 +3,8 @@
 package model
 
 import (
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/dcadolph/peepwho/internal/util"
@@ -57,6 +59,18 @@ type Person struct {
 	// working in it. Without it, indexing a CODEOWNERS file makes every owner
 	// look active in everything they own.
 	Stated map[ID]float64
+}
+
+// Reach is the sum of the person's topic weights: how much of everything their
+// expertise covers. It adds in sorted topic order, because float addition is
+// not associative and a sum in map order differs between runs in its last
+// digits, which is enough to reorder two people who are otherwise tied.
+func (p *Person) Reach() float64 {
+	var total float64
+	for _, tid := range slices.Sorted(maps.Keys(p.Topics)) {
+		total += p.Topics[tid]
+	}
+	return total
 }
 
 // Team is a named group of people within an organization.

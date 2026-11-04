@@ -74,3 +74,36 @@ func TestSalientKeepsProseOutOfSubjects(t *testing.T) {
 		})
 	}
 }
+
+// TestPersonReach verifies Reach sums every topic weight and gives the same
+// bits however the map was built. The weights in test 2 sum to a different
+// value in each order, so a sum taken in map order fails it.
+func TestPersonReach(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		Topics    map[ID]float64
+		WantReach float64
+	}{{ // Test 0: No topics.
+		Topics: nil, WantReach: 0,
+	}, { // Test 1: Exact weights.
+		Topics: map[ID]float64{"go": 1, "k8s": 2.5, "sql": 0.5}, WantReach: 4,
+	}, { // Test 2: Weights whose sum depends on order, taken in sorted topic order.
+		Topics: map[ID]float64{"a": 1e16, "b": 1, "c": -1e16, "d": 1, "e": 0.1, "f": 0.2, "g": 0.3},
+		// In sorted order 1e16+1 rounds the 1 away, so only the second 1 survives.
+		WantReach: 1.6,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			for range 200 {
+				topics := make(map[ID]float64, len(test.Topics))
+				for k, v := range test.Topics {
+					topics[k] = v
+				}
+				if got := (&Person{Topics: topics}).Reach(); got != test.WantReach {
+					t.Fatalf("Reach = %v, want %v", got, test.WantReach)
+				}
+			}
+		})
+	}
+}

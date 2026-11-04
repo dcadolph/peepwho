@@ -1,7 +1,9 @@
 package resolve
 
 import (
+	"maps"
 	"math"
+	"slices"
 	"sort"
 	"strings"
 
@@ -184,7 +186,7 @@ func PlaceLeads(
 		// people whose work is inexactly equal then break their tie
 		// differently. Measured on kubernetes that moved a scored directory,
 		// and every place in an assessment is ranked by this number.
-		for _, email := range sortedTallyKeys(people) {
+		for _, email := range slices.Sorted(maps.Keys(people)) {
 			w := people[email]
 			total += w
 			breadth := workTotals[email]
@@ -249,17 +251,6 @@ func PlaceLeads(
 		}
 		return out[i].Dir < out[j].Dir
 	})
-	return out
-}
-
-// sortedTallyKeys returns a place tally's addresses in order, so a walk that
-// accumulates floats yields the same sum on every run.
-func sortedTallyKeys(people map[string]float64) []string {
-	out := make([]string, 0, len(people))
-	for email := range people {
-		out = append(out, email)
-	}
-	sort.Strings(out)
 	return out
 }
 

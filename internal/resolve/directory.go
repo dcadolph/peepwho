@@ -1,6 +1,8 @@
 package resolve
 
 import (
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 
@@ -99,7 +101,10 @@ func BuildDirectory(ix *index.Index) Directory {
 	// team is about instead of only how many are in it.
 	teamWeight := make(map[model.ID]map[model.ID]float64)
 	var squads []DirectoryTeam
-	for _, p := range g.People {
+	// People run in ID order: a team's topic weights sum one share per member,
+	// and in map order those sums differ in their last digits between runs.
+	for _, id := range slices.Sorted(maps.Keys(g.People)) {
+		p := g.People[id]
 		// A group named as a CODEOWNERS owner is a team, not a person: it
 		// belongs on the teams list with the areas it was declared over, and
 		// its membership is unknown here rather than zero-sized.
@@ -240,10 +245,12 @@ func BuildDirectory(ix *index.Index) Directory {
 			if p == nil {
 				continue
 			}
+			// Topics run sorted so the sums, and the lead they pick, are the
+			// same every run.
 			var mine, recent float64
-			for tid, w := range p.Topics {
+			for _, tid := range slices.Sorted(maps.Keys(p.Topics)) {
 				if groups[string(tid)] == name || string(tid) == name {
-					mine += w
+					mine += p.Topics[tid]
 					recent += p.Recent[tid]
 				}
 			}

@@ -3,7 +3,9 @@ package index
 import (
 	"context"
 	"fmt"
+	"maps"
 	"math"
+	"slices"
 	"sort"
 	"strings"
 
@@ -115,7 +117,11 @@ func (ix *Index) topicVocab() map[model.ID][]string {
 	perTopic := make(map[model.ID]map[string]float64)
 	totals := make(map[model.ID]float64)
 
-	for id, p := range ix.Graph.People {
+	// People run in ID order: each subject's word counts and total sum one
+	// affinity per person, and in map order those sums differ in their last
+	// digits between runs.
+	for _, id := range slices.Sorted(maps.Keys(ix.Graph.People)) {
+		p := ix.Graph.People[id]
 		pt := ix.texts[id]
 		if pt == nil || pt.Text == "" {
 			continue
@@ -270,10 +276,7 @@ func (ix *Index) TopicExperts(tid model.ID, limit int) []*model.Person {
 		// Discounted by everything else this person does. Ranked on raw weight,
 		// the few who touch all of a code base come back as the experts on
 		// every part of it.
-		var reach float64
-		for _, x := range p.Topics {
-			reach += x
-		}
+		reach := p.Reach()
 		if reach <= 0 {
 			continue
 		}

@@ -130,14 +130,13 @@ func scorePerson(p *model.Person, team, q string) (float64, []string) {
 	// back in alphabetical order and the person who owns it is wherever their
 	// name happens to fall. The bonus is bounded well below the next tier, so
 	// no amount of work in a subject outranks a title or team match.
-	var strongest, reach float64
+	var strongest float64
 	for tid, w := range p.Topics {
-		reach += w
 		if w > strongest && strings.Contains(strings.ToLower(string(tid)), q) {
 			strongest = w
 		}
 	}
-	if strongest > 0 && reach > 0 {
+	if reach := p.Reach(); strongest > 0 && reach > 0 {
 		// Discounted by how much this person does everywhere else, for the same
 		// reason every other ranking here is: the few who touch all of a code
 		// base out-weigh the owner of any one part of it.
