@@ -182,12 +182,12 @@ func (s *SocketRunner) Run(ctx context.Context) error {
 	backoff := initialBackoff
 	for {
 		if ctx.Err() != nil {
-			return nil
+			return nil //nolint:nilerr // Shutdown is a clean exit.
 		}
 		start := time.Now()
 		err := s.connectAndServe(ctx)
 		if ctx.Err() != nil {
-			return nil
+			return nil //nolint:nilerr // Shutdown is a clean exit.
 		}
 		if time.Since(start) >= steadyPeriod {
 			backoff = initialBackoff

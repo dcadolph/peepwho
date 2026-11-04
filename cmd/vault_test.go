@@ -71,7 +71,7 @@ func TestEncryptedIndexNeedsKey(t *testing.T) {
 	}
 
 	t.Setenv(keyring.EnvKey, "")
-	_, _, err := runCmdStdin(t, "", "ask", "--data-dir", dir, "who owns billing")
+	err := runCmdStdin(t, "ask", "--data-dir", dir, "who owns billing")
 	if err == nil {
 		t.Fatal("ask without key: want error")
 		return
@@ -358,7 +358,7 @@ func TestKeyModeFileRefusesPassphrasePrompt(t *testing.T) {
 	}
 
 	t.Setenv(keyring.EnvKey, "")
-	_, _, err := runCmdStdin(t, "", "ask", "--data-dir", dir, "who owns billing")
+	err := runCmdStdin(t, "ask", "--data-dir", dir, "who owns billing")
 	if err == nil {
 		t.Fatal("ask without key: want error")
 		return

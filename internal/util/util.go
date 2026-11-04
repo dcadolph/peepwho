@@ -111,7 +111,7 @@ func WriteFileAtomic(path string, data []byte, perm fs.FileMode) error {
 		if errors.As(err, &pe) {
 			cause = pe.Err
 		}
-		return fmt.Errorf("cannot write to directory %s: %v", filepath.Dir(path), cause)
+		return fmt.Errorf("cannot write to directory %s: %w", filepath.Dir(path), cause)
 	}
 	name := tmp.Name()
 	if err := fillTemp(tmp, data, perm); err != nil {

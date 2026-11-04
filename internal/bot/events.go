@@ -134,7 +134,7 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintln(h.log, "peepwho bot: busy, dropped an event")
 			return
 		}
-		go func() {
+		go func() { //nolint:contextcheck // Reply outlives the request.
 			defer func() { <-h.slots }()
 			routeEvent(context.Background(), h.engine, h.replier, h.botUserID, ev, h.log)
 		}()

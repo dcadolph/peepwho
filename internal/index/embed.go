@@ -226,7 +226,7 @@ func (ix *Index) SemanticTopics(query []float32, limit int) []model.ID {
 	// the truncated list, the same query counted as discriminating at one limit
 	// and flat at another, and a small limit could dress a flat field up as an
 	// answer because two results are too few to judge.
-	ranked := rankByCosine(ix.topicVecs, query, 0)
+	ranked := rankByCosine(ix.topicVecs, query)
 	if !discriminating(ranked) {
 		return nil
 	}
@@ -248,7 +248,7 @@ func (ix *Index) TopicSimilarity(query []float32, tid model.ID) float64 {
 	if !ok {
 		return 0
 	}
-	ranked := rankByCosine(ix.topicVecs, query, 0)
+	ranked := rankByCosine(ix.topicVecs, query)
 	median, ok := fieldMedian(ranked)
 	return standout(cosine(query, vec), median, ok)
 }
@@ -368,7 +368,7 @@ func (ix *Index) SemanticPeople(query []float32, limit int) []model.Match {
 	// list. Measured against the truncated ranking, the same match reported a
 	// different strength at limit 5 than at limit 50, and strength must be a
 	// fact about the match, not about how much of the list was requested.
-	ranked := rankByCosine(ix.personVecs, query, 0)
+	ranked := rankByCosine(ix.personVecs, query)
 	if !discriminating(ranked) {
 		return nil
 	}
@@ -408,7 +408,7 @@ func (ix *Index) SemanticChannels(query []float32, limit int) []model.ChannelMat
 	// standout rather than raw cosine: an embedding model puts two unrelated
 	// pieces of engineering talk around 0.6 as a matter of course, so the raw
 	// number states a certainty nothing earned.
-	ranked := rankByCosine(ix.channelVecs, query, 0)
+	ranked := rankByCosine(ix.channelVecs, query)
 	if !discriminating(ranked) {
 		return nil
 	}
@@ -446,9 +446,9 @@ type scoredID struct {
 	score float64
 }
 
-// rankByCosine scores every vector against query and returns the top entities,
-// or all of them when limit is non-positive.
-func rankByCosine(vecs map[model.ID][]float32, query []float32, limit int) []scoredID {
+// rankByCosine scores every vector against query and returns the
+// positively scoring entities, best first.
+func rankByCosine(vecs map[model.ID][]float32, query []float32) []scoredID {
 	ranked := make([]scoredID, 0, len(vecs))
 	for id, vec := range vecs {
 		// Anything at or below zero is unrelated, not merely a weak match.
@@ -465,9 +465,6 @@ func rankByCosine(vecs map[model.ID][]float32, query []float32, limit int) []sco
 		}
 		return ranked[i].id < ranked[j].id
 	})
-	if limit > 0 && len(ranked) > limit {
-		ranked = ranked[:limit]
-	}
 	return ranked
 }
 

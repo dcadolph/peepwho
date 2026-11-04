@@ -1,6 +1,11 @@
 version: "2"
 
 linters:
+  enable:
+    - errorlint
+    - unparam
+    - contextcheck
+    - nilerr
   settings:
     errcheck:
       exclude-functions:

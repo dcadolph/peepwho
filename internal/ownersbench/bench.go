@@ -347,7 +347,7 @@ func leafCounts(repo string) map[string]int {
 	out := make(map[string]int)
 	_ = filepath.WalkDir(repo, func(path string, d os.DirEntry, err error) error {
 		if err != nil || !d.IsDir() {
-			return nil
+			return nil //nolint:nilerr // Unreadable entries are skipped.
 		}
 		name := d.Name()
 		if name == ".git" || name == "vendor" || name == "node_modules" {

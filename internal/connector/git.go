@@ -464,7 +464,7 @@ func worktreeCommon(dotFile string) (billy.Filesystem, error) {
 	if err != nil {
 		// No commondir means this is not a linked worktree after all, so the
 		// directory it names is the repository.
-		return osfs.New(gitDir), nil
+		return osfs.New(gitDir), nil //nolint:nilerr // A missing commondir is expected.
 	}
 	shared := strings.TrimSpace(string(common))
 	if !filepath.IsAbs(shared) {

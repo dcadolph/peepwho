@@ -149,7 +149,7 @@ func TestConnectStatus(t *testing.T) {
 // terminal and points at the scriptable index command.
 func TestConnectNonInteractive(t *testing.T) {
 	t.Parallel()
-	_, _, err := runCmdStdin(t, "", "connect")
+	err := runCmdStdin(t, "connect")
 	if !errors.Is(err, ErrBadArgs) {
 		t.Fatalf("err = %v, want ErrBadArgs", err)
 	}
@@ -159,7 +159,7 @@ func TestConnectNonInteractive(t *testing.T) {
 // the terminal check, so it fails clearly even in a script.
 func TestConnectUnknownSource(t *testing.T) {
 	t.Parallel()
-	_, _, err := runCmdStdin(t, "", "connect", "not-a-source")
+	err := runCmdStdin(t, "connect", "not-a-source")
 	if !errors.Is(err, ErrUnknownSource) {
 		t.Fatalf("err = %v, want ErrUnknownSource", err)
 	}
@@ -227,17 +227,16 @@ func TestCollect(t *testing.T) {
 }
 
 // runCmdStdin executes the root command with a scripted, non-terminal stdin,
-// capturing stdout and stderr.
-func runCmdStdin(t *testing.T, stdin string, args ...string) (stdout, stderr []byte, err error) {
+// and returns the execution error.
+func runCmdStdin(t *testing.T, args ...string) error {
 	t.Helper()
 	var out, errBuf bytes.Buffer
 	root := newRootCmd()
-	root.SetIn(strings.NewReader(stdin))
+	root.SetIn(strings.NewReader(""))
 	root.SetOut(&out)
 	root.SetErr(&errBuf)
 	root.SetArgs(args)
-	err = root.Execute()
-	return out.Bytes(), errBuf.Bytes(), err
+	return root.Execute()
 }
 
 // TestQuietAbortDistinguishesNetworkEOF verifies a clean exit only for a user

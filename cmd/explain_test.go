@@ -47,7 +47,7 @@ func TestExplainSourceError(t *testing.T) {
 					t.Errorf("message %q missing %q", got, want)
 				}
 			}
-			if !test.WantAuth && got != test.In {
+			if !test.WantAuth && !errors.Is(got, test.In) {
 				t.Errorf("non-auth error was rewritten: %v", got)
 			}
 		})

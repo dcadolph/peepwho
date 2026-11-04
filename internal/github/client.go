@@ -388,7 +388,7 @@ func getAll[T any](ctx context.Context, c *Client, path string, query url.Values
 		}
 		endpoint = next
 	}
-	return all, nil
+	return all, nil //nolint:nilerr // A malformed next link ends pagination, keeping fetched pages.
 }
 
 // getURL performs one GET against a full endpoint URL, decodes the JSON body

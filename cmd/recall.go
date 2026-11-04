@@ -76,7 +76,7 @@ Examples:
 				}
 			}
 			if explain {
-				if err := attachSummarizer(cmd, opts, res, model, ollamaURL, provider, openaiURL); err != nil {
+				if err := attachSummarizer(opts, res, model, ollamaURL, provider, openaiURL); err != nil {
 					return err
 				}
 			}
@@ -123,7 +123,7 @@ Examples:
 // only under the open policy, exactly as it is for an answer that quotes
 // candidate detail. A local model is loopback and needs no opt-in.
 func attachSummarizer(
-	cmd *cobra.Command, opts *options, res *recall.Resolver,
+	opts *options, res *recall.Resolver,
 	model, ollamaURL, provider, openaiURL string,
 ) error {
 	switch provider {

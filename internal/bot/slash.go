@@ -215,7 +215,7 @@ func (h *SlashHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("peepwho is busy answering other questions. Try again in a moment."))
 		return
 	}
-	go func() {
+	go func() { //nolint:contextcheck // Reply outlives the request.
 		defer func() { <-h.slots }()
 		routeSlash(context.Background(), h.engine, h.respond, cmd, h.log)
 	}()

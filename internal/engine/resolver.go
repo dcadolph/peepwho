@@ -179,7 +179,7 @@ func NewDocOllama(embedModel, ollamaURL string) *llm.Ollama {
 func GuardLLMHost(pol policy.Policy, raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil {
-		return fmt.Errorf("%w: invalid model url %q: %v", ErrBadArgs, raw, err)
+		return fmt.Errorf("%w: invalid model url %q: %w", ErrBadArgs, raw, err)
 	}
 	host := u.Hostname()
 	if u.Opaque != "" || host == "" {

@@ -225,7 +225,8 @@ func (l *LLM) Resolve(ctx context.Context, query string, limit int) (Answer, err
 	if jsonErr := json.Unmarshal([]byte(extractJSON(raw)), &out); jsonErr != nil {
 		// The reply was not usable JSON: keep keyword order rather than trusting
 		// unparsed prose, and write the summary from those grounded results.
-		return groundedAnswer(Cap(people, limit), Cap(channels, limit)), nil
+		answer := groundedAnswer(Cap(people, limit), Cap(channels, limit))
+		return answer, nil //nolint:nilerr // Unusable model output falls back to grounded results.
 	}
 	return groundedAnswer(
 		rankedPeople(people, out.People, limit),
