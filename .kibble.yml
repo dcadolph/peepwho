@@ -1,0 +1,18 @@
+# Kibble runs the documentation's example commands in a clean container and
+# reports what actually works. These skips name the lines a container genuinely
+# cannot supply; everything else in the docs is expected to run, including the
+# quickstart chain against examples/people.csv, which ships in this repo
+# precisely so the documented path is runnable.
+version: 1
+examples:
+  steps:
+    - match: "--file people.csv"
+      skip: "the reader's own org chart; the runnable sample is examples/people.csv"
+    - match: "--file /path/to/your/people.csv"
+      skip: "explicitly the reader's own path"
+    - match: "--aliases aliases.json"
+      skip: "the reader's own alias ledger; a sample ships as examples/aliases.json"
+    - match: "--embed"
+      skip: "embeddings need a local Ollama server the container does not run"
+    - match: "--mode semantic"
+      skip: "semantic mode needs an embedded index, which needs Ollama"

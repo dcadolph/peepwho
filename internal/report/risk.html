@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Knowledge risk brief</title>
+<style>
+:root {
+	--bg: #f6f7f9;
+	--panel: #ffffff;
+	--ink: #12161c;
+	--muted: #5a6472;
+	--line: #dde1e7;
+	--accent: #0f6f4d;
+	--accent-soft: #e6f2ec;
+	--critical: #a11f2c;
+	--critical-soft: #fbe9eb;
+	--elevated: #8a5a00;
+	--elevated-soft: #fdf1de;
+	--ok: #3f6b52;
+	--ok-soft: #ecf3ee;
+}
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #0d1117;
+		--panel: #151b23;
+		--ink: #e6eaf0;
+		--muted: #9aa5b4;
+		--line: #262d38;
+		--accent: #4bd0a0;
+		--accent-soft: #12261f;
+		--critical: #ff8a95;
+		--critical-soft: #2a1418;
+		--elevated: #e8b562;
+		--elevated-soft: #2a2113;
+		--ok: #8fd3ae;
+		--ok-soft: #16241c;
+	}
+}
+* { box-sizing: border-box; }
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--ink);
+	font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+a { color: var(--accent); }
+.layout { display: flex; align-items: flex-start; gap: 32px; max-width: 1400px; margin: 0 auto; padding: 32px; }
+nav {
+	position: sticky; top: 32px; flex: 0 0 300px; width: 300px;
+	background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px;
+}
+nav h2 { margin: 0 0 4px; font-size: 15px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+nav ul { list-style: none; margin: 12px 0 0; padding: 0; }
+nav li { margin: 0 0 2px; }
+nav button {
+	display: block; width: 100%; text-align: left; padding: 8px 10px; border: 0; border-radius: 6px;
+	background: transparent; color: var(--ink); font: inherit; font-size: 15px; cursor: pointer;
+}
+nav button:hover, nav button:focus-visible { background: var(--accent-soft); color: var(--accent); outline: none; }
+main { flex: 1 1 auto; min-width: 0; }
+header.brief { margin-bottom: 24px; }
+h1 { margin: 0 0 6px; font-size: 30px; letter-spacing: -.01em; }
+.provenance { color: var(--muted); font-size: 14px; margin: 0; }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 24px; margin: 0 0 24px; scroll-margin-top: 24px; }
+section h2 { margin: 0 0 6px; font-size: 21px; }
+section h3 { margin: 24px 0 6px; font-size: 17px; }
+section p.desc { margin: 0 0 18px; color: var(--muted); font-size: 15px; max-width: 72ch; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 24px; }
+.card {
+	background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--accent);
+	border-radius: 10px; padding: 16px 18px; cursor: pointer; text-align: left; font: inherit; color: inherit;
+}
+.card:hover, .card:focus-visible { border-color: var(--accent); outline: none; }
+.card.crit { border-left-color: var(--critical); }
+.card.elev { border-left-color: var(--elevated); }
+.card .n { display: block; font-size: 34px; font-weight: 650; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.card .k { display: block; font-size: 14px; color: var(--muted); margin-top: 4px; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+input[type=search] {
+	flex: 1 1 240px; min-width: 180px; padding: 8px 11px; font: inherit; font-size: 15px;
+	background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 7px;
+}
+button.action {
+	padding: 8px 13px; font: inherit; font-size: 14px; cursor: pointer;
+	background: var(--accent-soft); color: var(--accent); border: 1px solid var(--line); border-radius: 7px;
+}
+button.action:hover { border-color: var(--accent); }
+.scroller { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 13px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+/* Headings that wrap, where a nowrap heading would take width from a column
+   of names and leave it a word wide. */
+table.wrapped th { white-space: normal; }
+table.wrapped td.names { min-width: 26ch; }
+th[data-sort] { cursor: pointer; user-select: none; }
+th[data-sort]:hover { color: var(--accent); }
+th .arrow { opacity: .45; font-size: 11px; }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+tbody tr:hover { background: var(--accent-soft); }
+.pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.pill.critical { background: var(--critical-soft); color: var(--critical); }
+.pill.elevated { background: var(--elevated-soft); color: var(--elevated); }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.also { color: var(--muted); font-size: 14px; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; background: var(--accent-soft); color: var(--accent); padding: 1px 5px; border-radius: 4px; }
+/* One click selects the whole command, so a reader without the clipboard
+   button still gets the line rather than a word of it. It wraps rather than
+   scrolling, because a command with its tail off the edge is not checkable. */
+code.cmd { display: block; user-select: all; white-space: pre-wrap; word-break: break-word; padding: 8px 11px; }
+.check { border-top: 1px solid var(--line); padding: 14px 0; }
+.check:first-of-type { border-top: 0; }
+.check .head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 7px; }
+.check .head strong { font-size: 15px; }
+p.note { border-left: 3px solid var(--line); padding-left: 12px; }
+.figure { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin: 0 0 14px; }
+.figure .n { font-size: 34px; font-weight: 650; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.figure .k { font-size: 15px; color: var(--muted); }
+.caveat { border-left: 4px solid var(--elevated); }
+dl.spread { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; margin: 0 0 18px; font-size: 15px; }
+dl.spread dt { color: var(--muted); }
+dl.spread dd { margin: 0; font-variant-numeric: tabular-nums; }
+details { border-top: 1px solid var(--line); padding: 12px 0; }
+details:first-of-type { border-top: 0; }
+summary { cursor: pointer; font-size: 16px; font-weight: 600; }
+summary::marker { color: var(--muted); }
+details .body { padding: 10px 0 4px 18px; }
+details h4 { margin: 12px 0 4px; font-size: 14px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+details p { margin: 0; font-size: 15px; }
+.count { color: var(--muted); font-weight: 400; font-size: 15px; }
+.empty { color: var(--muted); font-size: 15px; margin: 0; }
+footer { color: var(--muted); font-size: 14px; padding: 0 32px 40px; max-width: 1400px; margin: 0 auto; }
+@media print {
+	nav, .toolbar, .card, .copy { display: none !important; }
+	.check { break-inside: avoid; }
+	body { background: #fff; color: #000; }
+	section { border: 0; padding: 0; margin: 0 0 22px; break-inside: avoid; }
+	details { break-inside: avoid; }
+	details[open] .body, details .body { display: block; }
+	.layout { display: block; padding: 0; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav>
+	<h2>Knowledge risk</h2>
+	<p class="provenance">{{ .People }} people, {{ .Scored }} scored {{ plural .Scored "subject" "subjects" }}</p>
+	<ul>
+		<li><button type="button" data-jump="summary">Summary</button></li>
+		{{ if .Split }}<li><button type="button" data-jump="identity">Who is who</button></li>{{ end }}
+		<li><button type="button" data-jump="topics">Concentrated subjects</button></li>
+		<li><button type="button" data-jump="people">Who is exposed</button></li>
+		{{ if .Systems }}<li><button type="button" data-jump="systems">The systems most exposed</button></li>{{ end }}
+		{{ if .Checks }}<li><button type="button" data-jump="checks">Check any row yourself</button></li>{{ end }}
+		{{ if .Ramp.Measured }}<li><button type="button" data-jump="ramp">What moving areas has cost</button></li>{{ end }}
+		{{ if .Regions }}<li><button type="button" data-jump="joined">Joined work</button></li>{{ end }}
+		{{ if .Spans }}<li><button type="button" data-jump="spans">One-person connections</button></li>{{ end }}
+		<li><button type="button" data-jump="method">How this was measured</button></li>
+	</ul>
+</nav>
+<main>
+<header class="brief">
+	<h1>Knowledge risk brief</h1>
+	<p class="provenance">
+		Generated {{ date .Generated }} across {{ .People }} {{ plural .People "person" "people" }}{{ if .Sources }},
+		indexed from {{ join .Sources }}{{ end }}.
+	</p>
+</header>
+
+{{ $c := .Totals }}
+<section id="summary">
+	<h2>Summary</h2>
+	<p class="desc">Where this company's knowledge rests on too few people. Each figure below jumps to the detail behind it.</p>
+	<div class="cards">
+		<button type="button" class="card crit" data-jump="topics">
+			<span class="n">{{ $c.Critical }}</span>
+			<span class="k">Critical {{ plural $c.Critical "subject" "subjects" }}</span>
+		</button>
+		<button type="button" class="card elev" data-jump="topics">
+			<span class="n">{{ $c.Elevated }}</span>
+			<span class="k">Elevated {{ plural $c.Elevated "subject" "subjects" }}</span>
+		</button>
+		<button type="button" class="card" data-jump="topics">
+			<span class="n">{{ $c.SinglePoint }}</span>
+			<span class="k">Held by one person</span>
+		</button>
+		<button type="button" class="card crit" data-jump="topics">
+			<span class="n">{{ $c.MovedOn }}</span>
+			<span class="k">Whose expert has moved on</span>
+		</button>
+		<button type="button" class="card" data-jump="people">
+			<span class="n">{{ $c.Exposed }}</span>
+			<span class="k">People holding knowledge alone</span>
+		</button>
+		{{ if .Split }}
+		<button type="button" class="card elev" data-jump="identity">
+			<span class="n">{{ len .Split }}</span>
+			<span class="k">{{ plural (len .Split) "Name" "Names" }} on more than one record</span>
+		</button>
+		{{ end }}
+		{{ if .Ramp.Measured }}
+		<button type="button" class="card elev" data-jump="ramp">
+			<span class="n">{{ pct .Ramp.StalledShare }}</span>
+			<span class="k">Arrivals in a new area that did not carry on</span>
+		</button>
+		{{ end }}
+	</div>
+</section>
+
+{{ if .Split }}
+<section id="identity" class="caveat">
+	<h2>Who is who <span class="count">({{ len .Split }} unresolved)</span></h2>
+	<p class="desc">Read this before the findings below, because every one of them rests on it. One person counted twice halves the concentration in everything they touch, and two people counted as one invents a hole nobody has.{{ if .Merged }} {{ .Merged }} {{ plural .Merged "record was" "records were" }} folded into somebody already indexed on evidence beyond a shared name.{{ end }}</p>
+	<p class="desc">These {{ len .Split }} {{ plural (len .Split) "name is" "names are" }} held by more than one record that could not be joined into a single person. Each reads as extra cover the organization does not have, so wherever these people appear, the coverage below is better than the truth. Nothing was merged on a name alone: a wrong join costs more than a missed one.</p>
+	<div class="scroller">
+	<table>
+		<thead><tr><th>Name</th><th>Records</th><th>Identifiers</th></tr></thead>
+		<tbody>
+		{{ range .Split }}
+			<tr>
+				<td>{{ .Name }}</td>
+				<td class="num">{{ len .IDs }}</td>
+				<td class="also">{{ join .IDs }}</td>
+			</tr>
+		{{ end }}
+		</tbody>
+	</table>
+	</div>
+	{{ if .Aliases }}
+	<h3>Suggested joins</h3>
+	<p class="desc">The same suggestions are written to <code>aliases.json</code> in the format the <code>--aliases</code> flag reads. Review them, drop any pair that really is two people, and run the assessment again with that file. Correcting them can only sharpen the findings, never soften them.</p>
+	<div class="scroller">
+	<table class="wrapped">
+		<thead><tr><th>Name</th><th>Would fold into</th><th>Other identifiers</th><th>Shared subjects</th><th>Why it was not joined</th></tr></thead>
+		<tbody>
+		{{ range .Aliases }}
+			<tr>
+				<td>{{ .Name }}</td>
+				<td class="also">{{ .Canonical }}</td>
+				<td class="also">{{ join .Aliases }}</td>
+				<td class="num">{{ .Shared }}</td>
+				<td>{{ .Why }}</td>
+			</tr>
+		{{ end }}
+		</tbody>
+	</table>
+	</div>
+	{{ end }}
+</section>
+{{ end }}
+
+<section id="topics">
+	<h2>Concentrated subjects <span class="count">({{ if lt (len .Risks) .Scored }}worst {{ len .Risks }} of {{ .Scored }}{{ else }}all {{ .Scored }}{{ end }})</span></h2>
+	{{ if lt (len .Risks) .Scored }}<p class="desc">Listed here are the {{ len .Risks }} subjects resting on the most work, of {{ .Scored }} scored. The figures above count all {{ .Scored }} of them. Run the report with <code>--limit 0</code> for the whole table.</p>{{ end }}
+	<p class="desc">Where an expert is marked <em>not lately</em>, they know the subject but have stopped working on it. That is a sharper finding than concentration alone: measured against a real project, a lead who had already stopped was less than half as likely to still hold the subject six months on.</p>
+	<p class="desc">A subject is concentrated when most of its expertise sits with one or two people. Bus factor is how few people together hold the majority of it, so a bus factor of one means a single departure takes the topic with it.</p>
+	{{ if .Risks }}
+	<div class="toolbar">
+		<input type="search" id="topic-filter" placeholder="Filter topics, people, or levels" aria-label="Filter topics">
+		<button type="button" class="action" id="topic-csv">Export CSV</button>
+	</div>
+	<div class="scroller">
+	<table id="topic-table" data-csv="peepwho-knowledge-risk.csv">
+		<thead>
+			<tr>
+				<th data-sort="text">Topic <span class="arrow">&#9662;</span></th>
+				<th data-sort="rank">Level <span class="arrow">&#9662;</span></th>
+				<th data-sort="num">Bus factor <span class="arrow">&#9662;</span></th>
+				<th data-sort="num">Top expert holds <span class="arrow">&#9662;</span></th>
+				<th data-sort="text">Rests on <span class="arrow">&#9662;</span></th>
+				<th data-sort="text">Who holds it <span class="arrow">&#9662;</span></th>
+				<th>Also covers</th>
+			</tr>
+		</thead>
+		<tbody>
+		{{ range .Risks }}
+			<tr>
+				<td>{{ .Topic }}</td>
+				<td><span class="pill {{ .Level }}" data-rank="{{ if eq .Level "critical" }}3{{ else if eq .Level "elevated" }}2{{ else }}1{{ end }}">{{ .Level }}</span></td>
+				<td class="num">{{ .BusFactor }}</td>
+				<td class="num">{{ pct .Concentration }}</td>
+				<td>{{ if .Lead }}{{ .Lead }}{{ else }}&mdash;{{ end }}</td>
+				<td>{{ range $i, $e := .Experts }}{{ if $i }}, {{ end }}{{ $e.Name }} ({{ pct $e.Share }}{{ if $e.Quiet }}, not lately{{ end }}){{ end }}</td>
+				<td class="also">{{ join .Includes }}</td>
+			</tr>
+		{{ end }}
+		</tbody>
+	</table>
+	</div>
+	{{ else }}
+	<p class="empty">No subjects scored. The index may not hold enough activity yet.</p>
+	{{ end }}
+</section>
+
+<section id="people">
+	<h2>Who is exposed <span class="count">({{ len .Exposed }})</span></h2>
+	<p class="desc">The same finding read by person rather than by topic. Sole knowledge has no cover behind it at all. Led knowledge has others contributing, so it degrades rather than disappears.</p>
+	<p class="desc">Where a nearest candidate is named, that is a statement about the record and not about ability: of everyone indexed, this person starts closest to the work. Where nobody is named, nobody in the record stands out, which is the sharper finding of the two.</p>
+	{{ if .Exposed }}
+		{{ range .Exposed }}
+		<details>
+			<summary>{{ .Name }} <span class="count">&mdash; {{ len .Sole }} sole, {{ len .Leading }} led</span></summary>
+			<div class="body">
+				{{ if .Sole }}
+				<h4>Would leave with them</h4>
+				<p>{{ join .Sole }}</p>
+				{{ end }}
+				{{ if .Leading }}
+				<h4>Would lose its lead</h4>
+				<p>{{ join .Leading }}</p>
+				{{ end }}
+				{{ with .Succession }}
+				<h4>Who stands nearest</h4>
+				{{ if .NobodyClose }}
+				<p>Nobody stands out in the record, which is itself the finding.</p>
+				{{ else }}
+				<p>{{ .Nearest }}{{ if .Reasons }}: {{ evidence .Reasons }}{{ end }}.{{ if .Dir }} <span class="count">Judged against {{ .Dir }}.</span>{{ end }}</p>
+				{{ end }}
+				{{ end }}
+			</div>
+		</details>
+		{{ end }}
+	{{ else }}
+	<p class="empty">Nobody holds a topic alone. Knowledge is spread across the people indexed.</p>
+	{{ end }}
+</section>
+
+{{ if .Systems }}
+<section id="systems">
+	<h2>The systems most exposed <span class="count">({{ len .Systems }})</span></h2>
+	<p class="desc">Ownership asked about places rather than words: each row is a directory, scored on the work done in it. Ordered by how few people cover that work, not by size, so a directory everybody has touched does not bury one that rests on a single person.</p>
+	<p class="desc">Where the record holds one person, the name beside it is the whole of it. Where it holds many, the names are the most active of them and the head count beside them is what stops a reader taking three names for the whole of a hundred.</p>
+	<div class="toolbar">
+		<input type="search" id="systems-filter" placeholder="Filter directories or people" aria-label="Filter systems">
+		<button type="button" class="action" id="systems-csv">Export CSV</button>
+	</div>
+	<div class="scroller">
+	<table id="systems-table" class="wrapped" data-csv="peepwho-systems.csv">
+		<thead>
+			<tr>
+				<th data-sort="text">Directory <span class="arrow">&#9662;</span></th>
+				<th data-sort="num">People in the record <span class="arrow">&#9662;</span></th>
+				<th data-sort="num">Cover most of the work <span class="arrow">&#9662;</span></th>
+				<th data-sort="text">Most active</th>
+			</tr>
+		</thead>
+		<tbody>
+		{{ range .Systems }}
+			<tr>
+				<td>{{ .Dir }}</td>
+				<td class="num">{{ .People }}</td>
+				<td class="num">{{ .Bus }}</td>
+				<td class="names">{{ range $i, $h := .Holders }}{{ if $i }}, {{ end }}{{ $h.Name }} ({{ pct $h.Share }}){{ end }}</td>
+			</tr>
+		{{ end }}
+		</tbody>
+	</table>
+	</div>
+</section>
+{{ end }}
+
+{{ if .Checks }}
+<section id="checks">
+	<h2>Check any row yourself <span class="count">({{ len .Checks }})</span></h2>
+	<p class="desc">One command per system above, in the same order. Each counts the same window of history this assessment read, straight from git. When a row is doubted, run its command rather than arguing with the report. Click a command to select the whole line, or use the copy button beside it.</p>
+	{{ range notes .Checks }}<p class="desc note">{{ . }}</p>{{ end }}
+	{{ range .Checks }}
+	<div class="check">
+		<div class="head">
+			<strong>{{ .Dir }}</strong>
+			<button type="button" class="action copy" data-copy>Copy</button>
+		</div>
+		<code class="cmd">{{ .Command }}</code>
+	</div>
+	{{ end }}
+</section>
+{{ end }}
+
+{{ if .Ramp.Measured }}
+{{ with .Ramp }}
+<section id="ramp">
+	<h2>What moving into a new area has cost</h2>
+	<p class="desc">This is history, not a forecast. Peepwho's published holdout showed this model does not predict who will be active later, so nothing here says how long a handover would take. What the record can say is what it cost the people who already did it, and how many started and did not carry on.</p>
+	<div class="figure">
+		<span class="n">{{ pct .StalledShare }}</span>
+		<span class="k">of arrivals in an unfamiliar area had not carried on by the end of the window read. That is {{ sub .Arrivals .Established }} of {{ .Arrivals }}.</span>
+	</div>
+	<p class="desc">Read that figure first. Stalling is the commoner outcome, and unlike the days below it is not measured only on the people who got through.</p>
+	<dl class="spread">
+		<dt>Directories counted</dt><dd>{{ .Places }}</dd>
+		<dt>Arrivals seen</dt><dd>{{ .Arrivals }}</dd>
+		<dt>Went on to land {{ .Changes }} changes there</dt><dd>{{ .Established }}</dd>
+		<dt>Median days to get there</dt><dd>{{ .MedianDays }}</dd>
+		<dt>Middle half of those days</dt><dd>{{ .QuickestDays }} to {{ .SlowestDays }}</dd>
+	</dl>
+	<p class="desc">An arrival is somebody already working in this repository touching a directory they had not worked in before. Anyone whose history in the repository begins in that directory is excluded: their first change anywhere landed there, so nothing observed says they were new to the area rather than new to the record. The count covers every directory the assessment scored, not only the most exposed of them listed above.</p>
+</section>
+{{ end }}
+{{ end }}
+
+{{ if .Spans }}
+<section id="spans">
+	<h2>One-person connections <span class="count">({{ len .Spans }})</span></h2>
+	<p class="desc">Subjects that only one person has ever done work across. They have their own experts, so nothing that counts experts per subject shows this: what rests on one person is not any of the subjects but the knowledge that they belong together, and whoever picks one up afterwards has no reason to look at the others. Where the crossings join up they are listed as the one body of work they are, since that is what would leave.</p>
+	<div class="scroller">
+	<table>
+		<thead><tr><th>Subjects</th><th>Only</th><th>People holding them</th><th>Worked on together</th></tr></thead>
+		<tbody>
+		{{ range .Spans }}
+			<tr>
+				<td>{{ range $i, $t := .Topics }}{{ if $i }} + {{ end }}{{ $t }}{{ end }}</td>
+				<td>{{ .Person }}</td>
+				<td class="num">{{ .Experts }}</td>
+				<td class="num">{{ pct .Together }}</td>
+			</tr>
+		{{ end }}
+		</tbody>
+	</table>
+	</div>
+</section>
+{{ end }}
+
+{{ if .Regions }}
+<section id="joined">
+	<h2>Joined work <span class="count">({{ len .Regions }})</span></h2>
+	<p class="desc">Subjects that get worked on together, where the same person leads every one of them. This is a heavier finding than a concentrated subject on its own: whoever takes the work over has to learn the whole of it at once, and a list of subjects one at a time never shows that.</p>
+	{{ range .Regions }}
+	<details>
+		<summary>{{ .Lead }} <span class="count">&mdash; {{ .Size }} joined subjects</span></summary>
+		<div class="body"><p>{{ join .Topics }}</p></div>
+	</details>
+	{{ end }}
+</section>
+{{ end }}
+
+<section id="method">
+	<h2>How this was measured</h2>
+	<p class="desc">Every figure here is arithmetic over the indexed graph, with no model involved and no judgement applied. A person's share of a topic is their weight in it against everyone else's. Bus factor counts the fewest people whose combined share passes a majority. A topic is critical when one person holds most of it, and elevated when two do.</p>
+	{{ if .Systems }}<p class="desc">Systems are scored by directory rather than by the words in a subject name, and a person's work is discounted by how widely they range, so somebody who touches everything does not come out holding everything. Where reviews were read, a review counts towards the directories its pull request changed rather than the words in its title.</p>{{ end }}
+	<p class="desc">The finding only sees what was indexed{{ if .Sources }}, which here was {{ join .Sources }}{{ end }}. Knowledge that lives somewhere peepwho was not pointed at does not appear, so this is a floor on concentration rather than a complete picture.</p>
+</section>
+</main>
+</div>
+<footer>Generated by peepwho. Deterministic, offline, and self-contained: this file needs nothing to open.</footer>
+
+<script>
+(function () {
+	"use strict";
+	// Jump by script rather than by anchor href, because a file:// URL will not
+	// follow a fragment link.
+	document.querySelectorAll("[data-jump]").forEach(function (el) {
+		el.addEventListener("click", function () {
+			var target = document.getElementById(el.getAttribute("data-jump"));
+			if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+		});
+	});
+
+	// Open every collapsed entry for printing, so a printed brief carries the
+	// same findings as the one on screen.
+	window.addEventListener("beforeprint", function () {
+		document.querySelectorAll("details").forEach(function (d) {
+			if (!d.open) { d.open = true; d.setAttribute("data-was-shut", "1"); }
+		});
+	});
+	window.addEventListener("afterprint", function () {
+		document.querySelectorAll("details[data-was-shut]").forEach(function (d) {
+			d.open = false;
+			d.removeAttribute("data-was-shut");
+		});
+	});
+
+	// The sort arrow lives in the heading, and exporting it puts a column named
+	// "Directory <arrow>" in the spreadsheet.
+	function cellText(cell) {
+		if (!cell.querySelector(".arrow")) return cell.textContent;
+		var copy = cell.cloneNode(true);
+		copy.querySelectorAll(".arrow").forEach(function (a) { a.remove(); });
+		return copy.textContent;
+	}
+
+	function csvCell(s) {
+		var v = String(s).trim();
+		// Author names come from repositories third parties control, and a
+		// spreadsheet runs a cell that opens with one of these.
+		if (/^[=+\-@]/.test(v)) v = "'" + v;
+		return '"' + v.replace(/"/g, '""') + '"';
+	}
+
+	function cellKey(row, i, kind) {
+		var cell = row.cells[i];
+		if (kind === "rank") {
+			var pill = cell.querySelector("[data-rank]");
+			return pill ? Number(pill.getAttribute("data-rank")) : 0;
+		}
+		if (kind === "num") return parseFloat(cell.textContent.replace(/[^0-9.\-]/g, "")) || 0;
+		return cell.textContent.trim().toLowerCase();
+	}
+
+	function wire(tableID, filterID, csvID) {
+		var table = document.getElementById(tableID);
+		if (!table) return;
+		var body = table.tBodies[0];
+
+		var filter = document.getElementById(filterID);
+		if (filter) {
+			filter.addEventListener("input", function () {
+				var q = filter.value.trim().toLowerCase();
+				Array.prototype.forEach.call(body.rows, function (row) {
+					row.style.display = !q || row.textContent.toLowerCase().indexOf(q) >= 0 ? "" : "none";
+				});
+			});
+		}
+
+		Array.prototype.forEach.call(table.tHead.rows[0].cells, function (th, i) {
+			var kind = th.getAttribute("data-sort");
+			if (!kind) return;
+			var descending = true;
+			th.addEventListener("click", function () {
+				var rows = Array.prototype.slice.call(body.rows);
+				rows.sort(function (a, b) {
+					var x = cellKey(a, i, kind), y = cellKey(b, i, kind);
+					if (x < y) return descending ? 1 : -1;
+					if (x > y) return descending ? -1 : 1;
+					return 0;
+				});
+				rows.forEach(function (r) { body.appendChild(r); });
+				descending = !descending;
+			});
+		});
+
+		var csv = document.getElementById(csvID);
+		if (!csv) return;
+		csv.addEventListener("click", function () {
+			var lines = [];
+			function push(row) {
+				var cells = Array.prototype.map.call(row.cells, function (c) { return csvCell(cellText(c)); });
+				lines.push(cells.join(","));
+			}
+			push(table.tHead.rows[0]);
+			Array.prototype.forEach.call(body.rows, function (row) {
+				if (row.style.display !== "none") push(row);
+			});
+			var blob = new Blob([lines.join("\n")], { type: "text/csv" });
+			var a = document.createElement("a");
+			a.href = URL.createObjectURL(blob);
+			a.download = table.getAttribute("data-csv") || "peepwho.csv";
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(a.href);
+		});
+	}
+
+	wire("topic-table", "topic-filter", "topic-csv");
+	wire("systems-table", "systems-filter", "systems-csv");
+
+	// Selecting the text and copying the selection is the fallback, because a
+	// file:// page is not a secure context in every browser and the clipboard
+	// API is missing there. When both fail the command is left selected.
+	function selectAndCopy(el, done) {
+		var range = document.createRange();
+		range.selectNodeContents(el);
+		var sel = window.getSelection();
+		sel.removeAllRanges();
+		sel.addRange(range);
+		try {
+			if (document.execCommand("copy")) done();
+		} catch (e) { /* The selection stands, so the reader can still copy it. */ }
+	}
+
+	document.querySelectorAll("button[data-copy]").forEach(function (btn) {
+		btn.addEventListener("click", function () {
+			var box = btn.closest(".check");
+			var cmd = box ? box.querySelector(".cmd") : null;
+			if (!cmd) return;
+			function done() {
+				btn.textContent = "Copied";
+				setTimeout(function () { btn.textContent = "Copy"; }, 1500);
+			}
+			if (navigator.clipboard && navigator.clipboard.writeText) {
+				navigator.clipboard.writeText(cmd.textContent).then(done, function () {
+					selectAndCopy(cmd, done);
+				});
+				return;
+			}
+			selectAndCopy(cmd, done);
+		});
+	});
+})();
+</script>
+</body>
+</html>

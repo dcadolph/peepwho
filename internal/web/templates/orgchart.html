@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>peepwho · org chart</title>
+  <script src="/static/theme.js?v=18"></script>
+  <link rel="stylesheet" href="/static/orgchart.css?v=23">
+  <link rel="icon" type="image/svg+xml" href="/static/logo.svg">
+</head>
+<body class="oc-body" data-me="{{.Me}}">
+  <header class="oc-top">
+    <a class="oc-brand" href="/">
+      <img class="oc-logo" src="/static/logo.svg" alt="peepwho">
+      <span>Org chart</span>
+    </a>
+
+    <label class="oc-search">
+      <svg class="oc-search-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input id="oc-search" type="search" placeholder="Search people, teams, topics…" autocomplete="off" aria-label="Search people">
+    </label>
+    <span id="oc-searchcount" class="oc-searchcount" aria-live="polite"></span>
+
+    <select id="oc-team" class="oc-select" aria-label="Filter by team"><option value="">All teams</option></select>
+    <select id="oc-topic" class="oc-select" aria-label="Filter by topic"><option value="">All topics</option></select>
+
+    <button id="oc-myteam" class="oc-btn2" type="button" title="Jump to my part of the org">My team</button>
+    <button id="oc-risk" class="oc-btn2" type="button" aria-pressed="false" title="Show only the people who are the sole holder of something">At risk</button>
+    <button id="oc-export" class="oc-btn2" type="button" title="Download the seats now on screen, as a spreadsheet">Export</button>
+
+    <div class="oc-grow"></div>
+
+    <div class="oc-seg" role="group" aria-label="Tree">
+      <button id="oc-collapse" class="oc-segbtn" type="button" title="Collapse all">Collapse</button>
+      <button id="oc-expand" class="oc-segbtn" type="button" title="Expand all">Expand</button>
+    </div>
+
+    <div class="oc-seg" role="group" aria-label="Zoom">
+      <button id="oc-zoomout" class="oc-segbtn oc-ico" type="button" title="Zoom out" aria-label="Zoom out">&#8722;</button>
+      <span id="oc-zoomlevel" class="oc-zoomlevel">100%</span>
+      <button id="oc-zoomin" class="oc-segbtn oc-ico" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+      <button id="oc-fit" class="oc-segbtn" type="button" title="Fit to screen">Fit</button>
+    </div>
+
+    <div class="oc-themes" role="group" aria-label="Theme">
+      <button data-theme-btn="radar" class="oc-sw oc-sw-radar" type="button" title="Radar theme" aria-label="Radar theme"></button>
+      <button data-theme-btn="ink" class="oc-sw oc-sw-ink" type="button" title="Ink theme" aria-label="Ink theme"></button>
+      <button data-theme-btn="loom" class="oc-sw oc-sw-loom" type="button" title="Loom theme" aria-label="Loom theme"></button>
+    </div>
+
+    <a class="oc-back" href="/" title="Back to peepwho">&#8592;</a>
+  </header>
+
+  <main id="oc-stage" class="oc-stage">
+    <div id="oc-crumbs" class="oc-crumbs" aria-label="Path"></div>
+    <div id="oc-canvas" class="oc-canvas">
+      <svg id="oc-links" class="oc-links" aria-hidden="true"></svg>
+      <div id="oc-nodes" class="oc-nodes"></div>
+    </div>
+    <div class="oc-hint">Drag to pan · scroll to zoom · click anyone for detail</div>
+    <div class="oc-key" aria-label="What the marks on a seat mean">
+      <span class="oc-key-i"><i class="oc-key-bar oc-key-alone"></i>Only holder</span>
+      <span class="oc-key-i"><i class="oc-key-bar oc-key-quiet"></i>Gone quiet</span>
+    </div>
+    <div id="oc-contact" class="oc-contact" hidden></div>
+    <div id="oc-empty" class="oc-empty" hidden></div>
+  </main>
+
+  <aside id="oc-detail" class="oc-detail" hidden></aside>
+  <script src="/static/portable.js?v=1"></script>
+  <script src="/static/orgchart.js?v=23"></script>
+</body>
+</html>

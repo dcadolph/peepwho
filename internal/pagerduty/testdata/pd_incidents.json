@@ -1,0 +1,141 @@
+{
+ "incidents": [
+  {
+   "id": "PINC0001",
+   "type": "incident",
+   "incident_number": 4211,
+   "title": "Payments webhook retries duplicating charges",
+   "description": "Duplicate charge alerts from the reconciliation job",
+   "status": "resolved",
+   "urgency": "high",
+   "created_at": "2026-08-20T14:03:00Z",
+   "resolved_at": "2026-08-20T15:12:00Z",
+   "html_url": "https://acme.pagerduty.com/incidents/PINC0001",
+   "service": {
+    "id": "PSVC0001",
+    "type": "service_reference",
+    "summary": "Payments API",
+    "self": "https://api.pagerduty.com/services/PSVC0001",
+    "html_url": "https://acme.pagerduty.com/services/PSVC0001"
+   },
+   "assignments": [
+    {
+     "at": "2026-08-20T14:03:10Z",
+     "assignee": {
+      "id": "PUSR0001",
+      "type": "user",
+      "name": "Alice Nguyen",
+      "email": "alice@corp.com",
+      "summary": "Alice Nguyen",
+      "time_zone": "America/Chicago",
+      "role": "user",
+      "self": "https://api.pagerduty.com/users/PUSR0001",
+      "html_url": "https://acme.pagerduty.com/users/PUSR0001"
+     }
+    }
+   ],
+   "acknowledgements": [
+    {
+     "at": "2026-08-20T14:04:00Z",
+     "acknowledger": {
+      "id": "PUSR0002",
+      "type": "user_reference",
+      "summary": "Bob Okafor",
+      "self": "https://api.pagerduty.com/users/PUSR0002",
+      "html_url": "https://acme.pagerduty.com/users/PUSR0002"
+     }
+    }
+   ],
+   "last_status_change_at": "2026-08-20T15:12:00Z",
+   "last_status_change_by": {
+    "id": "PUSR0001",
+    "type": "user_reference",
+    "summary": "Alice Nguyen",
+    "self": "https://api.pagerduty.com/users/PUSR0001",
+    "html_url": "https://acme.pagerduty.com/users/PUSR0001"
+   },
+   "first_trigger_log_entry": {
+    "id": "PLOG0001",
+    "type": "trigger_log_entry_reference",
+    "summary": "Triggered via API",
+    "self": "https://api.pagerduty.com/trigger_log_entrys/PLOG0001",
+    "html_url": "https://acme.pagerduty.com/trigger_log_entrys/PLOG0001"
+   },
+   "escalation_policy": {
+    "id": "PPOL0001",
+    "type": "escalation_policy_reference",
+    "summary": "Payments Escalation",
+    "self": "https://api.pagerduty.com/escalation_policys/PPOL0001",
+    "html_url": "https://acme.pagerduty.com/escalation_policys/PPOL0001"
+   },
+   "teams": [
+    {
+     "id": "PTEAM001",
+     "type": "team_reference",
+     "summary": "Payments",
+     "self": "https://api.pagerduty.com/teams/PTEAM001",
+     "html_url": "https://acme.pagerduty.com/teams/PTEAM001"
+    }
+   ],
+   "priority": null,
+   "alert_counts": {
+    "all": 3,
+    "triggered": 0,
+    "resolved": 3
+   }
+  },
+  {
+   "id": "PINC0002",
+   "type": "incident",
+   "incident_number": 4212,
+   "title": "Search Cluster latency above threshold",
+   "description": "p99 over 2s for 10 minutes",
+   "status": "resolved",
+   "urgency": "low",
+   "created_at": "2026-08-21T02:00:00Z",
+   "resolved_at": "2026-08-21T02:30:00Z",
+   "html_url": "https://acme.pagerduty.com/incidents/PINC0002",
+   "service": {
+    "id": "PSVC0002",
+    "type": "service_reference",
+    "summary": "Search Cluster",
+    "self": "https://api.pagerduty.com/services/PSVC0002",
+    "html_url": "https://acme.pagerduty.com/services/PSVC0002"
+   },
+   "assignments": [],
+   "acknowledgements": [],
+   "last_status_change_at": "2026-08-21T02:30:00Z",
+   "last_status_change_by": {
+    "id": "PSVC0002",
+    "type": "service_reference",
+    "summary": "Search Cluster",
+    "self": "https://api.pagerduty.com/services/PSVC0002",
+    "html_url": "https://acme.pagerduty.com/services/PSVC0002"
+   },
+   "first_trigger_log_entry": {
+    "id": "PLOG0002",
+    "type": "trigger_log_entry_reference",
+    "summary": "Triggered via monitoring",
+    "self": "https://api.pagerduty.com/trigger_log_entrys/PLOG0002",
+    "html_url": "https://acme.pagerduty.com/trigger_log_entrys/PLOG0002"
+   },
+   "escalation_policy": {
+    "id": "PPOL0002",
+    "type": "escalation_policy_reference",
+    "summary": "Search Escalation",
+    "self": "https://api.pagerduty.com/escalation_policys/PPOL0002",
+    "html_url": "https://acme.pagerduty.com/escalation_policys/PPOL0002"
+   },
+   "teams": [],
+   "priority": null,
+   "alert_counts": {
+    "all": 1,
+    "triggered": 0,
+    "resolved": 1
+   }
+  }
+ ],
+ "limit": 25,
+ "offset": 0,
+ "more": false
+}

@@ -1,0 +1,4 @@
+{
+  "angela.malone@example.com": ["github:angela-malone", "codeowners:angela-malone"],
+  "bob.smith@example.com": ["jira:5b10a2844c20165700ede21g", "pagerduty:PXPGF42"]
+}

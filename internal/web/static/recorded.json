@@ -1,0 +1,7 @@
+{
+  "ask-llm": {
+    "label": "peepwho ask --mode llm",
+    "note": "Recorded on a laptop running a local model (llama3.2 via Ollama), against this same simulated company. It is recorded rather than live because generating a recommendation on a small server without a graphics card takes the better part of a minute, and this public demo runs no model at all. Compare it with the keyword answer beside it: the same person comes first either way. The model does not decide who knows what, it writes the recommendation on top of an answer the graph already worked out.",
+    "text": "$ peepwho ask --mode llm \"kafka consumer lag keeps climbing, who can help\"\nWho knows about \"kafka consumer lag keeps climbing, who can help\"\nTalk to Hilary Bighetti (Security Engineer); ask in #kafka-lag.\n\n  PEOPLE\n\n   1  Hilary Bighetti  Security Engineer, Discovery\n      \u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b1\u25b1  75%   semantic match\n\n   2  Kimmy Smith      Security Engineer, Discovery\n      \u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b1\u25b1\u25b1  73%   semantic match\n\n   3  Steve Fring      Principal Engineer, Developer Experience\n      \u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b1\u25b1\u25b1  70%   semantic match\n\n   4  Jane Capone      Software Engineer, Ledger"
+  }
+}

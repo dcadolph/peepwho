@@ -1,0 +1,160 @@
+# peepwho
+
+[![CI][ci-badge]][ci]
+
+[ci-badge]: https://github.com/dcadolph/peepwho/actions/workflows/ci.yml/badge.svg
+[ci]: https://github.com/dcadolph/peepwho/actions/workflows/ci.yml
+
+Know who knows. peepwho reads the tools your team already works in and answers a plain question
+with the people and channels to ask, the reasons for each, and how strong the match is. It also
+shows where knowledge has narrowed to one person, and when nobody who knew is left, it points
+back at the conversation where the problem was solved last time.
+
+It runs on your machine, with or without a language model.
+
+## What this is not for
+
+peepwho describes where knowledge and systems are at risk. It never ranks, scores, or labels
+people, and its findings must not be used for performance reviews, layoffs, or any other
+employment decision. A person who shows up as the only one who knows something is a sign the
+team needs another person to know it.
+
+## Install
+
+With a Go toolchain:
+
+    go install github.com/dcadolph/peepwho@latest
+
+Or download an archive for Linux, macOS, or Windows from the
+[releases page](https://github.com/dcadolph/peepwho/releases).
+
+### Verifying a release
+
+`checksums.txt` carries a keyless Sigstore signature made by this repository's release
+workflow, and every archive carries SLSA build provenance. Check a download before you run it:
+
+```
+id='^https://github.com/dcadolph/peepwho/\.github/workflows/release\.yml@refs/tags/v'
+cosign verify-blob checksums.txt \
+  --signature checksums.txt.sig \
+  --certificate checksums.txt.pem \
+  --certificate-identity-regexp "$id" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+sha256sum -c checksums.txt --ignore-missing
+gh attestation verify peepwho_<version>_linux_amd64.tar.gz --repo dcadolph/peepwho
+```
+
+On macOS without GNU coreutils, use `shasum -a 256 -c checksums.txt --ignore-missing` for the
+second line.
+
+## Quickstart
+
+Start with a repository you already have. peepwho reads its git history and opens on what it
+found: the directories the work rests on, and which of them rest on one person. Nothing is
+fetched and no credentials are needed.
+
+    peepwho demo --repo .
+
+Every name it gives you can be checked against the same history:
+
+    git log --format='%an' -- path/it/named | sort | uniq -c | sort -rn
+
+Without `--repo`, the demo builds a simulated company across every source, which shows what a
+git-only run cannot, and the sidebar has a two-minute guided tour.
+
+Then index something real and ask:
+
+    peepwho index --source org-csv --file examples/people.csv
+    peepwho ask --pretty "who do I talk to about billing retries"
+
+When the person who knew has left, ask what happened instead of who to ask. `recall` finds the
+conversation where something was worked out and answers with a pointer: the people, the place,
+the date, and a link back to the tool it happened in. It covers conversations you took part in,
+so it needs to know who you are, from `--me`, `PEEPWHO_ME`, or your git email:
+
+    peepwho recall "certificate renewal"
+
+`peepwho connect` walks through the rest of your tools one at a time. It explains each source,
+reads the token without echoing it, checks it, and runs the first index. Each source also has a
+copy-paste recipe in [docs/CONNECT.md](docs/CONNECT.md).
+
+## Sources
+
+| Source         | Reads                                          | Credentials               |
+| -------------- | ---------------------------------------------- | ------------------------- |
+| `org-csv`      | Org chart CSV: names, titles, teams, topics    | none                      |
+| `matters`      | Time-entry or matter CSV from a billing system | none                      |
+| `codeowners`   | CODEOWNERS paths per owner                     | none                      |
+| `git`          | Commit authors per changed path                | none                      |
+| `slack`        | Users, channels, and message history           | `PEEPWHO_SLACK_TOKEN`     |
+| `slack-export` | A Slack workspace export zip                   | none                      |
+| `github`       | Repos, contributors, PRs, issues, CODEOWNERS   | `PEEPWHO_GITHUB_TOKEN`    |
+| `jira`         | Issue assignees and reporters                  | `PEEPWHO_JIRA_*`          |
+| `confluence`   | Page creators and editors                      | `PEEPWHO_CONFLUENCE_*`    |
+| `pagerduty`    | Services and current on-calls                  | `PEEPWHO_PAGERDUTY_TOKEN` |
+| `graph`        | Microsoft Graph users and reporting lines      | `PEEPWHO_GRAPH_TOKEN`     |
+| `json`         | A JSON array of records from a file or stdin   | none                      |
+
+Every source feeds one graph of people, teams, topics, and channels. One human stays one node:
+sources join by email, GitHub noreply logins fold in on their own, measured rules link handles
+and second mailboxes, and an alias file covers the rest.
+
+## Asking and ranking
+
+Explicit signals such as ownership files and on-call rotations stay strong, while repetition
+saturates, so the person who owns a thing outranks the person who talks about it most. Recent
+work counts for more. Every answer carries its match strength and says which words matched
+where. Confirm or correct an answer and later rankings move with it.
+
+Keyword answers need no model and always work. Semantic search and written answers run on a
+local Ollama model, or on Claude, Gemini, or OpenAI once you opt in. The CLI, the local web UI,
+a Slack bot, and an MCP server for coding agents all share one engine.
+
+## Sealing a finding
+
+A knowledge-risk finding sometimes has to travel: into a reorganization plan, a due diligence,
+or the case for a new hire. peepwho seals one into a directory that anyone can check offline
+without trusting the machine that made it:
+
+    peepwho attest --out finding
+    peepwho verify finding
+
+`attest` writes the finding to `risk.json`, then `manifest.json` listing every file by size and
+SHA-256, then `manifest.sig`, an Ed25519 signature over the exact bytes of the manifest.
+`verify` checks the signature, then every file, and names each file that was altered or is
+missing. A failed check exits non-zero. `peepwho attest key` prints the public key to share
+through some other channel, and `peepwho verify --key` refuses a seal made by any other key.
+
+`peepwho assess` seals its whole deliverable the same way, over the bytes it already wrote, so a
+reader checks their own copy with `peepwho verify .` from inside the directory.
+
+## Data governance
+
+Work data is sensitive, so peepwho decides what a model may see. The default policy is strict:
+answers are computed locally and nothing goes to any model beyond this machine. The redacted
+policy admits only the known cloud providers and sends your question plus numbered candidates
+described by title, team, and matched terms, never names, emails, channel names, or message
+text. The open policy sends full candidate detail wherever you point it.
+
+Indexing talks only to the sources you name, with your own tokens. The index on disk is readable
+only by your user and can be encrypted at rest with `peepwho vault`. Serving the web UI beyond
+localhost requires a bearer token on every request. An organization can pin the policy with a
+locked file that flags and environment variables cannot override. `peepwho forget` purges a
+person from everything peepwho stores on the machine. [docs/PRIVACY.md](docs/PRIVACY.md) lists
+what is kept, where, and for how long.
+
+## Docs
+
+- [Getting started](docs/GETTING_STARTED.md): install, index each source, ask, serve, and run
+  the bot.
+- [Connect your tools](docs/CONNECT.md): the `peepwho connect` wizard and a recipe per source.
+- [Reference](docs/REFERENCE.md): every command, flag, source, and environment variable.
+- [Privacy](docs/PRIVACY.md): what peepwho stores and what can leave the machine.
+- [Accuracy](docs/ACCURACY.md): how the findings were measured against real repositories.
+- [Architecture](docs/ARCHITECTURE.md), [deploying](docs/DEPLOY.md),
+  [weekly digest](docs/DIGEST.md), [roadmap](docs/ROADMAP.md), and
+  [contributing](CONTRIBUTING.md).
+
+## License
+
+MIT. See [LICENSE](LICENSE).

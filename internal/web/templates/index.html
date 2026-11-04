@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>peepwho</title>
+  <script src="/static/theme.js?v=10"></script>
+  <link rel="stylesheet" href="/static/style.css?v=34">
+  <link rel="icon" type="image/svg+xml" href="/static/logo.svg">
+</head>
+<body{{if .Voting}} data-voting="1"{{end}}>
+  <div class="layout">
+    <aside class="sidebar">
+      <a class="side-brand" href="#/">
+        <img class="side-logo" src="/static/logo.svg" alt="peepwho - know who knows">
+      </a>
+      <p class="side-tag">know who knows</p>
+      <button id="side-menu-btn" class="side-menu-btn" type="button"
+        aria-expanded="false" aria-controls="side-nav" aria-label="Menu">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Menu
+      </button>
+      <nav id="side-nav">
+        <a href="#/" data-view="ask">Ask</a>
+        <button id="story-btn" class="story-launch" type="button" title="A guided walk through the whole idea, on live data">&#9658; Take the tour <span class="story-min">2 min</span></button>
+
+        {{/* peepwho answers three different questions for three different
+             people, and a flat list of views hides that. The headings are the
+             questions: who holds what, how it was done last time, and where the
+             organization is thin. */}}
+        <p class="nav-group">Who knows what</p>
+        <a href="#/people" data-view="people">People
+          <span class="nav-count" data-count="people"></span></a>
+        <a href="#/channels" data-view="channels">Channels
+          <span class="nav-count" data-count="channels"></span></a>
+        <a href="#/teams" data-view="teams">Teams
+          <span class="nav-count" data-count="teams"></span></a>
+        <a href="#/topics" data-view="topics">Topics
+          <span class="nav-count" data-count="topics"></span></a>
+
+        {{if .Recall}}<p class="nav-group">How it was done</p>
+        <a href="#/recall" data-view="recall">Recall</a>{{end}}
+
+        <p class="nav-group">Where it is thin</p>
+        {{if .Exposure}}<a href="#/exposure" data-view="exposure">Exposure</a>{{end}}
+        <a href="/orgchart">Org chart</a>
+
+        {{if .CLI}}<a class="nav-tool" href="#/cli" data-view="cli">Command line</a>{{end}}
+        <button id="fb-how" class="nav-tool nav-tool-btn" type="button">Tell us how it went</button>
+      </nav>
+      <div class="side-foot">
+      <div class="side-themes" role="group" aria-label="Theme">
+        <button data-theme-btn="radar" class="oc-sw oc-sw-radar" type="button" title="Radar theme" aria-label="Radar theme"></button>
+        <button data-theme-btn="ink" class="oc-sw oc-sw-ink" type="button" title="Ink theme" aria-label="Ink theme"></button>
+        <button data-theme-btn="loom" class="oc-sw oc-sw-loom" type="button" title="Loom theme" aria-label="Loom theme"></button>
+      </div>
+        <a class="side-link" target="_blank" rel="noopener"
+           href="https://github.com/dcadolph/peepwho/blob/main/docs/GETTING_STARTED.md">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"/></svg>
+          Docs
+        </a>
+        <a class="side-link" target="_blank" rel="noopener" aria-label="peepwho on GitHub"
+           href="https://github.com/dcadolph/peepwho">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+          GitHub
+        </a>
+        <span class="side-version">peepwho {{.Version}}</span>
+      </div>
+    </aside>
+
+    <main>
+      <section id="view-ask">
+        <form id="ask-form" autocomplete="off">
+          <input id="q" name="q" type="text"
+                 placeholder="who do I talk to about billing retries" autofocus>
+          <div class="controls">
+            <div id="mode-seg" class="seg" role="group" aria-label="Answer mode">
+              <button type="button" class="seg-btn active" data-mode="keyword" aria-pressed="true"
+                      data-tip="Matches your exact words, with typo tolerance. Always available.">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9 1 3 9h4l-1 6 7-9H8z"/></svg>
+                Keyword
+              </button>
+              <button type="button" class="seg-btn" data-mode="semantic" aria-pressed="false"
+                      data-tip='Matches by meaning: "failed payments" can find "billing retries".'>
+                <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="6" cy="8" r="4.25" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="8" r="4.25" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                Meaning
+              </button>
+              <button type="button" class="seg-btn" data-mode="llm" aria-pressed="false"
+                      data-tip="A model picks the best matches and writes a recommendation. Pick a provider below.">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l1.8 4.2L14 7l-4.2 1.8L8 13l-1.8-4.2L2 7l4.2-1.8z"/><path d="M12.6 10.6l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z"/></svg>
+                AI
+              </button>
+            </div>
+            <button type="submit" class="ask-btn">Ask</button>
+          </div>
+
+          <div id="provider-seg" class="seg seg-sub" role="group" aria-label="AI provider" hidden>
+            <button type="button" class="seg-btn active" data-provider="ollama" aria-pressed="true"
+                    data-tip="A private model on this machine, via Ollama.">Ollama</button>
+            <button type="button" class="seg-btn" data-provider="anthropic" aria-pressed="false"
+                    data-tip="Anthropic's Claude.">Claude</button>
+            <button type="button" class="seg-btn" data-provider="openai" aria-pressed="false"
+                    data-tip="OpenAI's ChatGPT.">ChatGPT</button>
+            <button type="button" class="seg-btn" data-provider="gemini" aria-pressed="false"
+                    data-tip="Google's Gemini.">Gemini</button>
+          </div>
+        </form>
+
+        <div id="examples" class="examples">
+          <span class="examples-label">Try</span>
+        </div>
+
+        <p id="status" class="status" role="status"></p>
+        <div id="summary" class="summary" hidden></div>
+
+        <section id="people-section" hidden>
+          <h2>People</h2>
+          <div id="people" class="cards"></div>
+        </section>
+
+        <section id="channels-section" hidden>
+          <h2>Channels</h2>
+          <div id="channels" class="cards"></div>
+        </section>
+      </section>
+
+      <section id="view-recall" hidden>
+        <div class="recall-head">
+          <div>
+            <h2 class="recall-title">Your recall</h2>
+            <p class="recall-note">The conversations you took part in, most recent first. Opening a link uses your own access to that tool.</p>
+          </div>
+          <label class="recall-as">as
+            <input id="recall-me" class="recall-me" type="text" aria-label="Who you are"
+                   placeholder="you@example.com" value="{{.RecallMe}}">
+          </label>
+        </div>
+        <div class="recall-toolbar">
+          <div class="recall-controls">
+            <label class="recall-search">
+              <svg class="recall-search-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input id="recall-q" type="search" placeholder="Refine by topic (optional)" autocomplete="off">
+            </label>
+            <select id="recall-since" class="recall-since" aria-label="Time range">
+              <option value="0">Any time</option>
+              <option value="7">Past week</option>
+              <option value="30">Past month</option>
+              <option value="90">Past 3 months</option>
+              <option value="365">Past year</option>
+            </select>
+          </div>
+          <div class="recall-filterline">
+            <span id="recall-slabel" class="recall-flabel" hidden>Sources</span>
+            <div id="recall-sources" class="recall-sources" role="group" aria-label="Filter by source"></div>
+            <span id="recall-count" class="recall-count"></span>
+          </div>
+        </div>
+        <p id="recall-status" class="status" role="status"></p>
+        <div id="recall-list" class="cards recall-list"></div>
+        <p id="recall-scope" class="recall-scope"></p>
+      </section>
+
+      <section id="view-directory" hidden>
+        <div class="dir-head">
+          <h2 id="dir-title"></h2>
+          <p id="dir-status" class="dir-count" role="status"></p>
+        </div>
+        <div class="dir-controls">
+          <input id="dir-filter" type="text" placeholder="Filter...">
+          <select id="dir-sort" class="facet" aria-label="Sort by"></select>
+          <select id="facet-team" class="facet" hidden aria-label="Filter by team"></select>
+          <select id="facet-org" class="facet" hidden aria-label="Filter by org"></select>
+        </div>
+        <div id="dir-list" class="cards"></div>
+      </section>
+
+      {{if .Exposure}}
+      <section id="view-exposure" hidden>
+        <div class="dir-head">
+          <h2>Where you are exposed</h2>
+          <p id="exp-status" class="dir-count" role="status"></p>
+        </div>
+        <p class="exp-lede">Deterministic over the graph, no model required. Anything here
+          rests on one person when a single holder covers most of the work, and each row
+          is checkable against the record it was counted from.</p>
+
+        <div id="exp-cards" class="exp-cards"></div>
+
+        <h3 class="exp-head" id="exp-sec-places" hidden>Systems and who they rest on</h3>
+        <p class="exp-note" id="exp-note-places" hidden>Each directory with enough work to
+          claim about, and the people that work rests on. Check any row against the same
+          directory in git log: it is the same history, counted.</p>
+        <div id="exp-places" class="exp-list"></div>
+
+        <h3 class="exp-head" id="exp-sec-regions">Joined work</h3>
+        <p class="exp-note">Subjects worked on together where the same person leads every
+          one. Heavier than one concentrated subject: whoever takes it over has to learn
+          the whole of it.</p>
+        <div id="exp-regions" class="exp-list"></div>
+
+        <h3 class="exp-head" id="exp-sec-spans">One-person connections</h3>
+        <p class="exp-note">Subjects only one person has ever worked across. Both sides have
+          their own experts, so counting experts per subject never shows it: what rests on
+          one person is the knowledge that they belong together.</p>
+        <div id="exp-spans" class="exp-list"></div>
+
+        <h3 class="exp-head" id="exp-sec-risk">Knowledge concentration</h3>
+        <div id="exp-risk" class="exp-list"></div>
+        <h3 class="exp-head" id="exp-sec-drift">Where nobody is behind them</h3>
+        <p class="exp-note">Name a person and see what loses its strongest expert the day
+          they leave. Click any expert above to check them.</p>
+        <div class="exp-dep-controls">
+          <input id="exp-dep-input" type="text" list="exp-dep-people"
+            placeholder="Name or email, e.g. Gavin Hudson" aria-label="Person who is leaving">
+          <datalist id="exp-dep-people"></datalist>
+          <button id="exp-dep-go" type="button">Check</button>
+        </div>
+        <div id="exp-dep-result" class="exp-list"></div>
+
+        <h3 class="exp-head">Ownership drift</h3>
+        <p class="exp-note">Where the owner on paper is not the one doing the work.</p>
+        <div id="exp-drift" class="exp-list"></div>
+
+        <h3 class="exp-head">Take it with you</h3>
+        <div class="exp-proof">
+          <div class="exp-proof-head">
+            <h3 class="exp-head exp-head-flush">Prove it</h3>
+            <button id="exp-proof-go" type="button">Seal this finding</button>
+          </div>
+          <p class="exp-note">Peepwho can seal the finding below into a directory: the
+            finding, a manifest of every file's sha256, and an ed25519 signature over that
+            manifest. Anyone can check it offline with
+            <a href="https://github.com/dcadolph/peepwho#sealing-a-finding" target="_blank" rel="noopener">peepwho verify</a>,
+            with no account and nothing sent anywhere, so the finding can be trusted without
+            trusting the machine that produced it.</p>
+          <div id="exp-proof-out"></div>
+        </div>
+
+        {{if .Brief}}
+        <div class="exp-proof">
+          <div class="exp-proof-head">
+            <h3 class="exp-head exp-head-flush">Send it up</h3>
+            <a id="exp-brief" href="/report/risk.html" download="peepwho-knowledge-risk.html">Download the brief</a>
+          </div>
+          <p class="exp-note">The same finding as one page you can forward: the headline
+            counts, every scored subject in a sortable table with a CSV export, and what
+            would leave with each person. It carries its own styling and needs no network,
+            no server, and no peepwho to open, so it still reads for somebody who has none
+            of them.</p>
+        </div>
+        {{end}}
+      </section>
+      {{end}}
+
+      {{if .CLI}}
+      <section id="view-cli" hidden>
+        <div class="dir-head">
+          <h2>On the command line</h2>
+          <p id="cli-status" class="dir-count" role="status"></p>
+        </div>
+        <p class="exp-lede">Everything here also answers from a terminal, and the web app is
+          one way to read it rather than the product itself. These run against the same
+          simulated company you are looking at, printed by the same code the terminal uses.
+          Setting up your own sources is <code>peepwho connect</code>, then
+          <code>peepwho index</code>.</p>
+        <div class="cli-tabs" id="cli-tabs"></div>
+        <p id="cli-note" class="cli-note" hidden></p>
+        <pre id="cli-out" class="cli-out" tabindex="0"></pre>
+      </section>
+      {{end}}
+    </main>
+  </div>
+
+  <script src="/static/portable.js?v=1"></script>
+  <script src="/static/app.js?v=38"></script>
+  <script src="/static/story.js?v=2"></script>
+</body>
+</html>

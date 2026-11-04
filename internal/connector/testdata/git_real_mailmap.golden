@@ -1,0 +1,10 @@
+BOB JONES <BOB@CORP.COM> => Robert Jones <bob@corp.com>
+bob jones <bob@CORP.com> => Robert Jones <bob@corp.com>
+Bob Jones <bob@corp.com> => Robert Jones <bob@corp.com>
+Bob The Contractor <bob@contractor.example> => Robert Jones <bob@corp.com>
+BOB THE CONTRACTOR <bob@contractor.example> => Robert Jones <bob@corp.com>
+Bob The Contractor <other@example.com> => Bob The Contractor <other@example.com>
+Åsa Öberg <ASA.OBERG@OLD.EXAMPLE> => Åsa Öberg <asa@corp.com>
+Ghost <ghost@old.example> => Ghost <ghost@old.example>
+Dana Whatever <dana@corp.com> => Dana Whatever <dana@corp.com>
+Unmapped Person <nobody@example.com> => Unmapped Person <nobody@example.com>

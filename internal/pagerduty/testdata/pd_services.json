@@ -1,0 +1,48 @@
+{
+ "services": [
+  {
+   "id": "PSVC0001",
+   "name": "Payments API",
+   "description": "Card processing and webhooks",
+   "type": "service",
+   "summary": "Payments API",
+   "status": "active",
+   "escalation_policy": {
+    "id": "PPOL0001",
+    "type": "escalation_policy_reference",
+    "summary": "Payments Escalation",
+    "self": "https://api.pagerduty.com/escalation_policys/PPOL0001",
+    "html_url": "https://acme.pagerduty.com/escalation_policys/PPOL0001"
+   },
+   "teams": [
+    {
+     "id": "PTEAM001",
+     "type": "team_reference",
+     "summary": "Payments",
+     "self": "https://api.pagerduty.com/teams/PTEAM001",
+     "html_url": "https://acme.pagerduty.com/teams/PTEAM001"
+    }
+   ]
+  },
+  {
+   "id": "PSVC0002",
+   "name": "Search Cluster",
+   "description": "Elasticsearch and rankers",
+   "type": "service",
+   "summary": "Search Cluster",
+   "status": "active",
+   "escalation_policy": {
+    "id": "PPOL0002",
+    "type": "escalation_policy_reference",
+    "summary": "Search Escalation",
+    "self": "https://api.pagerduty.com/escalation_policys/PPOL0002",
+    "html_url": "https://acme.pagerduty.com/escalation_policys/PPOL0002"
+   },
+   "teams": []
+  }
+ ],
+ "limit": 25,
+ "offset": 0,
+ "total": null,
+ "more": false
+}

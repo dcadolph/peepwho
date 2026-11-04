@@ -1,0 +1,78 @@
+name: release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to build and sign, e.g. v1.0.0. Dispatch from that tag.
+        required: true
+
+permissions:
+  contents: write
+  # Keyless signing and build provenance: the job's OIDC token mints the short-lived signing
+  # certificate, and the attestation is stored against this repository.
+  id-token: write
+  attestations: write
+
+env:
+  TAG: ${{ inputs.tag || github.event.release.tag_name }}
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ env.TAG }}
+
+      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+
+      # One keyless signature over checksums.txt covers every archive through its checksum.
+      # Self-verified immediately with the same identity check a downloader would run, so a
+      # release cannot ship a signature its own instructions would reject.
+      - name: Sign the checksums
+        run: |
+          set -euo pipefail
+          cd dist
+          for i in 1 2 3; do
+            if cosign sign-blob --yes checksums.txt \
+                --output-signature checksums.txt.sig \
+                --output-certificate checksums.txt.pem; then
+              break
+            fi
+            if [ "$i" = 3 ]; then exit 1; fi
+            sleep 15
+          done
+          cosign verify-blob checksums.txt \
+            --signature checksums.txt.sig \
+            --certificate checksums.txt.pem \
+            --certificate-identity-regexp '^https://github.com/dcadolph/peepwho/\.github/workflows/release\.yml@refs/tags/v' \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com
+          sha256sum -c checksums.txt
+
+      - name: Attach the signature to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$TAG" dist/checksums.txt.sig dist/checksums.txt.pem --clobber
+
+      # SLSA build provenance for every published archive, checkable with `gh attestation verify`.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.zip
