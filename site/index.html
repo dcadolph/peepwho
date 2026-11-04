@@ -14,12 +14,26 @@
 <meta property="og:type" content="website">
 </head>
 <body>
-<header>
-<a class="brand" href="/"><img src="/logo.svg" alt="" width="72" height="72"><span><strong>peepwho</strong></span></a>
-</header>
-<main>
-<h1>peepwho</h1>
-<p class="lede">Know who knows. peepwho reads the tools your team already works in and answers a plain question with the people and channels to ask, the reasons for each, and how strong the match is.</p>
+<div class="band">
+<div class="wrap bar">
+<a class="brand" href="/"><img src="/logo.svg" alt="" width="34" height="44"><span class="word">peep<span class="who">who</span></span></a>
+<nav><a href="https://github.com/dcadolph/peepwho">GitHub</a></nav>
+</div>
+<div class="wrap hero">
+<img src="/logo.svg" alt="" width="168" height="221">
+<div>
+<h1 class="word">peep<span class="who">who</span></h1>
+<p class="tagline">Know who knows</p>
+<p class="lede">peepwho reads the tools your team already works in and answers a plain question with the people and channels to ask, the reasons for each, and how strong the match is.</p>
+<pre><code>go install github.com/dcadolph/peepwho@latest</code></pre>
+<div class="actions">
+<a class="button primary" href="#install">Install</a>
+<a class="button ghost" href="https://github.com/dcadolph/peepwho">View on GitHub</a>
+</div>
+</div>
+</div>
+</div>
+<main class="wrap">
 <p>peepwho is free and MIT licensed. It runs on your machine, with or without a language model.</p>
 
 <h2>What it does</h2>
@@ -33,7 +47,7 @@
 <h2>What this is not for</h2>
 <p class="notice">peepwho describes where knowledge and systems are at risk. It never ranks, scores, or labels people, and its findings must not be used for performance reviews, layoffs, or any other employment decision. A person who shows up as the only one who knows something is a sign the team needs another person to know it.</p>
 
-<h2>Install</h2>
+<h2 id="install">Install</h2>
 <p>With a Go toolchain:</p>
 <pre><code>go install github.com/dcadolph/peepwho@latest</code></pre>
 <p>Or download an archive for Linux, macOS, or Windows from the <a href="https://github.com/dcadolph/peepwho/releases">releases page</a>.</p>
@@ -76,7 +90,7 @@ peepwho ask --pretty "who do I talk to about billing retries"</code></pre>
 <li><a href="https://github.com/dcadolph/peepwho/blob/main/docs/ACCURACY.md">Accuracy</a></li>
 </ul>
 </main>
-<footer>
+<footer class="wrap">
 <p>MIT License. Copyright (c) 2026 dcadolph. <a href="/privacy">Privacy</a></p>
 </footer>
 </body>
