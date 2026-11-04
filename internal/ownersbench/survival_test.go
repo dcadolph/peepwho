@@ -1,10 +1,9 @@
 package ownersbench
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/dcadolph/peepwho/internal/connector"
@@ -17,21 +16,18 @@ import (
 func newSurvivalRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	runGit(t, dir, nil, "init", "-q", "-b", "main")
+	runGit(t, dir, "init", "-q", "-b", "main")
+	files := make(map[string]string)
+	var pending []string
+	var stream bytes.Buffer
 	write := func(rel, content string) {
-		t.Helper()
-		full := filepath.Join(dir, rel)
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			t.Fatalf("mkdir: %v", err)
-		}
-		if err := os.WriteFile(full, []byte(content), 0o600); err != nil {
-			t.Fatalf("write: %v", err)
-		}
+		files[rel] = content
+		pending = append(pending, rel)
 	}
 	commit := func(who []string, msg string) {
 		t.Helper()
-		runGit(t, dir, nil, "add", "-A")
-		runGit(t, dir, who, "commit", "-q", "-m", msg)
+		importCommit(t, &stream, who, msg, files, pending)
+		pending = nil
 	}
 	// Before the cutoff: one person alone in "lonely", three in "covered".
 	for i := range 14 {
@@ -52,6 +48,8 @@ func newSurvivalRepo(t *testing.T) string {
 		write(fmt.Sprintf("covered/later%02d.go", i), fmt.Sprintf("%d\n", i))
 		commit(relAuthor(who, mail, 300-i*15), "covered continues")
 	}
+	runGitIn(t, dir, &stream, "fast-import", "--quiet")
+	runGit(t, dir, "reset", "-q", "--hard")
 	return dir
 }
 

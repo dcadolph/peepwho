@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/dcadolph/peepwho/internal/connector"
 	"github.com/dcadolph/peepwho/internal/index"
@@ -22,7 +24,13 @@ import (
 // fixtures failed intermittently in CI with "unable to create temporary
 // file" while never reproducing locally, which is the shape of a test reading
 // ambient state rather than its own.
-func runGit(t *testing.T, dir string, env []string, args ...string) {
+func runGit(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	runGitIn(t, dir, nil, args...)
+}
+
+// runGitIn is runGit with in as git's standard input.
+func runGitIn(t *testing.T, dir string, in io.Reader, args ...string) {
 	t.Helper()
 	home := dir + "-githome"
 	if err := os.MkdirAll(home, 0o700); err != nil {
@@ -33,7 +41,7 @@ func runGit(t *testing.T, dir string, env []string, args ...string) {
 	cmd.Env = append(os.Environ(),
 		"HOME="+home, "TMPDIR="+home,
 		"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
-	cmd.Env = append(cmd.Env, env...)
+	cmd.Stdin = in
 	var errb bytes.Buffer
 	cmd.Stderr = &errb
 	if err := cmd.Run(); err != nil {
@@ -77,31 +85,57 @@ func author(name, email, date string) []string {
 	}
 }
 
+// importCommit appends one commit to a git fast-import stream. The identity
+// and dates come from env as author returns them, and each path is recorded
+// with its current content in files, as git add of those paths would.
+func importCommit(t *testing.T, w *bytes.Buffer, env []string, msg string, files map[string]string,
+	paths []string) {
+	t.Helper()
+	vars := make(map[string]string, len(env))
+	for _, kv := range env {
+		k, v, _ := strings.Cut(kv, "=")
+		vars[k] = v
+	}
+	stamp := func(key string) string {
+		at, err := time.Parse(time.RFC3339, vars[key])
+		if err != nil {
+			t.Fatalf("commit date %s: %v", key, err)
+		}
+		return fmt.Sprintf("%d %s", at.Unix(), at.Format("-0700"))
+	}
+	fmt.Fprintf(w, "commit refs/heads/main\n")
+	fmt.Fprintf(w, "author %s <%s> %s\n",
+		vars["GIT_AUTHOR_NAME"], vars["GIT_AUTHOR_EMAIL"], stamp("GIT_AUTHOR_DATE"))
+	fmt.Fprintf(w, "committer %s <%s> %s\n",
+		vars["GIT_COMMITTER_NAME"], vars["GIT_COMMITTER_EMAIL"], stamp("GIT_COMMITTER_DATE"))
+	fmt.Fprintf(w, "data %d\n%s\n", len(msg)+1, msg)
+	for _, p := range paths {
+		fmt.Fprintf(w, "M 100644 inline %s\ndata %d\n%s\n", p, len(files[p]), files[p])
+	}
+}
+
 // newBenchRepo builds a repository with two owned areas. In billing the
 // OWNERS approver is also the top committer (cohort A). In search the OWNERS
 // approver commits a sixth of what the top contributor does and works nowhere
 // else, which is the focused-owner shape the lead score is built for, while
 // three busier contributors fill git's top three (cohort C). A sweeper
 // touches everything, so share ranking alone would name them everywhere.
+//
+// The commits go through one git fast-import stream rather than an add and a
+// commit per change, which cost two git processes per commit and made this
+// fixture most of the package's test time. The result is the same repository,
+// commit for commit.
 func newBenchRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	runGit(t, dir, nil, "init", "-q", "-b", "main")
+	runGit(t, dir, "init", "-q", "-b", "main")
 
-	write := func(rel, content string) {
-		t.Helper()
-		full := filepath.Join(dir, rel)
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			t.Fatalf("mkdir: %v", err)
-		}
-		if err := os.WriteFile(full, []byte(content), 0o600); err != nil {
-			t.Fatalf("write: %v", err)
-		}
-	}
+	files := make(map[string]string)
+	var stream bytes.Buffer
+	write := func(rel, content string) { files[rel] = content }
 	commit := func(env []string, msg string, paths ...string) {
 		t.Helper()
-		runGit(t, dir, nil, append([]string{"add", "--"}, paths...)...)
-		runGit(t, dir, env, "commit", "-q", "-m", msg)
+		importCommit(t, &stream, env, msg, files, paths)
 	}
 
 	write("OWNERS_ALIASES", "aliases:\n  search-approvers:\n    - quietowner\n")
@@ -185,6 +219,8 @@ func newBenchRepo(t *testing.T) string {
 		write("infra/sweep.go", "s"+next())
 		commit(sweep(), "wide cleanup", "billing/sweep.go", "search/sweep.go", "infra/sweep.go")
 	}
+	runGitIn(t, dir, &stream, "fast-import", "--quiet")
+	runGit(t, dir, "reset", "-q", "--hard")
 	return dir
 }
 
