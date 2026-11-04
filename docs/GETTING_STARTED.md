@@ -27,6 +27,10 @@ explicitly change the policy.
 
 ## Install
 
+With Homebrew on macOS:
+
+    brew install --cask dcadolph/tap/peepwho
+
 With Go 1.26 or newer:
 
     go install github.com/dcadolph/peepwho@latest

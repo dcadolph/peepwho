@@ -36,3 +36,20 @@ changelog:
 release:
   mode: keep-existing
   replace_existing_artifacts: true
+
+homebrew_casks:
+  - name: peepwho
+    repository:
+      owner: dcadolph
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Casks
+    homepage: https://peepwho.app
+    description: Ask who knows about a topic across the tools your team already uses
+    license: MIT
+    hooks:
+      post:
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/peepwho"]
+          end

@@ -21,6 +21,10 @@ team needs another person to know it.
 
 ## Install
 
+With Homebrew on macOS:
+
+    brew install --cask dcadolph/tap/peepwho
+
 With a Go toolchain:
 
     go install github.com/dcadolph/peepwho@latest
