@@ -2,7 +2,7 @@ BINARY  := peepwho
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X github.com/dcadolph/peepwho/cmd.version=$(VERSION)
 
-.PHONY: build install test test-short e2e vet fmt lint core-deps release clean
+.PHONY: build install test test-short e2e vet fmt lint core-deps host release clean
 
 build:
 	go build -ldflags "$(LDFLAGS)" -o $(BINARY) .
@@ -36,6 +36,13 @@ core-deps:
 	@bad=$$(go list -deps ./core | grep -E '$(CORE_BANNED)'); \
 	if [ -n "$$bad" ]; then echo "core links banned packages:"; echo "$$bad"; exit 1; fi; \
 	echo "core-deps: ok"
+
+# host binds the core into the sandboxed test host and builds it signed. See docs/APPS.md.
+HOST_FRAMEWORK := mac/Host/Frameworks/PeepwhoCore.xcframework
+
+host:
+	gomobile bind -target macos -o $(HOST_FRAMEWORK) ./core
+	$(MAKE) -C mac/Host app
 
 release:
 	goreleaser release --clean
