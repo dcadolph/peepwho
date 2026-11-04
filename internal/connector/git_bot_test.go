@@ -35,6 +35,14 @@ func TestIsBotAuthorNamesAutomation(t *testing.T) {
 	}, { // Test 8: An ordinary contributor.
 		Name: "Julien Pivotto", Email: "291750+roidelapluie@users.noreply.github.com",
 		Want: false,
+	}, { // Test 9: A coding agent's co-author trailer, as it appears on go-git.
+		Name: "Claude Opus 5 (1M context)", Email: "noreply@anthropic.com", Want: true,
+	}, { // Test 10: Another coding agent, whose address differs only in case.
+		Name: "Codex", Email: "NoReply@OpenAI.com", Want: true,
+	}, { // Test 11: An editor's agent.
+		Name: "Cursor", Email: "cursoragent@cursor.com", Want: true,
+	}, { // Test 12: A person named Claude at the same company is still a person.
+		Name: "Claude Shannon", Email: "claude@anthropic.com", Want: false,
 	}}
 	for testNum, test := range tests {
 		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {

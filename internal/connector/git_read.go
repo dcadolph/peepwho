@@ -1022,6 +1022,16 @@ var automationNames = map[string]bool{
 	"imgbot": true, "allcontributors": true, "codecov": true,
 }
 
+// automationEmails are the addresses coding agents sign their co-author
+// trailers with. Their display names change with every model release and some
+// are ordinary first names, so the address is the only stable mark. On go-git a
+// coding agent credited through these trailers was ranked a holder of a
+// subject.
+var automationEmails = map[string]bool{
+	"noreply@anthropic.com": true, "noreply@openai.com": true,
+	"cursoragent@cursor.com": true,
+}
+
 // IsAutomationName reports whether a display name belongs to an automation
 // account. It is the name-only half of the author check, exported because a
 // benchmark judging peepwho has to hold its ground truth to the same standard:
@@ -1048,6 +1058,9 @@ func IsAutomationName(name string) bool {
 // caught while Talbot and Abbott stay people.
 func isBotAuthor(name, email string) bool {
 	if strings.HasSuffix(name, "[bot]") || strings.Contains(email, "[bot]") {
+		return true
+	}
+	if automationEmails[strings.ToLower(strings.TrimSpace(email))] {
 		return true
 	}
 	local := email
