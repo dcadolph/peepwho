@@ -38,10 +38,14 @@ core-deps:
 	echo "core-deps: ok"
 
 # host binds the core into the sandboxed test host and builds it signed. See docs/APPS.md.
+# -macosversion sets the floor on every cgo object. gomobile overrides CGO_CFLAGS, so the
+# flag is the only way in, and the build cache ignores it: after changing it, build once
+# with GOFLAGS=-a or the cached runtime objects keep the old floor.
 HOST_FRAMEWORK := mac/Host/Frameworks/PeepwhoCore.xcframework
+MACOS_MIN := 14.0
 
 host:
-	gomobile bind -target macos -o $(HOST_FRAMEWORK) ./core
+	gomobile bind -target macos -macosversion $(MACOS_MIN) -o $(HOST_FRAMEWORK) ./core
 	$(MAKE) -C mac/Host app
 
 release:
