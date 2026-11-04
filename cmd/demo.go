@@ -76,6 +76,7 @@ PEEPWHO_ANTHROPIC_KEY) and add --policy redacted. Only do this for a demo you ke
 to yourself: the demo serves with no token, so a publicly reachable one with a key
 set becomes an open relay to your paid account.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			cfg.memoryKey = true
 			if len(repoPaths) > 0 {
 				return demoRepo(cmd, opts, cfg, repoPaths, maxCommits, open)
 			}

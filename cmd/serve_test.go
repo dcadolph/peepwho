@@ -79,7 +79,7 @@ func TestLocalOnlyServe(t *testing.T) {
 func TestAttestFnSeals(t *testing.T) {
 	t.Parallel()
 	opts := &options{dataDir: t.TempDir()}
-	sealer := attestFn(index.New(), opts, io.Discard)
+	sealer := attestFn(index.New(), opts, false, io.Discard)
 	if sealer == nil {
 		t.Fatal("attestFn returned no sealer")
 	}
@@ -124,6 +124,39 @@ func TestAttestFnSeals(t *testing.T) {
 	}
 	if !bytes.Equal(inside, sealed.Manifest) {
 		t.Error("the served manifest is not the one inside the archive")
+	}
+}
+
+// TestAttestFnMemoryKeyWritesNothing verifies a sealer asked for a memory key
+// signs without creating a signing key in the data directory, which is what
+// lets the demo promise it writes nothing there, and that the persistent path
+// still creates one.
+func TestAttestFnMemoryKeyWritesNothing(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		MemoryKey   bool
+		WantKeyFile bool
+	}{{ // Test 0: The demo's memory key leaves the data directory untouched.
+		MemoryKey: true, WantKeyFile: false,
+	}, { // Test 1: Serve keeps one key under the data directory.
+		MemoryKey: false, WantKeyFile: true,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			opts := &options{dataDir: t.TempDir()}
+			sealer := attestFn(index.New(), opts, test.MemoryKey, io.Discard)
+			if sealer == nil {
+				t.Fatal("attestFn returned no sealer")
+			}
+			if _, err := sealer(); err != nil {
+				t.Fatalf("seal: %v", err)
+			}
+			_, err := os.Stat(opts.dir().AttestKey())
+			if got := err == nil; got != test.WantKeyFile {
+				t.Errorf("signing key on disk = %t, want %t (stat: %v)", got, test.WantKeyFile, err)
+			}
+		})
 	}
 }
 

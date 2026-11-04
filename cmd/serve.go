@@ -67,6 +67,9 @@ type webConfig struct {
 	// meant only for the demo, whose index and recall are sample data with
 	// nothing private to protect.
 	public bool
+	// memoryKey signs sealed findings with a key held only in memory instead of
+	// the one under the data directory, so the demo writes nothing there.
+	memoryKey bool
 }
 
 // newServeCmd builds the serve command, which runs the web UI on localhost and
@@ -202,7 +205,7 @@ func serveWeb(cmd *cobra.Command, opts *options, eng *engine.Engine, store *feed
 	// when no key can be kept, generate DIFFERENT keys: the same finding would
 	// then be signed under one identity through the API and another through the
 	// command-line view, which is worse than not signing it.
-	sealer := attestFn(ix, opts, cmd.ErrOrStderr())
+	sealer := attestFn(ix, opts, cfg.memoryKey, cmd.ErrOrStderr())
 
 	handler, err := web.Handler(web.Config{
 		Ask: ask, Feedback: vote, Person: person, Version: version, AuthToken: token,
@@ -354,19 +357,27 @@ func cliFn(ix *index.Index, ask web.AskFunc, sealer web.AttestFunc) web.CLIFunc 
 
 // attestFn returns the web handler that seals the current knowledge-risk finding
 // into a signed directory and serves it as a zip. The signing key is the
-// persistent one under the data directory where that is writable. A hardened or
-// read-only deployment, such as the public demo, cannot keep one, so it signs
+// persistent one under the data directory where that is writable. The demo,
+// which promises to write nothing outside a temporary directory, asks for
+// memoryKey, and a hardened or read-only deployment cannot keep one. Both sign
 // with a key held only in memory: the manifest carries its own public key, so it
 // still verifies on its own terms, it just does not claim the same identity
 // across restarts.
-func attestFn(ix *index.Index, opts *options, logw io.Writer) web.AttestFunc {
-	priv, err := opts.attestKey()
-	if err != nil {
+func attestFn(ix *index.Index, opts *options, memoryKey bool, logw io.Writer) web.AttestFunc {
+	var priv ed25519.PrivateKey
+	var err error
+	if !memoryKey {
+		priv, err = opts.attestKey()
+	}
+	if memoryKey || err != nil {
 		_, key, genErr := ed25519.GenerateKey(nil)
 		if genErr != nil {
 			fmt.Fprintf(logw, "peepwho: attest disabled: %v\n", genErr)
 			return nil
 		}
+		priv = key
+	}
+	if err != nil {
 		// Say what this costs and how to stop paying it. Signed findings that
 		// cannot be checked against a stable key after a restart are worth
 		// much less than the feature promises, and the fix is one flag.
@@ -375,7 +386,6 @@ func attestFn(ix *index.Index, opts *options, logw io.Writer) web.AttestFunc {
 				"  findings signed now will not verify against this install after a restart.\n"+
 				"  point --data-dir at somewhere writable to keep one key, "+
 				"such as a systemd StateDirectory.\n", err)
-		priv = key
 	}
 	return func() (web.Sealed, error) {
 		dir, err := os.MkdirTemp("", "peepwho-seal-*")
