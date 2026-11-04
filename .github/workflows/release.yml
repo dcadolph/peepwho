@@ -31,6 +31,16 @@ jobs:
         with:
           go-version-file: go.mod
 
+      # GoReleaser keeps the release body under keep-existing but resets the title to the bare
+      # tag, so the title set at publish time is saved here and restored after the build.
+      - name: Save the release title
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          title="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json name --jq .name)"
+          echo "RELEASE_TITLE=$title" >>"$GITHUB_ENV"
+
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"
@@ -38,6 +48,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_CURRENT_TAG: ${{ env.TAG }}
+
+      - name: Restore the release title
+        if: env.RELEASE_TITLE != '' && env.RELEASE_TITLE != env.TAG
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --title "$RELEASE_TITLE"
 
       - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
 
