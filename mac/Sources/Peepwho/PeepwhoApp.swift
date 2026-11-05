@@ -5,29 +5,40 @@ import SwiftUI
 // PeepwhoApp is the menu bar app: a search field over the index and a settings window.
 @main
 struct PeepwhoApp: App {
-    // search drives the menu bar search over the app's own index.
-    @StateObject private var search = PeepwhoApp.openSearch()
+    // app holds the search and the settings over one open index.
+    @StateObject private var app = AppModel()
 
-    // body declares the menu bar item.
+    // body declares the menu bar item and the settings window.
     var body: some Scene {
         MenuBarExtra("peepwho", systemImage: "person.2") {
-            SearchView(model: search)
+            SearchView(model: app.search)
         }
         .menuBarExtraStyle(.window)
-    }
-
-    // openSearch opens the data directory in the app's container under the Keychain's index key
-    // and builds the search over it. A failure to open shows in the menu instead of the results.
-    @MainActor
-    static func openSearch() -> SearchModel {
-        let opener: (URL) -> Bool = { NSWorkspace.shared.open($0) }
-        do {
-            let key = try IndexKey.load()
-            let core = try Core.open(dir: DataDir.url, key: key, secrets: KeychainSecrets())
-            return SearchModel(core: core, opener: opener)
-        } catch {
-            return SearchModel(core: nil, openError: "The index did not open: \(error.localizedDescription)",
-                               opener: opener)
+        Settings {
+            SettingsView(model: app.settings)
         }
+    }
+}
+
+// AppModel opens the data directory in the app's container under the Keychain's index key and
+// shares it between the search and the settings, which reopens it after a wipe.
+@MainActor
+final class AppModel: ObservableObject {
+    // search drives the menu bar search.
+    let search: SearchModel
+    // settings drives the settings window and owns the open core.
+    let settings: SettingsModel
+
+    // init opens the index and wires the search to every core the settings open.
+    init() {
+        let dir = DataDir.url
+        settings = SettingsModel(
+            dir: dir,
+            open: { try Core.open(dir: dir, key: try IndexKey.load(), secrets: KeychainSecrets()) },
+            secrets: KeychainStore(),
+            places: BookmarkStore()
+        )
+        search = SearchModel(core: settings.core, openError: settings.lines.first) { NSWorkspace.shared.open($0) }
+        settings.onCore = { [weak search] core in search?.use(core) }
     }
 }

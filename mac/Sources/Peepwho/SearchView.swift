@@ -26,6 +26,9 @@ struct SearchView: View {
             HStack {
                 Text("Enter messages the first person.").font(.caption).foregroundStyle(.secondary)
                 Spacer()
+                SettingsLink { Text("Settings…") }
+                    .controlSize(.small)
+                    .simultaneousGesture(TapGesture().onEnded { NSApp.activate(ignoringOtherApps: true) })
                 Button("Quit") { NSApp.terminate(nil) }.controlSize(.small)
             }
         }

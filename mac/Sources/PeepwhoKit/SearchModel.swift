@@ -16,7 +16,7 @@ public final class SearchModel: ObservableObject {
     @Published public private(set) var message: String?
 
     // core answers the questions, nil when the data directory did not open.
-    private let core: Core?
+    private var core: Core?
     // opener opens a link in its own app and reports whether it did.
     private let opener: (URL) -> Bool
     // delay is how long typing must pause before a question is asked.
@@ -37,6 +37,17 @@ public final class SearchModel: ObservableObject {
         if core == nil {
             message = openError ?? "The index did not open."
         }
+    }
+
+    // use swaps in core, such as the fresh one a wipe opens, and clears what the old one answered.
+    public func use(_ core: Core?, openError: String? = nil) {
+        self.core = core
+        generation += 1
+        people = []
+        channels = []
+        detail = nil
+        answered = ""
+        message = core == nil ? (openError ?? "The index is not open.") : nil
     }
 
     // typed asks about text once typing pauses, replacing any question still waiting.
