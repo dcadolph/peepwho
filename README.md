@@ -16,6 +16,10 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8B4A1C" alt="License: MIT"></a>
 </p>
 
+<p align="center">
+  <img src="docs/demo.gif" width="100%" alt="peepwho ask answering who knows about payments retry and kafka consumer lag, with people, channels, match strength, and reasons">
+</p>
+
 Know who knows. peepwho reads the tools your team already works in and answers a plain question
 with the people and channels to ask, the reasons for each, and how strong the match is. It also
 shows where knowledge has narrowed to one person, and when nobody who knew is left, it points
