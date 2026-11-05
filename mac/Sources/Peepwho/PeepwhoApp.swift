@@ -11,7 +11,7 @@ struct PeepwhoApp: App {
     // body declares the menu bar item and the settings window.
     var body: some Scene {
         MenuBarExtra("peepwho", systemImage: "person.2") {
-            SearchView(model: app.search)
+            SearchView(model: app.search) { await app.settings.refreshIfStale() }
         }
         .menuBarExtraStyle(.window)
         Settings {
@@ -28,6 +28,10 @@ final class AppModel: ObservableObject {
     let search: SearchModel
     // settings drives the settings window and owns the open core.
     let settings: SettingsModel
+    // timer checks for a stale index while the app runs.
+    private var timer: Timer?
+    // wake is the observer that checks for a stale index when the Mac wakes.
+    private var wake: NSObjectProtocol?
 
     // init opens the index and wires the search to every core the settings open.
     init() {
@@ -40,5 +44,14 @@ final class AppModel: ObservableObject {
         )
         search = SearchModel(core: settings.core, openError: settings.lines.first) { NSWorkspace.shared.open($0) }
         settings.onCore = { [weak search] core in search?.use(core) }
+        let tick = max(15, min(settings.refreshInterval / 4, 300))
+        timer = Timer.scheduledTimer(withTimeInterval: tick, repeats: true) { [weak self] _ in
+            Task { @MainActor in await self?.settings.refreshIfStale() }
+        }
+        wake = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in await self?.settings.refreshIfStale() }
+        }
     }
 }

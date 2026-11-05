@@ -14,6 +14,8 @@ public final class SearchModel: ObservableObject {
     @Published public private(set) var detail: PersonDetail?
     // message says why there is nothing to show, such as an index not built yet.
     @Published public private(set) var message: String?
+    // changes say who and what joined or left since the menu last closed.
+    @Published public private(set) var changes: [String] = []
 
     // core answers the questions, nil when the data directory did not open.
     private var core: Core?
@@ -21,6 +23,8 @@ public final class SearchModel: ObservableObject {
     private let opener: (URL) -> Bool
     // delay is how long typing must pause before a question is asked.
     private let delay: Duration
+    // defaults keeps the last look across launches.
+    private let defaults: UserDefaults
     // pending is the debounced question waiting for typing to pause.
     private var pending: Task<Void, Never>?
     // answered is the query the shown results answer.
@@ -30,10 +34,11 @@ public final class SearchModel: ObservableObject {
 
     // init builds a model over core that opens links with opener. A nil core shows openError.
     public init(core: Core?, openError: String? = nil, delay: Duration = .milliseconds(250),
-                opener: @escaping (URL) -> Bool) {
+                defaults: UserDefaults = .standard, opener: @escaping (URL) -> Bool) {
         self.core = core
         self.opener = opener
         self.delay = delay
+        self.defaults = defaults
         if core == nil {
             message = openError ?? "The index did not open."
         }
@@ -48,6 +53,27 @@ public final class SearchModel: ObservableObject {
         detail = nil
         answered = ""
         message = core == nil ? (openError ?? "The index is not open.") : nil
+    }
+
+    // lastLookKey is the UserDefaults key for when the menu last closed.
+    public static let lastLookKey = "PeepwhoLastLook"
+
+    // opened shows what changed since the last look. The first open ever starts the clock and
+    // shows nothing, since everything would count as new.
+    public func opened(now: Date = Date()) async {
+        guard let core else { return }
+        guard let last = defaults.object(forKey: Self.lastLookKey) as? Date else {
+            defaults.set(now, forKey: Self.lastLookKey)
+            changes = []
+            return
+        }
+        guard let answer = try? await core.changes(since: last) else { return }
+        changes = ChangeSummary.lines(answer.changes)
+    }
+
+    // closed moves the last look to now.
+    public func closed(now: Date = Date()) {
+        defaults.set(now, forKey: Self.lastLookKey)
     }
 
     // typed asks about text once typing pauses, replacing any question still waiting.

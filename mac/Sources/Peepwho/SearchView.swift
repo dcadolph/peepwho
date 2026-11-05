@@ -6,6 +6,8 @@ import SwiftUI
 struct SearchView: View {
     // model answers the field and holds what the window shows.
     @ObservedObject var model: SearchModel
+    // onOpen runs each time the window opens, after the changes are read.
+    var onOpen: () async -> Void = {}
     // focused keeps the cursor in the field whenever the window opens.
     @FocusState private var focused: Bool
 
@@ -17,6 +19,14 @@ struct SearchView: View {
                 .focused($focused)
                 .onSubmit { Task { await model.submit() } }
                 .onChange(of: model.query) { _, text in model.typed(text) }
+            if !model.changes.isEmpty, model.detail == nil {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Changed since you last looked").font(.caption.weight(.semibold))
+                    ForEach(model.changes, id: \.self) { line in
+                        Text(line).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
             if let person = model.detail {
                 PersonView(person: person, model: model)
             } else {
@@ -34,7 +44,14 @@ struct SearchView: View {
         }
         .padding(12)
         .frame(width: 360)
-        .onAppear { focused = true }
+        .onAppear {
+            focused = true
+            Task {
+                await model.opened()
+                await onOpen()
+            }
+        }
+        .onDisappear { model.closed() }
     }
 }
 

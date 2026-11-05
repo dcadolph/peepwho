@@ -140,6 +140,9 @@ public final class SettingsModel: ObservableObject {
     }
     // core is the open data directory, nil when it did not open.
     public private(set) var core: Core?
+    // lastAttempt is when refreshIfStale last started a refresh, so a refresh that keeps failing
+    // waits a full interval before it runs again.
+    private var lastAttempt: Date?
     // onCore hears every core the model opens, so the search follows a wipe.
     public var onCore: ((Core?) -> Void)?
 
@@ -244,6 +247,36 @@ public final class SettingsModel: ObservableObject {
                 r.ok ? "\(r.source): refreshed \(r.scope)." : "\(r.source): \(r.error ?? "failed")."
             }
         }
+    }
+
+    // intervalKey is the UserDefaults key for how many seconds old the index may get before
+    // refreshIfStale refreshes it.
+    public static let intervalKey = "PeepwhoRefreshIntervalSeconds"
+    // defaultInterval is six hours.
+    public static let defaultInterval: TimeInterval = 6 * 3600
+
+    // refreshInterval is the stored interval, or six hours when none is set.
+    public var refreshInterval: TimeInterval {
+        let stored = defaults.double(forKey: Self.intervalKey)
+        return stored > 0 ? stored : Self.defaultInterval
+    }
+
+    // refreshIfStale refreshes when the index at now is older than the interval and no refresh
+    // started within the interval, and reports whether it refreshed. The menu opening, the Mac
+    // waking, and the timer all call it.
+    @discardableResult
+    public func refreshIfStale(now: Date = Date()) async -> Bool {
+        guard busy == nil, let core else { return false }
+        let interval = refreshInterval
+        if let lastAttempt, now.timeIntervalSince(lastAttempt) < interval {
+            return false
+        }
+        guard let status = try? await core.status(now: now), status.builtAt != nil,
+              TimeInterval(status.ageSeconds) >= interval
+        else { return false }
+        lastAttempt = now
+        await refresh()
+        return true
     }
 
     // wipe deletes the data directory and opens a fresh, empty one in its place. Tokens and
