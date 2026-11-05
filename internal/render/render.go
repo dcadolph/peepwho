@@ -179,11 +179,11 @@ func RenderStatus(w io.Writer, v map[string]any, s Style) {
 			when = t.Format("Jan 2, 3:04 PM")
 		}
 		if age := gets("age"); age != "" {
-			when += "  (" + humanAge(age) + " ago)"
+			when += "  (" + humanAge(age) + ")"
 		}
 		line("Built", s.Dim(when))
 	} else if age := gets("age"); age != "" {
-		line("Built", s.Dim(humanAge(age)+" ago"))
+		line("Built", s.Dim(humanAge(age)))
 	}
 	if src, ok := v["sources"].(map[string]int); ok && len(src) > 0 {
 		parts := make([]string, 0, len(src))
@@ -210,14 +210,27 @@ func RenderStatus(w io.Writer, v map[string]any, s Style) {
 	fmt.Fprintln(w)
 }
 
-// humanAge trims a Go duration like "15m0s" to a compact "15m", or "just now"
-// when nothing measurable has passed.
+// humanAge turns a Go duration string such as "1h30m0s" into a phrase such as "1h 30m ago", or
+// "just now" under a minute. A string that does not parse is shown as is with "ago".
 func humanAge(d string) string {
-	d = strings.TrimSuffix(d, "0s")
-	if d == "" {
-		return "just now"
+	dur, err := time.ParseDuration(d)
+	if err != nil {
+		return d + " ago"
 	}
-	return d
+	switch {
+	case dur < time.Minute:
+		return "just now"
+	case dur < time.Hour:
+		return fmt.Sprintf("%dm ago", int(dur.Minutes()))
+	case dur < 24*time.Hour:
+		h, m := int(dur.Hours()), int(dur.Minutes())%60
+		if m == 0 {
+			return fmt.Sprintf("%dh ago", h)
+		}
+		return fmt.Sprintf("%dh %dm ago", h, m)
+	default:
+		return fmt.Sprintf("%dd ago", int(dur.Hours()/24))
+	}
 }
 
 // RenderRecall prints the conversations a person took part in, each card led by

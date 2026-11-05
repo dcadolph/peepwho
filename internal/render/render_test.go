@@ -384,3 +384,35 @@ func TestSourceColor(t *testing.T) {
 		})
 	}
 }
+
+func TestHumanAge(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		In         string
+		WantResult string
+	}{{ // Test 0: Zero reads as just now.
+		In: "0s", WantResult: "just now",
+	}, { // Test 1: Under a minute reads as just now.
+		In: "45s", WantResult: "just now",
+	}, { // Test 2: Minutes.
+		In: "15m0s", WantResult: "15m ago",
+	}, { // Test 3: A whole hour drops the minutes.
+		In: "1h0m0s", WantResult: "1h ago",
+	}, { // Test 4: Hours and minutes.
+		In: "3h5m0s", WantResult: "3h 5m ago",
+	}, { // Test 5: The last minute before a day stays in hours.
+		In: "23h59m0s", WantResult: "23h 59m ago",
+	}, { // Test 6: A day or more reads in days.
+		In: "50h3m0s", WantResult: "2d ago",
+	}, { // Test 7: An unparsable string is shown as is.
+		In: "soon", WantResult: "soon ago",
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			if diff := cmp.Diff(test.WantResult, humanAge(test.In)); diff != "" {
+				t.Errorf("mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
