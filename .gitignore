@@ -25,6 +25,6 @@ coverage.*
 # Cloudflare deploy cache
 .wrangler/
 
-# Mac host build output and the bound core framework
-/mac/Host/.build/
-/mac/Host/Frameworks/
+# Mac build output and the bound core framework
+/mac/.build/
+/mac/Frameworks/

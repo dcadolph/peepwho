@@ -1,0 +1,22 @@
+{
+  "age_seconds": 3599,
+  "built_at": "2026-11-05T02:43:20Z",
+  "channels": 4,
+  "conversations": 6,
+  "embeddings": false,
+  "people": 12,
+  "sealed": false,
+  "sources": {
+    "codeowners": 1,
+    "confluence": 2,
+    "git": 3,
+    "github": 3,
+    "jira": 3,
+    "org-csv": 12,
+    "pagerduty": 2,
+    "slack": 17
+  },
+  "subjects": 20,
+  "teams": 7,
+  "words": 71
+}

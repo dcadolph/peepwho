@@ -1,0 +1,5 @@
+{
+  "log": "git: /tmp/TestSwiftFixtures493772256/004/my repo: 3 commits\nindexed 2 people, 0 channels, 0 teams, 2 subjects and 5 words from text into /tmp/TestSwiftFixtures493772256/003/data/index.json\nnote: this index holds names, emails, and titles in plaintext, protected only by file permissions. Set PEEPWHO_INDEX_KEY or PEEPWHO_INDEX_PASSPHRASE to encrypt it at rest.\nchanges since last index: +2 people\n  joined: Ann Lee, Bob Ray\n",
+  "scope": "repo:/tmp/TestSwiftFixtures493772256/004/my repo",
+  "source": "git"
+}

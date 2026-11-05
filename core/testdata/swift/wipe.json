@@ -1,0 +1,11 @@
+{
+  "removed": [
+    "/tmp/TestSwiftFixtures493772256/003/data/index.json",
+    "/tmp/TestSwiftFixtures493772256/003/data/index.json.lock",
+    "/tmp/TestSwiftFixtures493772256/003/data/index.sources.json",
+    "/tmp/TestSwiftFixtures493772256/003/data/index.state.json",
+    "/tmp/TestSwiftFixtures493772256/003/data/index.state.json.lock",
+    "/tmp/TestSwiftFixtures493772256/003/data/refresh.json",
+    "/tmp/TestSwiftFixtures493772256/003/data/refresh.json.lock"
+  ]
+}

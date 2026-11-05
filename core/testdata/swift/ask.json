@@ -1,0 +1,67 @@
+{
+  "channels": [
+    {
+      "members": [
+        {
+          "email": "carol@corp.com",
+          "name": "Carol Lee"
+        },
+        {
+          "email": "grace@corp.com",
+          "name": "Grace Kim"
+        },
+        {
+          "email": "angela@corp.com",
+          "name": "Angela Malone"
+        }
+      ],
+      "name": "infra",
+      "reasons": [
+        "terraform (mention)"
+      ],
+      "score": 1.4205247655317992,
+      "strength": 0.5,
+      "topic": "kubernetes deploys and oncall",
+      "url": "https://corp.slack.com/archives/C3"
+    }
+  ],
+  "people": [
+    {
+      "email": "carol@corp.com",
+      "id": "carol@corp.com",
+      "identities": [
+        "slack:u3"
+      ],
+      "name": "Carol Lee",
+      "reasons": [
+        "terraform (topic)"
+      ],
+      "score": 6.499705055888327,
+      "strength": 1,
+      "team": "Infrastructure",
+      "title": "Site Reliability Engineer",
+      "topics": [
+        "infra",
+        "terraform",
+        "deploys"
+      ]
+    },
+    {
+      "email": "victor@corp.com",
+      "id": "victor@corp.com",
+      "name": "Victor Old",
+      "reasons": [
+        "terraform (topic)"
+      ],
+      "score": 3.5179520221542147,
+      "strength": 1,
+      "team": "Infrastructure",
+      "title": "Systems Engineer",
+      "topics": [
+        "infra",
+        "terraform"
+      ]
+    }
+  ],
+  "query": "terraform"
+}

@@ -2,31 +2,8 @@ import AppKit
 import Foundation
 import os
 import PeepwhoCore
+import PeepwhoKit
 import Security
-
-// Names are the environment variable names the command line reads, which the core asks the
-// host's Secrets for. They match engine.JiraURLEnv, JiraEmailEnv, JiraTokenEnv, and
-// keyring.EnvKey in the Go tree.
-enum SecretName {
-    // indexKey holds the base64 key the data directory is sealed with.
-    static let indexKey = "PEEPWHO_INDEX_KEY"
-    // jiraURL holds the Jira site URL.
-    static let jiraURL = "PEEPWHO_JIRA_URL"
-    // jiraEmail holds the Jira account email.
-    static let jiraEmail = "PEEPWHO_JIRA_EMAIL"
-    // jiraToken holds the Jira API token.
-    static let jiraToken = "PEEPWHO_JIRA_TOKEN"
-}
-
-// KeychainSecrets hands the core the host's Keychain items by name, so the core reads tokens
-// without learning where they live.
-final class KeychainSecrets: NSObject, CoreSecretsProtocol {
-    // get returns the Keychain item stored under name, or empty when there is none.
-    func get(_ name: String?) -> String {
-        guard let name else { return "" }
-        return Keychain.get(name) ?? ""
-    }
-}
 
 // HostModel runs the core calls the host proves and keeps the log the window shows. Core calls
 // run on one serial queue, so the window never blocks and calls never overlap.
@@ -78,28 +55,15 @@ final class HostModel: ObservableObject {
     // openHandle reads or makes the index key and opens the data directory under it.
     private func openHandle() -> Bool {
         if handle != nil { return true }
+        let hadKey = Keychain.get(SecretName.indexKey) != nil
         let key: String
-        if let stored = Keychain.get(SecretName.indexKey) {
-            key = stored
-            say("index key: read from keychain")
-        } else {
-            var raw = Data(count: 32)
-            let status = raw.withUnsafeMutableBytes {
-                SecRandomCopyBytes(kSecRandomDefault, 32, $0.baseAddress!)
-            }
-            guard status == errSecSuccess else {
-                say("index key: random bytes failed with status \(status)")
-                return false
-            }
-            key = raw.base64EncodedString()
-            do {
-                try Keychain.set(SecretName.indexKey, key)
-                say("index key: generated and saved to keychain")
-            } catch {
-                say("index key: save failed: \(error)")
-                return false
-            }
+        do {
+            key = try IndexKey.load()
+        } catch {
+            say("index key: \(hadKey ? "read" : "save") failed: \(error)")
+            return false
         }
+        say(hadKey ? "index key: read from keychain" : "index key: generated and saved to keychain")
         var err: NSError?
         guard let h = CoreOpen(dataDir.path, key, &err) else {
             say("open failed: \(err?.localizedDescription ?? "no handle")")
@@ -130,6 +94,8 @@ final class HostModel: ObservableObject {
             index("git", ["--repo-path", resolved.url.path, "--git-since-days", "10000"])
         case .csv:
             index("org-csv", ["--file", resolved.url.path])
+        case .codeowners:
+            index("codeowners", ["--file", resolved.url.path])
         }
     }
 

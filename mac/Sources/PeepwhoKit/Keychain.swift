@@ -1,15 +1,16 @@
 import Foundation
 import Security
 
-// Keychain keeps the host's secrets as generic passwords in the login keychain, one item per
+// Keychain keeps an app's secrets as generic passwords in the login keychain, one item per
 // name. The data protection keychain needs a provisioning profile, which a Developer ID build
 // without one does not have, and the login keychain ties each item to the app's signature.
-enum Keychain {
-    // service is the Keychain service every host item is stored under.
-    static let service = "com.dcadolph.peepwho.host"
+public enum Keychain {
+    // service is the Keychain service every item is stored under: the running app's bundle id, so
+    // two apps built from this package never read each other's items.
+    static let service = Bundle.main.bundleIdentifier ?? "com.dcadolph.peepwho"
 
     // get returns the secret stored under name, or nil when there is none.
-    static func get(_ name: String) -> String? {
+    public static func get(_ name: String) -> String? {
         var query = baseQuery(name)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
@@ -23,11 +24,11 @@ enum Keychain {
     }
 
     // set replaces the secret stored under name.
-    static func set(_ name: String, _ value: String) throws {
+    public static func set(_ name: String, _ value: String) throws {
         SecItemDelete(baseQuery(name) as CFDictionary)
         var item = baseQuery(name)
         item[kSecValueData as String] = Data(value.utf8)
-        item[kSecAttrLabel as String] = "peepwho host \(name)"
+        item[kSecAttrLabel as String] = "\(service) \(name)"
         let status = SecItemAdd(item as CFDictionary, nil)
         guard status == errSecSuccess else {
             throw KeychainError(status: status)
@@ -35,7 +36,7 @@ enum Keychain {
     }
 
     // delete removes the secret stored under name, if any.
-    static func delete(_ name: String) {
+    public static func delete(_ name: String) {
         SecItemDelete(baseQuery(name) as CFDictionary)
     }
 
@@ -50,12 +51,12 @@ enum Keychain {
 }
 
 // KeychainError reports a failed Keychain write by its OSStatus.
-struct KeychainError: Error, CustomStringConvertible {
+public struct KeychainError: Error, CustomStringConvertible {
     // status is the OSStatus SecItemAdd returned.
-    let status: OSStatus
+    public let status: OSStatus
 
     // description names the status in words when Security has a message for it.
-    var description: String {
+    public var description: String {
         let text = SecCopyErrorMessageString(status, nil) as String? ?? "unknown"
         return "keychain status \(status): \(text)"
     }

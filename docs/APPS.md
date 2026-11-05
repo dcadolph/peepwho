@@ -5,9 +5,27 @@ The Mac and iPhone apps call the Go core in `core/` through gomobile, bound as t
 argument to `CoreOpen`, and source tokens come through a `CoreSecrets` the host sets on the
 handle. `make core-deps` fails if the core ever links the command line or a keychain.
 
+## Layout
+
+`mac/` is one Swift package. `PeepwhoKit` is the library both apps share: the Keychain,
+security-scoped bookmarks, the `CoreSecrets` that reads the Keychain, and `Core`, which
+runs every core call off the main thread and decodes its JSON into Swift types. `Host` is
+the test host below. `Peepwho` is the menu bar app. The `PeepwhoKitTests` decode one saved
+answer per core call from `core/testdata/swift`, which the Go test `TestSwiftFixtures`
+writes and checks, so a field renamed in Go fails in Go first and then in Swift:
+
+```sh
+go test ./core -run TestSwiftFixtures -update-swift
+make -C mac test
+```
+
+The two apps share nothing at run time. Each keeps its Keychain items under its own bundle
+id and its index in its own container, and neither can read the command line's
+`~/.peepwho`.
+
 ## The test host
 
-`mac/Host` is a small sandboxed SwiftUI app that proves, against the real framework, the
+`mac/Sources/Host` is a small sandboxed SwiftUI app that proves, against the real framework, the
 things a sandboxed app needs before it can ship:
 
 - A folder or file the user picked survives a relaunch as a security-scoped bookmark, and
@@ -24,13 +42,13 @@ separate from the command line's `~/.peepwho`.
 ## Build
 
 ```sh
-make host
+make mac
 ```
 
-This binds the core into `mac/Host/Frameworks/` and builds `mac/Host/.build/Host.app`,
-signed with the personal Developer ID so Keychain items keep their access across rebuilds.
-Pass `SIGN_ID=-` to `make -C mac/Host app` for an ad hoc build; Keychain checks need the
-Developer ID build.
+This binds the core into `mac/Frameworks/` and builds `mac/.build/Host.app` and
+`mac/.build/Peepwho.app`, signed with the personal Developer ID so Keychain items keep their
+access across rebuilds. `make host` is the same target. Pass `SIGN_ID=-` to `make -C mac host
+app` for an ad hoc build; Keychain checks need the Developer ID build.
 
 ## Run the checks
 
@@ -46,7 +64,7 @@ Grant a repository folder and a CSV once, through the window's buttons or by ope
 with the app, which grants the same access:
 
 ```sh
-open -g -a mac/Host/.build/Host.app ~/src/some-repo examples/people.csv
+open -g -a mac/.build/Host.app ~/src/some-repo examples/people.csv
 ```
 
 Every launch then resolves both bookmarks, indexes them, asks a fixed question, and
@@ -64,11 +82,11 @@ For the token check, `go run ./mac/Host/fakejira -addr 127.0.0.1:18080` serves a
 Server site that accepts only the bearer token `good`. Then:
 
 ```sh
-open -g -a mac/Host/.build/Host.app --args \
+open -g -a mac/.build/Host.app --args \
   --save-jira http://127.0.0.1:18080 me@example.invalid good KAFKA server --quit
-open -g -a mac/Host/.build/Host.app --args --quit
-open -g -a mac/Host/.build/Host.app --args --forget-token --refresh --quit
-open -g -a mac/Host/.build/Host.app --args --wipe --quit
+open -g -a mac/.build/Host.app --args --quit
+open -g -a mac/.build/Host.app --args --forget-token --refresh --quit
+open -g -a mac/.build/Host.app --args --wipe --quit
 ```
 
 The second launch refreshes Jira with the token read back from the Keychain. The third

@@ -1,0 +1,50 @@
+{
+  "episodes": [
+    {
+      "id": "github:corp/billing-service:412",
+      "kind": "change",
+      "matched": [
+        "bill",
+        "retri"
+      ],
+      "people": [],
+      "permalink": "https://github.com/corp/billing-service/pull/412",
+      "place": "corp/billing-service",
+      "source": "github",
+      "strength": 1,
+      "when": "2026-11-03T02:43:20Z"
+    },
+    {
+      "id": "pagerduty:PINC1",
+      "kind": "incident",
+      "matched": [
+        "bill"
+      ],
+      "people": [
+        {
+          "email": "grace@corp.com",
+          "name": "Grace Kim",
+          "title": "Site Reliability Engineer"
+        }
+      ],
+      "permalink": "https://corp.pagerduty.com/incidents/PINC1",
+      "place": "Billing API",
+      "source": "pagerduty",
+      "strength": 0.5,
+      "when": "2026-10-06T01:43:20Z"
+    }
+  ],
+  "person": "angela@corp.com",
+  "query": "billing retries",
+  "scope": {
+    "episodes": 6,
+    "note": "Covers what peepwho has indexed from github, jira, pagerduty, and slack, within each source's history window. Slack covers channels the bot can read; direct messages are not indexed.",
+    "oldest": "2026-08-07",
+    "sources": [
+      "github",
+      "jira",
+      "pagerduty",
+      "slack"
+    ]
+  }
+}

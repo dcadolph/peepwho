@@ -1,0 +1,22 @@
+{
+  "query": "angela",
+  "results": [
+    {
+      "email": "angela@corp.com",
+      "id": "angela@corp.com",
+      "kind": "person",
+      "matched": [
+        "name",
+        "email"
+      ],
+      "name": "Angela Malone",
+      "score": 60,
+      "team": "Payments",
+      "title": "Staff Engineer",
+      "topics": [
+        "billing",
+        "retries"
+      ]
+    }
+  ]
+}
