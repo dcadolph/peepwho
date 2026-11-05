@@ -18,9 +18,7 @@ final class HostModel: ObservableObject {
     private let logger = Logger(subsystem: "com.dcadolph.peepwho.host", category: "host")
 
     // dataDir is the data directory inside the app's sandbox container.
-    let dataDir: URL = FileManager.default
-        .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("peepwho", isDirectory: true)
+    let dataDir = DataDir.url
 
     // query is the fixed question asked after each launch index.
     static let query = "packfile"

@@ -5,12 +5,7 @@ import Testing
 
 // fixture reads one core answer the Go test TestSwiftFixtures wrote under core/testdata/swift.
 func fixture(_ name: String) throws -> String {
-    let root = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-    let url = root.appendingPathComponent("core/testdata/swift/\(name).json")
+    let url = repoRoot.appendingPathComponent("core/testdata/swift/\(name).json")
     return try String(contentsOf: url, encoding: .utf8)
 }
 
