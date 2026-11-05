@@ -125,7 +125,7 @@ func SlackServer() *httptest.Server {
 	})
 	mux.HandleFunc("/auth.test", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, map[string]any{
-			"ok": true, "user_id": "U0", "url": "https://corp.slack.com/", "team": "Corp",
+			"ok": true, "user_id": "U0", "url": "https://corp.slack.com/", "team": "Corp", "team_id": "T0",
 		})
 	})
 	mux.HandleFunc("/conversations.replies", func(w http.ResponseWriter, r *http.Request) {
