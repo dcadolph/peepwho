@@ -1,9 +1,20 @@
-# peepwho
+<p align="center">
+  <img src="docs/banner.svg" width="100%" alt="The peepwho owl, a white owl shaped like a keyhole">
+</p>
 
-[![CI][ci-badge]][ci]
+<h1 align="center">peepwho</h1>
 
-[ci-badge]: https://github.com/dcadolph/peepwho/actions/workflows/ci.yml/badge.svg
-[ci]: https://github.com/dcadolph/peepwho/actions/workflows/ci.yml
+<p align="center">
+  <a href="https://peepwho.app"><img src="https://img.shields.io/badge/peepwho.app-Get_started-8B4A1C?style=for-the-badge" alt="peepwho.app: Get started"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/dcadolph/peepwho/actions/workflows/ci.yml"><img src="https://github.com/dcadolph/peepwho/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/dcadolph/peepwho/releases/latest"><img src="https://img.shields.io/github/v/release/dcadolph/peepwho?color=8B4A1C" alt="Latest release"></a>
+  <a href="https://github.com/dcadolph/homebrew-tap"><img src="https://img.shields.io/badge/homebrew-dcadolph%2Ftap%2Fpeepwho-FBB040?logo=homebrew&logoColor=white" alt="Homebrew: dcadolph/tap/peepwho"></a>
+  <img src="https://img.shields.io/badge/go-1.26-00ADD8?logo=go&logoColor=white" alt="Go 1.26">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8B4A1C" alt="License: MIT"></a>
+</p>
 
 Know who knows. peepwho reads the tools your team already works in and answers a plain question
 with the people and channels to ask, the reasons for each, and how strong the match is. It also
