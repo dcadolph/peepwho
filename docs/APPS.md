@@ -23,6 +23,56 @@ The two apps share nothing at run time. Each keeps its Keychain items under its 
 id and its index in its own container, and neither can read the command line's
 `~/.peepwho`.
 
+## The menu bar app
+
+`mac/Sources/Peepwho` is the Mac app, a menu bar item with no Dock icon. Typing in its search
+field asks who to talk to, and Enter opens a Slack DM with the first person, or shows them
+when the index has no Slack link for them. Clicking a person shows what the index knows
+about them. Above the results it lists who and what
+joined or left since the menu last closed.
+
+Settings holds the tokens, Jira and Confluence sites, and scopes for each source, and the
+git folder, org chart CSV, and CODEOWNERS file it reads. Tokens go to the app's Keychain
+under the same names the command line reads from the environment. Index Now reads every
+source set up, Refresh Now replays every scope indexed before, and Wipe deletes the index.
+Tokens and picked folders stay until forgotten one by one.
+
+The app refreshes on its own when the index is older than six hours: when the menu opens,
+when the Mac wakes, and on a timer while it runs. A failed refresh waits a full interval
+before it runs again. The interval is a default in seconds:
+
+```sh
+defaults write com.dcadolph.peepwho PeepwhoRefreshIntervalSeconds -int 3600
+```
+
+The index lives in
+`~/Library/Containers/com.dcadolph.peepwho/Data/Library/Application Support/peepwho`, sealed
+with a key the app makes on first launch and keeps in its Keychain. It is the app's own
+index, and the sandbox keeps it from reading the command line's `~/.peepwho`.
+
+## Release the app
+
+The app carries its own version, `CFBundleShortVersionString` in
+`mac/Sources/Peepwho/Info.plist`, and an integer `CFBundleVersion` that goes up with every
+build shipped. The notarized disk image is attached to the current command line release.
+`NOTARY_PROFILE` names a `notarytool store-credentials` profile for the signing team.
+
+```sh
+make mac
+ditto -c -k --keepParent mac/.build/Peepwho.app mac/.build/Peepwho.zip
+xcrun notarytool submit mac/.build/Peepwho.zip --keychain-profile "$NOTARY_PROFILE" --wait
+xcrun stapler staple mac/.build/Peepwho.app
+make -C mac dmg
+xcrun notarytool submit mac/.build/Peepwho.dmg --keychain-profile "$NOTARY_PROFILE" --wait
+xcrun stapler staple mac/.build/Peepwho.dmg
+xcrun stapler validate mac/.build/Peepwho.app
+xcrun stapler validate mac/.build/Peepwho.dmg
+spctl --assess --type open --context context:primary-signature -v mac/.build/Peepwho.dmg
+```
+
+`make -C mac dmg` packs the app already built and never rebuilds it, so the stapled app
+keeps its ticket inside the image.
+
 ## The test host
 
 `mac/Sources/Host` is a small sandboxed SwiftUI app that proves, against the real framework, the
