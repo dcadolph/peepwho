@@ -1,14 +1,17 @@
 import Foundation
 import PeepwhoCore
 
-// Core is an opened data directory with typed, async calls. Every call runs on one serial queue
-// off the main thread, so the interface never blocks and a refresh never overlaps an index. The
-// handle answers questions from the old index while a refresh builds the new one.
+// Core is an opened data directory with typed, async calls off the main thread. Questions run on
+// a concurrent queue and Index and Refresh on a serial one, so a refresh never overlaps an index
+// and a question never waits behind either: the handle answers from the old index while a
+// refresh builds the new one.
 public final class Core: @unchecked Sendable {
     // handle is the bound Go handle every call goes through.
     private let handle: CoreHandle
-    // queue runs every call in order off the main thread.
-    private let queue = DispatchQueue(label: "com.dcadolph.peepwho.core")
+    // reads runs questions, several at once.
+    private let reads = DispatchQueue(label: "com.dcadolph.peepwho.core.reads", attributes: .concurrent)
+    // writes runs Index and Refresh one at a time.
+    private let writes = DispatchQueue(label: "com.dcadolph.peepwho.core.writes")
 
     // init wraps a handle already opened.
     private init(handle: CoreHandle) {
@@ -66,19 +69,20 @@ public final class Core: @unchecked Sendable {
     // index reads one source with the command line's index flags and merges it into the index.
     public func index(_ source: String, flags: [String], now: Date = Date()) async throws -> IndexResult {
         let joined = flags.joined(separator: "\n")
-        return try await run { self.handle.index(source, flags: joined, nowUnix: Self.unix(now), error: $0) }
+        return try await run(on: writes) { self.handle.index(source, flags: joined, nowUnix: Self.unix(now), error: $0) }
     }
 
     // refresh replays every recorded run of sources, or of every source when sources is empty.
     public func refresh(_ sources: [String] = [], now: Date = Date()) async throws -> RefreshResult {
         let joined = sources.joined(separator: ",")
-        return try await run { self.handle.refresh(joined, nowUnix: Self.unix(now), error: $0) }
+        return try await run(on: writes) { self.handle.refresh(joined, nowUnix: Self.unix(now), error: $0) }
     }
 
-    // run calls body on the queue and decodes its JSON answer.
-    private func run<T: Decodable>(_ body: @escaping (NSErrorPointer) -> String) async throws -> T {
+    // run calls body on queue, the read queue unless given, and decodes its JSON answer.
+    private func run<T: Decodable>(on queue: DispatchQueue? = nil,
+                                   _ body: @escaping (NSErrorPointer) -> String) async throws -> T {
         try await withCheckedThrowingContinuation { cont in
-            queue.async {
+            (queue ?? reads).async {
                 var err: NSError?
                 let raw = body(&err)
                 if let err {

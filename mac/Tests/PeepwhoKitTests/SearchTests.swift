@@ -119,3 +119,33 @@ struct SearchTests {
         #expect(opened.urls.isEmpty)
     }
 }
+
+// ConcurrencyTests check that a question never waits behind an index run.
+struct ConcurrencyTests {
+    // Test 0: An ask started after a long index run starts finishes before it.
+    @Test func askDuringIndex() async throws {
+        let dir = try demoDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let core = try Core.open(dir: dir, key: "", secrets: KeychainSecrets())
+        let order = Order()
+        let index = Task {
+            _ = try await core.index("git", flags: ["--repo-path", repoRoot.path, "--git-since-days", "10000"])
+            await order.add("index")
+        }
+        try await Task.sleep(for: .milliseconds(100))
+        let answer = try await core.ask("terraform")
+        await order.add("ask")
+        try await index.value
+        #expect(answer.people?.first?.name == "Carol Lee")
+        #expect(await order.names == ["ask", "index"])
+    }
+}
+
+// Order records the order tasks finish in.
+actor Order {
+    // names are the finished tasks, first first.
+    var names: [String] = []
+
+    // add records name as finished.
+    func add(_ name: String) { names.append(name) }
+}
