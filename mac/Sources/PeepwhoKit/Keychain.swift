@@ -9,29 +9,48 @@ public enum Keychain {
     // two apps built from this package never read each other's items.
     static let service = Bundle.main.bundleIdentifier ?? "com.dcadolph.peepwho"
 
-    // get returns the secret stored under name, or nil when there is none.
-    public static func get(_ name: String) -> String? {
+    // read returns the secret stored under name and nil only when the Keychain says there is none.
+    // A locked Keychain or a denied prompt throws, so a caller never takes a failure for absence.
+    public static func read(_ name: String) throws -> String? {
         var query = baseQuery(name)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
-              let data = result as? Data
-        else {
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound {
             return nil
         }
-        return String(data: data, encoding: .utf8)
-    }
-
-    // set replaces the secret stored under name.
-    public static func set(_ name: String, _ value: String) throws {
-        SecItemDelete(baseQuery(name) as CFDictionary)
-        var item = baseQuery(name)
-        item[kSecValueData as String] = Data(value.utf8)
-        item[kSecAttrLabel as String] = "\(service) \(name)"
-        let status = SecItemAdd(item as CFDictionary, nil)
         guard status == errSecSuccess else {
             throw KeychainError(status: status)
+        }
+        guard let data = result as? Data, let value = String(data: data, encoding: .utf8) else {
+            throw KeychainError(status: errSecDecode)
+        }
+        return value
+    }
+
+    // get returns the secret stored under name, or nil when there is none or it cannot be read.
+    public static func get(_ name: String) -> String? {
+        try? read(name)
+    }
+
+    // set replaces the secret stored under name in place, so a failed write keeps the old value.
+    public static func set(_ name: String, _ value: String) throws {
+        let data = Data(value.utf8)
+        let update = [kSecValueData as String: data]
+        let updated = SecItemUpdate(baseQuery(name) as CFDictionary, update as CFDictionary)
+        if updated == errSecSuccess {
+            return
+        }
+        guard updated == errSecItemNotFound else {
+            throw KeychainError(status: updated)
+        }
+        var item = baseQuery(name)
+        item[kSecValueData as String] = data
+        item[kSecAttrLabel as String] = "\(service) \(name)"
+        let added = SecItemAdd(item as CFDictionary, nil)
+        guard added == errSecSuccess else {
+            throw KeychainError(status: added)
         }
     }
 

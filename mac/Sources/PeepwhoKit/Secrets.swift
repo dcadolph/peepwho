@@ -38,9 +38,12 @@ public final class KeychainSecrets: NSObject, CoreSecretsProtocol {
 
 // IndexKey reads the data directory's key from the Keychain, making and saving one the first time.
 public enum IndexKey {
-    // load returns the stored key, or a new random 32-byte key saved to the Keychain first.
-    public static func load() throws -> String {
-        if let stored = Keychain.get(SecretName.indexKey) {
+    // load returns the stored key, or a new random 32-byte key saved first when the store says it
+    // has none. A failed read throws and writes nothing, since replacing a key the Keychain only
+    // refused to hand over would lock the index forever.
+    public static func load(read: (String) throws -> String? = Keychain.read,
+                            write: (String, String) throws -> Void = Keychain.set) throws -> String {
+        if let stored = try read(SecretName.indexKey) {
             return stored
         }
         var raw = Data(count: 32)
@@ -51,7 +54,7 @@ public enum IndexKey {
             throw KeychainError(status: status)
         }
         let key = raw.base64EncodedString()
-        try Keychain.set(SecretName.indexKey, key)
+        try write(SecretName.indexKey, key)
         return key
     }
 }

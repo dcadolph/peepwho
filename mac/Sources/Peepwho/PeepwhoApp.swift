@@ -11,7 +11,10 @@ struct PeepwhoApp: App {
     // body declares the menu bar item and the settings window.
     var body: some Scene {
         MenuBarExtra("peepwho", systemImage: "person.2") {
-            SearchView(model: app.search) { await app.settings.refreshIfStale() }
+            SearchView(model: app.search) {
+                app.settings.reopenIfClosed()
+                await app.settings.refreshIfStale()
+            }
         }
         .menuBarExtraStyle(.window)
         Settings {
@@ -51,7 +54,10 @@ final class AppModel: ObservableObject {
         wake = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in await self?.settings.refreshIfStale() }
+            Task { @MainActor in
+                self?.settings.reopenIfClosed()
+                await self?.settings.refreshIfStale()
+            }
         }
     }
 }

@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import Testing
 
 @testable import PeepwhoKit
@@ -178,5 +179,35 @@ struct SettingsTests {
         #expect(model.lines == ["Nothing to index yet. Pick a folder or add a token first."])
         await model.refresh()
         #expect(model.lines == ["Nothing to refresh yet. Index something first."])
+    }
+
+    // Test 5: An open that failed, such as under a locked Keychain, opens on the next try, hands
+    // the search the core, and clears the failure.
+    @Test func reopenAfterFailure() throws {
+        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let dir = tempDir("peepwho-data")
+        var locked = true
+        let model = SettingsModel(dir: dir, open: {
+            if locked { throw KeychainError(status: errSecInteractionNotAllowed) }
+            return try Core.open(dir: dir, key: "", secrets: KeychainSecrets())
+        }, secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
+        var handed: [Core?] = []
+        model.onCore = { handed.append($0) }
+        #expect(model.core == nil)
+        #expect(model.lines.first?.hasPrefix("The index did not open") == true)
+
+        model.reopenIfClosed()
+        #expect(model.core == nil)
+        #expect(model.lines.first?.hasPrefix("The index did not open") == true)
+
+        locked = false
+        model.reopenIfClosed()
+        #expect(model.core != nil)
+        #expect(model.lines.isEmpty)
+        #expect(handed.last! != nil)
+
+        handed = []
+        model.reopenIfClosed()
+        #expect(handed.isEmpty)
     }
 }

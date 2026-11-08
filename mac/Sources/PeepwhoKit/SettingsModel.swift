@@ -261,6 +261,17 @@ public final class SettingsModel: ObservableObject {
         return stored > 0 ? stored : Self.defaultInterval
     }
 
+    // reopenIfClosed tries the data directory again after an open that failed, such as under a
+    // locked Keychain. The menu opening and the Mac waking call it, and the timer does not, so a
+    // Keychain prompt never repeats on its own.
+    public func reopenIfClosed() {
+        guard core == nil, busy == nil else { return }
+        reopen()
+        if core != nil {
+            lines = []
+        }
+    }
+
     // refreshIfStale refreshes when the index at now is older than the interval and no refresh
     // started within the interval, and reports whether it refreshed. The menu opening, the Mac
     // waking, and the timer all call it.
