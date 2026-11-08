@@ -1,7 +1,7 @@
 import Foundation
 
 // Scopes holds what each token source reads, which the user types once and refresh replays.
-public struct Scopes: Equatable, Sendable {
+public struct Scopes: Equatable, Sendable, Codable {
     // githubRepos are owner/name repositories, comma separated.
     public var githubRepos = ""
     // githubOrg is an org to read every repository of, used when githubRepos is empty.
@@ -18,26 +18,17 @@ public struct Scopes: Equatable, Sendable {
     // init makes empty scopes.
     public init() {}
 
-    // load reads the scopes saved in defaults.
-    public static func load(_ defaults: UserDefaults) -> Scopes {
-        var s = Scopes()
-        s.githubRepos = defaults.string(forKey: "scope.githubRepos") ?? ""
-        s.githubOrg = defaults.string(forKey: "scope.githubOrg") ?? ""
-        s.jiraProjects = defaults.string(forKey: "scope.jiraProjects") ?? ""
-        s.jiraServer = defaults.bool(forKey: "scope.jiraServer")
-        s.confluenceSpaces = defaults.string(forKey: "scope.confluenceSpaces") ?? ""
-        s.confluenceServer = defaults.bool(forKey: "scope.confluenceServer")
-        return s
+    // load reads the scopes saved in secrets. Nothing saved, or nothing readable, is empty scopes.
+    public static func load(_ secrets: SecretStore) -> Scopes {
+        guard let text = secrets.get(SecretName.scopes),
+              let scopes = try? JSONDecoder().decode(Scopes.self, from: Data(text.utf8)) else { return Scopes() }
+        return scopes
     }
 
-    // save writes the scopes to defaults.
-    public func save(_ defaults: UserDefaults) {
-        defaults.set(githubRepos, forKey: "scope.githubRepos")
-        defaults.set(githubOrg, forKey: "scope.githubOrg")
-        defaults.set(jiraProjects, forKey: "scope.jiraProjects")
-        defaults.set(jiraServer, forKey: "scope.jiraServer")
-        defaults.set(confluenceSpaces, forKey: "scope.confluenceSpaces")
-        defaults.set(confluenceServer, forKey: "scope.confluenceServer")
+    // save writes the scopes to secrets. They name the repositories, projects, and spaces a person
+    // reads, so they stay out of the plain preferences file beside the sealed index.
+    public func save(_ secrets: SecretStore) throws {
+        try secrets.set(SecretName.scopes, String(decoding: try JSONEncoder().encode(self), as: UTF8.self))
     }
 }
 
@@ -178,7 +169,7 @@ public final class SettingsModel: ObservableObject {
     @Published public private(set) var placeNames: [BookmarkSlot: String] = [:]
     // scopes are what the token sources read, saved on every change.
     @Published public var scopes: Scopes {
-        didSet { scopes.save(defaults) }
+        didSet { saveScopes() }
     }
     // core is the open data directory, nil when it did not open.
     public private(set) var core: Core?
@@ -198,7 +189,7 @@ public final class SettingsModel: ObservableObject {
     private let secrets: SecretStore
     // places stores the picked folders and files.
     private let places: PlaceStore
-    // defaults stores the scopes.
+    // defaults stores the refresh interval.
     private let defaults: UserDefaults
     // sampleDir is the sample company the app bundles, nil when it has none.
     private let sampleDir: URL?
@@ -212,9 +203,18 @@ public final class SettingsModel: ObservableObject {
         self.secrets = secrets
         self.places = places
         self.defaults = defaults
-        scopes = Scopes.load(defaults)
+        scopes = Scopes.load(secrets)
         reopen()
         readSaved()
+    }
+
+    // saveScopes keeps the scopes in the secret store, or says why it could not.
+    private func saveScopes() {
+        do {
+            try scopes.save(secrets)
+        } catch {
+            lines = ["Could not save to the Keychain: \(error)."]
+        }
     }
 
     // saveSecret stores value under name, or deletes the secret when value is empty.

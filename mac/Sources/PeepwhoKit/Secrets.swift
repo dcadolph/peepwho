@@ -24,6 +24,8 @@ public enum SecretName {
     public static let confluenceToken = "PEEPWHO_CONFLUENCE_TOKEN"
     // pagerdutyToken holds the PagerDuty API token.
     public static let pagerdutyToken = "PEEPWHO_PAGERDUTY_TOKEN"
+    // scopes holds what each token source reads, as JSON. The core never asks for it.
+    public static let scopes = "PEEPWHO_APP_SCOPES"
 }
 
 // KeychainSecrets hands the core the app's Keychain items by name, so the core reads tokens

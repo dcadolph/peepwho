@@ -19,6 +19,18 @@ final class MemorySecrets: SecretStore {
     func delete(_ name: String) { values[name] = nil }
 }
 
+// RefusingSecrets holds nothing and refuses every write, like a Keychain that says no.
+final class RefusingSecrets: SecretStore {
+    // get finds nothing.
+    func get(_ name: String) -> String? { nil }
+
+    // set refuses.
+    func set(_ name: String, _ value: String) throws { throw KeychainError(status: errSecAuthFailed) }
+
+    // delete does nothing.
+    func delete(_ name: String) {}
+}
+
 // MemoryPlaces keeps places in a dictionary and counts access, so a test sees every resolve
 // matched by a release.
 final class MemoryPlaces: PlaceStore {
@@ -195,7 +207,56 @@ struct SettingsTests {
         model.saveSecret(SecretName.slackToken, "")
         #expect(!model.has(SecretName.slackToken))
         model.scopes.jiraProjects = "KAFKA"
-        #expect(Scopes.load(defaults).jiraProjects == "KAFKA")
+        #expect(Scopes.load(secrets).jiraProjects == "KAFKA")
+    }
+
+    // Test 10: Scopes live in the secret store and never in preferences, and a stored value that
+    // does not decode reads as empty scopes.
+    @Test func scopesStayOutOfPreferences() throws {
+        let planted = "PLANTED-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let secrets = MemorySecrets()
+        let model = SettingsModel(dir: tempDir("peepwho-data"), open: { try Core.open(dir: tempDir("x"), key: "", secrets: KeychainSecrets()) },
+                                  secrets: secrets, places: MemoryPlaces(), defaults: defaults)
+        model.scopes.jiraProjects = planted
+        model.scopes.jiraServer = true
+        #expect(secrets.values[SecretName.scopes]?.contains(planted) == true)
+        for store in [defaults, UserDefaults.standard] {
+            #expect(!String(describing: store.dictionaryRepresentation()).contains(planted))
+        }
+        let back = Scopes.load(secrets)
+        #expect(back == model.scopes)
+        secrets.values[SecretName.scopes] = "{"
+        #expect(Scopes.load(secrets) == Scopes())
+    }
+
+    // Test 11: A failed scope save says so instead of dropping it in silence.
+    @Test func scopeSaveFailureShows() throws {
+        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let secrets = RefusingSecrets()
+        let model = SettingsModel(dir: tempDir("peepwho-data"), open: { try Core.open(dir: tempDir("x"), key: "", secrets: KeychainSecrets()) },
+                                  secrets: secrets, places: MemoryPlaces(), defaults: defaults)
+        model.scopes.jiraProjects = "KAFKA"
+        #expect(model.lines.first?.hasPrefix("Could not save to the Keychain") == true)
+    }
+
+    // Test 12: A bookmark lives in the secret store and never in preferences, resolves back to
+    // its place, and forgetting it leaves nothing.
+    @Test func bookmarksStayOutOfPreferences() throws {
+        let place = tempDir("peepwho-place-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: place, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: place) }
+        let secrets = MemorySecrets()
+        try Bookmarks.save(place, in: .git, store: secrets)
+        #expect(Bookmarks.has(.git, store: secrets))
+        #expect(secrets.values[BookmarkSlot.git.storeKey] != nil)
+        #expect(UserDefaults.standard.object(forKey: BookmarkSlot.git.storeKey) == nil)
+        let resolved = try #require(try Bookmarks.resolve(.git, store: secrets))
+        defer { resolved.url.stopAccessingSecurityScopedResource() }
+        #expect(resolved.url.resolvingSymlinksInPath().path == place.resolvingSymlinksInPath().path)
+        Bookmarks.forget(.git, store: secrets)
+        #expect(!Bookmarks.has(.git, store: secrets))
+        #expect(try Bookmarks.resolve(.git, store: secrets) == nil)
     }
 
     // Test 3: A picked repo indexes, refreshes with access held, and a wipe leaves no directory

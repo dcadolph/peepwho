@@ -9,8 +9,8 @@ public enum BookmarkSlot: String, CaseIterable, Sendable {
     // codeowners is the CODEOWNERS file the codeowners source reads.
     case codeowners
 
-    // defaultsKey is the UserDefaults key the bookmark data lives under.
-    public var defaultsKey: String { "bookmark.\(rawValue)" }
+    // storeKey is the name the bookmark lives under in the secret store.
+    public var storeKey: String { "bookmark.\(rawValue)" }
 }
 
 // Resolved is a bookmark turned back into a URL the sandbox lets the host read.
@@ -21,28 +21,29 @@ public struct Resolved {
     public let stale: Bool
 }
 
-// Bookmarks stores security-scoped bookmarks in UserDefaults so access to a folder or file the
-// user picked survives a relaunch without another open panel.
+// Bookmarks stores security-scoped bookmarks in the secret store so access to a folder or file the
+// user picked survives a relaunch without another open panel. A bookmark carries the path it
+// points at, so it stays out of the plain preferences file beside the sealed index.
 public enum Bookmarks {
     // save makes an app-scoped bookmark for url and stores it in slot.
-    public static func save(_ url: URL, in slot: BookmarkSlot) throws {
+    public static func save(_ url: URL, in slot: BookmarkSlot, store: SecretStore = KeychainStore()) throws {
         let data = try url.bookmarkData(
             options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess],
             includingResourceValuesForKeys: nil,
             relativeTo: nil
         )
-        UserDefaults.standard.set(data, forKey: slot.defaultsKey)
+        try store.set(slot.storeKey, data.base64EncodedString())
     }
 
     // has reports whether slot holds a bookmark.
-    public static func has(_ slot: BookmarkSlot) -> Bool {
-        UserDefaults.standard.data(forKey: slot.defaultsKey) != nil
+    public static func has(_ slot: BookmarkSlot, store: SecretStore = KeychainStore()) -> Bool {
+        store.get(slot.storeKey) != nil
     }
 
     // resolve turns slot's bookmark back into a URL and starts access to it. A stale bookmark is
     // saved again from the resolved URL. It returns nil when slot holds no bookmark.
-    public static func resolve(_ slot: BookmarkSlot) throws -> Resolved? {
-        guard let data = UserDefaults.standard.data(forKey: slot.defaultsKey) else {
+    public static func resolve(_ slot: BookmarkSlot, store: SecretStore = KeychainStore()) throws -> Resolved? {
+        guard let text = store.get(slot.storeKey), let data = Data(base64Encoded: text) else {
             return nil
         }
         var stale = false
@@ -56,14 +57,14 @@ public enum Bookmarks {
             throw BookmarkError.noAccess(slot)
         }
         if stale {
-            try save(url, in: slot)
+            try save(url, in: slot, store: store)
         }
         return Resolved(url: url, stale: stale)
     }
 
     // forget removes slot's bookmark.
-    public static func forget(_ slot: BookmarkSlot) {
-        UserDefaults.standard.removeObject(forKey: slot.defaultsKey)
+    public static func forget(_ slot: BookmarkSlot, store: SecretStore = KeychainStore()) {
+        store.delete(slot.storeKey)
     }
 }
 

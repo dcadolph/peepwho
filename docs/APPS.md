@@ -33,7 +33,8 @@ joined or left since the menu last closed.
 
 Settings holds the tokens, Jira and Confluence sites, and scopes for each source, and the
 git folder, org chart CSV, and CODEOWNERS file it reads. Tokens go to the app's Keychain
-under the same names the command line reads from the environment. Index Now reads every
+under the same names the command line reads from the environment. Scopes and picked places
+go there too, since they name what a person reads and the preferences file is plain. Index Now reads every
 source set up, Refresh Now replays every scope indexed before, and Wipe deletes the index.
 Tokens and picked folders stay until forgotten one by one.
 

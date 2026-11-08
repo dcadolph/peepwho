@@ -39,7 +39,7 @@ public protocol PlaceStore {
     func has(_ slot: BookmarkSlot) -> Bool
 }
 
-// BookmarkStore keeps places as security-scoped bookmarks in UserDefaults.
+// BookmarkStore keeps places as security-scoped bookmarks in the Keychain.
 public struct BookmarkStore: PlaceStore {
     // init makes a store over the app's bookmarks.
     public init() {}
