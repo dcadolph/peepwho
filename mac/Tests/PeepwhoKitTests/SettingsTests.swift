@@ -486,6 +486,163 @@ struct SettingsTests {
         #expect(model.lines == ["git: indexed repo:\(repo.path)."])
     }
 
+    // Test 11: Picking a new place into a slot stops refreshing the old one, and a place that went
+    // away shows in the menu after an automatic refresh, until picking another clears it.
+    @Test func replacedPlaceStopsRefreshing() async throws {
+        let (first, second) = (try gitRepo(), try gitRepo())
+        let dir = tempDir("peepwho-data")
+        defer {
+            try? FileManager.default.removeItem(at: first)
+            try? FileManager.default.removeItem(at: second)
+            try? FileManager.default.removeItem(at: dir)
+        }
+        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        defaults.set(60.0, forKey: SettingsModel.intervalKey)
+        let places = MemoryPlaces()
+        let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+                                  secrets: MemorySecrets(), places: places, defaults: defaults)
+        var heard: [String?] = []
+        model.onRefreshFailure = { heard.append($0) }
+
+        await model.pick(first, as: .git)
+        #expect(model.refreshFailure == nil)
+        try FileManager.default.removeItem(at: first)
+        #expect(await model.refreshIfStale(now: Date().addingTimeInterval(3600)))
+        let failure = "Last refresh failed for git. Open Settings to see why."
+        #expect(model.refreshFailure == failure)
+        #expect(heard.last == failure)
+        #expect(!(model.refreshFailure ?? "").contains(first.path))
+
+        await model.pick(second, as: .git)
+        #expect(model.status?.scopes.map(\.scope) == ["repo:\(second.path)"])
+        #expect(model.refreshFailure == nil)
+        #expect(heard.last == .some(nil))
+        await model.refresh()
+        #expect(model.lines == ["git: refreshed repo:\(second.path)."])
+    }
+
+    // Test 12: Forget stops refreshing the place, leaves the index, refuses while a run is going,
+    // and refresh then says there is nothing to do.
+    @Test func forgetStopsRefreshing() async throws {
+        let repo = try gitRepo()
+        let dir = tempDir("peepwho-data")
+        defer {
+            try? FileManager.default.removeItem(at: repo)
+            try? FileManager.default.removeItem(at: dir)
+        }
+        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let places = MemoryPlaces()
+        let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+                                  secrets: MemorySecrets(), places: places, defaults: defaults)
+        await model.pick(repo, as: .git)
+        #expect(model.status?.scopes.count == 1)
+
+        async let running: Void = model.indexAll()
+        while model.busy == nil { await Task.yield() }
+        await model.forgetPlace(.git)
+        #expect(model.lines.first?.hasSuffix("is still running. Try again when it finishes.") == true)
+        #expect(places.has(.git))
+        await running
+
+        await model.forgetPlace(.git)
+        #expect(model.placeNames[.git] == nil)
+        #expect(!places.has(.git))
+        #expect(model.status?.scopes.isEmpty == true)
+        #expect((model.status?.people ?? 0) > 0)
+        await model.refresh()
+        #expect(model.lines == ["Nothing to refresh: index a source at least once first."])
+    }
+
+    // Test 17: A new pick that fails to index still stops refreshing the place it replaced, since
+    // the slot no longer holds access to it.
+    @Test func failedPickDropsOldScope() async throws {
+        let first = try gitRepo()
+        let dir = tempDir("peepwho-data")
+        defer {
+            try? FileManager.default.removeItem(at: first)
+            try? FileManager.default.removeItem(at: dir)
+        }
+        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+                                  secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
+        await model.pick(first, as: .git)
+        #expect(model.status?.scopes.count == 1)
+        await model.pick(tempDir("peepwho-missing"), as: .git)
+        #expect(model.lines.first?.hasPrefix("git: indexed") == false)
+        #expect(model.status?.scopes.isEmpty == true)
+    }
+
+    // Test 15: Indexing again keeps only what this run read, so a scope changed in Settings stops
+    // being read on refresh.
+    @Test func indexReplacesOldScope() async throws {
+        let (first, second) = (try gitRepo(), try gitRepo())
+        let dir = tempDir("peepwho-data")
+        defer {
+            try? FileManager.default.removeItem(at: first)
+            try? FileManager.default.removeItem(at: second)
+            try? FileManager.default.removeItem(at: dir)
+        }
+        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let places = MemoryPlaces()
+        let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+                                  secrets: MemorySecrets(), places: places, defaults: defaults)
+        await model.pick(first, as: .git)
+        places.urls[.git] = second
+        await model.indexAll()
+        #expect(model.status?.scopes.map(\.scope) == ["repo:\(second.path)"])
+    }
+
+    // Test 16: The menu names sources that failed, once each and in order, leaves out a source
+    // missing a secret it needs, and says nothing when none failed.
+    @Test func refreshFailureNames() {
+        func scope(_ source: String, _ name: String, error: String? = nil) -> IndexScope {
+            IndexScope(source: source, scope: name, ranAt: nil, ageSeconds: 0, attemptedAt: nil, error: error)
+        }
+        let jira = [SecretName.jiraURL, SecretName.jiraToken]
+        #expect(SettingsModel.refreshFailure([], saved: []) == nil)
+        #expect(SettingsModel.refreshFailure([scope("git", "repo:/a")], saved: []) == nil)
+        #expect(SettingsModel.refreshFailure([scope("git", "repo:/a", error: "lost")], saved: [])
+            == "Last refresh failed for git. Open Settings to see why.")
+        let two = [scope("jira", "project:A", error: "401"), scope("jira", "project:B", error: "401"),
+                   scope("git", "repo:/a", error: "lost")]
+        #expect(SettingsModel.refreshFailure(two, saved: Set(jira))
+            == "Last refresh failed for git, jira. Open Settings to see why.")
+        #expect(SettingsModel.refreshFailure([scope("jira", "project:A", error: "no token")],
+                                             saved: [SecretName.jiraURL]) == nil)
+        for source in ["slack", "github", "jira", "confluence", "pagerduty"] {
+            #expect(!SecretName.required(by: source).isEmpty)
+        }
+    }
+
+    // Test 13: A place stays when the index is not open to forget it in.
+    @Test func forgetWithNoCoreKeepsPlace() async throws {
+        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let places = MemoryPlaces()
+        places.urls = [.git: URL(fileURLWithPath: "/tmp/repo")]
+        let model = SettingsModel(dir: tempDir("peepwho-data"), open: { throw KeychainError(status: errSecInteractionNotAllowed) },
+                                  secrets: MemorySecrets(), places: places, defaults: defaults)
+        await model.forgetPlace(.git)
+        #expect(model.lines == ["The index is not open."])
+        #expect(places.has(.git))
+    }
+
+    // Test 14: A refresh that ran no scope says so instead of showing nothing.
+    @Test func refreshOfNothingSaysSo() async throws {
+        let repo = try gitRepo()
+        let dir = tempDir("peepwho-data")
+        defer {
+            try? FileManager.default.removeItem(at: repo)
+            try? FileManager.default.removeItem(at: dir)
+        }
+        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+                                  secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
+        await model.pick(repo, as: .git)
+        try Data(#"{"jira":{}}"#.utf8).write(to: dir.appendingPathComponent("refresh.json"))
+        await model.refresh()
+        #expect(model.lines == ["Nothing to refresh: index a source at least once first."])
+    }
+
     // Test 5: An open that failed, such as under a locked Keychain, opens on the next try, hands
     // the search the core, and clears the failure.
     @Test func reopenAfterFailure() throws {

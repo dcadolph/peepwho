@@ -40,6 +40,10 @@ While either runs, Settings shows the source it is on and its newest progress li
 stops it. A canceled Index saves nothing for the source it was on, and a canceled Refresh keeps
 the scopes that finished and records no failed try for the one it stopped.
 Tokens and picked folders stay until forgotten one by one.
+Forgetting a picked place, or picking another in its slot, stops refreshing the old one, since it
+could only fail from then on, and Index Now stops refreshing a scope taken out of Settings. What
+they put in the index stays until a wipe. Forgetting a token keeps its scopes, so saving the token
+again picks the source back up.
 
 Settings also shows, per source, when it last indexed and why its last try failed, if it did.
 
@@ -52,7 +56,8 @@ both say it is sample data. Index and Refresh refuse while it is there, automati
 it, and Wipe removes it like any index. A load never replaces real data.
 
 The app refreshes on its own when the index is older than six hours: when the menu opens,
-when the Mac wakes, and on a timer while it runs. A failed refresh waits a full interval
+when the Mac wakes, and on a timer while it runs. The menu says which sources failed their last
+try until one works again, leaving out a source whose token was forgotten. A failed refresh waits a full interval
 before it runs again. The interval is a default in seconds:
 
 ```sh

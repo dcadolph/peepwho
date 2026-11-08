@@ -383,6 +383,31 @@ func (s *Store) RecordAttempt(source, scope string, now time.Time, attempt error
 	})
 }
 
+// DropScopes forgets every scope recorded for source except keep, so a refresh stops
+// replaying what a person no longer asked for. An empty keep drops them all, including a
+// scope with no name. With nothing to drop it writes nothing, and a source left with no
+// scopes goes too.
+func (s *Store) DropScopes(source, keep string) error {
+	inv, err := s.LoadInvocations()
+	if err != nil {
+		return err
+	}
+	dropped := func(scope string) bool { return keep == "" || scope != keep }
+	stale := false
+	for scope := range inv[source] {
+		stale = stale || dropped(scope)
+	}
+	if !stale {
+		return nil
+	}
+	return s.updateInvocations(func(inv Invocations) {
+		maps.DeleteFunc(inv[source], func(scope string, _ Run) bool { return dropped(scope) })
+		if len(inv[source]) == 0 {
+			delete(inv, source)
+		}
+	})
+}
+
 // updateInvocations applies change to the refresh config under its lock.
 func (s *Store) updateInvocations(change func(Invocations)) error {
 	unlock, err := util.LockFile(s.dir.Refresh() + util.LockSuffix)

@@ -126,7 +126,7 @@ struct PlaceRow: View {
             Text(model.placeNames[slot] ?? "None").foregroundStyle(.secondary)
             Button("Pick…") { pick() }.disabled(model.busy != nil || model.status?.sample == true)
             if model.placeNames[slot] != nil {
-                Button("Forget") { model.forgetPlace(slot) }
+                Button("Forget") { Task { await model.forgetPlace(slot) } }
             }
         }
     }

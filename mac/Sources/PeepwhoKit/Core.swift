@@ -105,6 +105,16 @@ public final class Core: @unchecked Sendable {
         return try await run(on: writes) { self.handle.refresh(joined, nowUnix: Self.unix(now), error: $0) }
     }
 
+    // forgetScopes stops a refresh replaying what source recorded, except the scope named keep.
+    // An empty keep forgets them all.
+    public func forgetScopes(_ source: String, keep: String = "") async throws {
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            writes.async {
+                cont.resume(with: Result { try self.handle.forgetScopes(source, keep: keep) })
+            }
+        }
+    }
+
     // importSample loads the sample company bundled at dir into the data directory.
     public func importSample(from dir: URL, now: Date = Date()) async throws -> SampleResult {
         try await run(on: writes) { self.handle.importSample(dir.path, nowUnix: Self.unix(now), error: $0) }

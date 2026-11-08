@@ -43,11 +43,11 @@ public struct IndexJob: Equatable, Sendable {
     public static func forPlace(_ slot: BookmarkSlot, _ url: URL) -> IndexJob {
         switch slot {
         case .git:
-            return IndexJob(source: "git", flags: ["--repo-path", url.path])
+            return IndexJob(source: slot.source, flags: ["--repo-path", url.path])
         case .csv:
-            return IndexJob(source: "org-csv", flags: ["--file", url.path])
+            return IndexJob(source: slot.source, flags: ["--file", url.path])
         case .codeowners:
-            return IndexJob(source: "codeowners", flags: ["--file", url.path])
+            return IndexJob(source: slot.source, flags: ["--file", url.path])
         }
     }
 
@@ -184,6 +184,8 @@ public final class SettingsModel: ObservableObject {
     public var onCore: ((Core?) -> Void)?
     // onSample hears whether the index holds the sample company after each status read.
     public var onSample: ((Bool) -> Void)?
+    // onRefreshFailure hears refreshFailure after each status read.
+    public var onRefreshFailure: ((String?) -> Void)?
 
     // dir is the data directory Wipe removes.
     private let dir: URL
@@ -244,7 +246,7 @@ public final class SettingsModel: ObservableObject {
         readSaved()
     }
 
-    // pick remembers url for slot and indexes it.
+    // pick remembers url for slot, stops refreshing the place it replaces, and indexes it.
     public func pick(_ url: URL, as slot: BookmarkSlot) async {
         guard refuseWhileBusy() else { return }
         do {
@@ -257,14 +259,21 @@ public final class SettingsModel: ObservableObject {
         await run("Indexing \(url.lastPathComponent)") { core in
             guard let url = try self.places.resolve(slot) else { return [] }
             defer { self.places.release(url) }
+            try await core.forgetScopes(slot.source)
             return [try await self.index(core, IndexJob.forPlace(slot, url))]
         }
     }
 
-    // forgetPlace drops slot's place. What it already put in the index stays until a wipe.
-    public func forgetPlace(_ slot: BookmarkSlot) {
-        places.forget(slot)
-        readSaved()
+    // forgetPlace drops slot's place and stops refreshing it, since it could only fail from then
+    // on. The place stays if that fails, so the person can try again. What it already put in the
+    // index stays until a wipe.
+    public func forgetPlace(_ slot: BookmarkSlot) async {
+        await run("Forgetting", cancelable: false) { core in
+            try await core.forgetScopes(slot.source)
+            self.places.forget(slot)
+            self.readSaved()
+            return []
+        }
     }
 
     // indexAll indexes every picked place and every token source with a scope.
@@ -302,12 +311,18 @@ public final class SettingsModel: ObservableObject {
             let opened = try self.resolveAll()
             defer { opened.values.forEach(self.places.release) }
             let result = try await core.refresh()
+            if result.results.isEmpty, result.canceled != true {
+                return [Self.nothingRefreshed]
+            }
             let done = result.results.map { r in
                 r.ok ? "\(r.source): refreshed \(r.scope)." : "\(r.source): \(r.error ?? "failed")."
             }
             return result.canceled == true ? done + ["Canceled."] : done
         }
     }
+
+    // nothingRefreshed says a refresh had no recorded scope to run.
+    private static let nothingRefreshed = "Nothing to refresh: index a source at least once first."
 
     // canLoadSample reports whether the sample company can load now: the app bundles one and the
     // index is empty or already holds it, so real data is never in the way.
@@ -388,6 +403,7 @@ public final class SettingsModel: ObservableObject {
     public func loadStatus(now: Date = Date()) async {
         guard let core else {
             status = nil
+            onRefreshFailure?(nil)
             return
         }
         statusAt = now
@@ -398,6 +414,26 @@ public final class SettingsModel: ObservableObject {
             lines = [SearchModel.describe(error)]
         }
         onSample?(status?.sample == true)
+        onRefreshFailure?(refreshFailure)
+    }
+
+    // refreshFailure says which sources failed their last try, nil when none did. It reads the
+    // record the core keeps, so an automatic refresh nobody watched still shows, and a later
+    // success clears it.
+    public var refreshFailure: String? {
+        Self.refreshFailure(status?.scopes ?? [], saved: saved)
+    }
+
+    // refreshFailure says which of scopes failed their last try. A source missing a secret it
+    // needs stays out: a person who forgot a token did that on purpose and should not be told
+    // about it forever, and saving the token again picks the source back up.
+    static func refreshFailure(_ scopes: [IndexScope], saved: Set<String>) -> String? {
+        let failed = scopes.filter { scope in
+            scope.error != nil && SecretName.required(by: scope.source).allSatisfy(saved.contains)
+        }
+        let names = Set(failed.map(\.source)).sorted()
+        guard !names.isEmpty else { return nil }
+        return "Last refresh failed for \(names.joined(separator: ", ")). Open Settings to see why."
     }
 
     // summary says how much the index holds and how old it is.
@@ -492,9 +528,13 @@ public final class SettingsModel: ObservableObject {
         }
     }
 
-    // index runs job and says what it read.
+    // index runs job, stops refreshing what the source read before if that changed, such as a
+    // project taken out of Settings, and says what it read.
     private func index(_ core: Core, _ job: IndexJob) async throws -> String {
         let result = try await core.index(job.source, flags: job.flags)
+        if !result.scope.isEmpty {
+            try await core.forgetScopes(job.source, keep: result.scope)
+        }
         return "\(result.source): indexed \(result.scope)."
     }
 

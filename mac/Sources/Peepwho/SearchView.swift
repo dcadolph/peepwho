@@ -22,6 +22,10 @@ struct SearchView: View {
             if model.sample {
                 Text("Sample company").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             }
+            if let failure = model.refreshFailure {
+                Label(failure, systemImage: "exclamationmark.triangle")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
             if !model.changes.isEmpty, model.detail == nil {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Changed since you last looked").font(.caption.weight(.semibold))

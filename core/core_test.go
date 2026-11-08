@@ -1313,7 +1313,7 @@ func TestEveryExportedCallRescues(t *testing.T) {
 		}
 	}
 	want := []string{"Open", "Ask", "Search", "Person", "Recall", "Status", "ChangesSince", "Index", "Refresh",
-		"ImportSample", "Wipe"}
+		"ForgetScopes", "ImportSample", "Wipe"}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("exported calls mismatch (-want +got):\n%s", diff)
 	}
@@ -1710,5 +1710,72 @@ func TestCancelWithNoRun(t *testing.T) {
 	}
 	if strings.Contains(raw, `"canceled"`) {
 		t.Errorf("a stale cancel reached the refresh: %s", raw)
+	}
+}
+
+// TestForgetScopes verifies a forgotten scope drops out of Refresh, keep holds on to the one
+// named, and the last scope leaving means nothing to refresh, with the index still answering.
+func TestForgetScopes(t *testing.T) {
+	t.Parallel()
+	kept, moved := newGitRepo(t), newGitRepo(t)
+	h, err := Open(t.TempDir(), "")
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	const now = int64(1_800_000_000)
+	for _, repo := range []string{kept, moved} {
+		if _, err := h.Index("git", "--repo-path\n"+repo+"\n--git-since-days=10000", now); err != nil {
+			t.Fatalf("Index %s: %v", repo, err)
+		}
+	}
+	if err := os.RemoveAll(moved); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := h.Refresh("git", now+60)
+	if err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+	if !strings.Contains(raw, `"ok":false`) {
+		t.Fatalf("refresh with a lost repo = %s, want a failure", raw)
+	}
+	if err := h.ForgetScopes("git", "repo:"+kept); err != nil {
+		t.Fatalf("ForgetScopes keep: %v", err)
+	}
+	raw, err = h.Refresh("git", now+120)
+	if err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+	var rv refreshView
+	if err := json.Unmarshal([]byte(raw), &rv); err != nil {
+		t.Fatalf("unmarshal %s: %v", raw, err)
+	}
+	if !rv.OK || len(rv.Results) != 1 || rv.Results[0].Scope != "repo:"+kept {
+		t.Errorf("refresh after forgetting the lost repo = %s, want only the kept one, ok", raw)
+	}
+	if err := h.ForgetScopes("git", ""); err != nil {
+		t.Fatalf("ForgetScopes all: %v", err)
+	}
+	if _, err := h.Refresh("", now+180); !errors.Is(err, engine.ErrNothingRecorded) {
+		t.Errorf("Refresh with every scope forgotten = %v, want %v", err, engine.ErrNothingRecorded)
+	}
+	if raw, err := h.Status(now + 180); err != nil || !strings.Contains(raw, `"people":`) || strings.Contains(raw, `"people":0`) {
+		t.Errorf("forgetting a scope touched the index: %v: %s", err, raw)
+	}
+	var none *Handle
+	if err := none.ForgetScopes("git", ""); !errors.Is(err, errNotOpen) {
+		t.Errorf("ForgetScopes on no handle = %v, want %v", err, errNotOpen)
+	}
+}
+
+// TestForgetScopesRescues verifies a panic while forgetting comes back as an error.
+func TestForgetScopesRescues(t *testing.T) {
+	t.Parallel()
+	dir := engine.Dir(t.TempDir())
+	if err := os.WriteFile(dir.Refresh(), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	h := &Handle{store: engine.NewStore(dir, panicCodec{})}
+	if err := h.ForgetScopes("git", ""); !errors.Is(err, errPanic) || !strings.Contains(err.Error(), "forget scopes: ") {
+		t.Errorf("error = %v, want %v naming forget scopes", err, errPanic)
 	}
 }

@@ -797,6 +797,23 @@ func (h *Handle) Refresh(sources string, nowUnix int64) (out string, err error) 
 	return toJSON(v)
 }
 
+// ForgetScopes stops Refresh replaying what source recorded, except the scope named keep, which
+// an Index answer gives. An empty keep forgets them all. What they put in the index stays until
+// a wipe. A place the host no longer holds access to could only fail on every refresh from then
+// on, and a project a person took out of Settings should not go on being read.
+func (h *Handle) ForgetScopes(source, keep string) (err error) {
+	defer rescue("forget scopes", &err)
+	if err := h.ready(); err != nil {
+		return err
+	}
+	h.writeMu.Lock()
+	defer h.writeMu.Unlock()
+	if err := h.store.DropScopes(source, keep); err != nil {
+		return fmt.Errorf("core: forget scopes: %w", err)
+	}
+	return nil
+}
+
 // refuseSample returns engine.ErrSample when the index holds sample data, so real
 // sources never merge into it.
 func (h *Handle) refuseSample() error {

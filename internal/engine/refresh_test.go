@@ -5,12 +5,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -454,6 +456,70 @@ func TestReplayFlags(t *testing.T) {
 			}
 			if diff := cmp.Diff(test.WantReplay, ReplayFlags(fs)); diff != "" {
 				t.Errorf("mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestDropScopes verifies only the source's other scopes go, a source left with none goes too,
+// and with nothing to drop the file is not touched.
+func TestDropScopes(t *testing.T) {
+	t.Parallel()
+	recorded := Invocations{
+		"git":     {"repo:/a": {Flags: []string{"--repo-path=/a"}}, "repo:/b": {Flags: []string{"--repo-path=/b"}}},
+		"org-csv": {"file:/p.csv": {Flags: []string{"--file=/p.csv"}}},
+		"slack":   {"": {}},
+	}
+	tests := []struct {
+		WantScopes map[string][]string
+		Source     string
+		Keep       string
+		Empty      bool
+		WantNoFile bool
+	}{{ // Test 0: Keeping one scope drops the other and leaves other sources alone.
+		Source: "git", Keep: "repo:/b",
+		WantScopes: map[string][]string{"git": {"repo:/b"}, "org-csv": {"file:/p.csv"}, "slack": {""}},
+	}, { // Test 1: No keep drops the whole source.
+		Source:     "git",
+		WantScopes: map[string][]string{"org-csv": {"file:/p.csv"}, "slack": {""}},
+	}, { // Test 2: A keep that is not recorded drops every scope of the source.
+		Source: "org-csv", Keep: "file:/new.csv",
+		WantScopes: map[string][]string{"git": {"repo:/a", "repo:/b"}, "slack": {""}},
+	}, { // Test 3: A source with no scopes changes nothing.
+		Source:     "jira",
+		WantScopes: map[string][]string{"git": {"repo:/a", "repo:/b"}, "org-csv": {"file:/p.csv"}, "slack": {""}},
+	}, { // Test 4: An empty directory stays empty.
+		Source: "git", Empty: true, WantNoFile: true, WantScopes: map[string][]string{},
+	}, { // Test 5: No keep drops a scope with no name too.
+		Source:     "slack",
+		WantScopes: map[string][]string{"git": {"repo:/a", "repo:/b"}, "org-csv": {"file:/p.csv"}},
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			dir := Dir(t.TempDir())
+			s := NewStore(dir, nil)
+			if !test.Empty {
+				if err := s.SaveInvocations(recorded); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := s.DropScopes(test.Source, test.Keep); err != nil {
+				t.Fatalf("DropScopes: %v", err)
+			}
+			inv, err := s.LoadInvocations()
+			if err != nil {
+				t.Fatalf("LoadInvocations: %v", err)
+			}
+			got := map[string][]string{}
+			for src, scopes := range inv {
+				got[src] = slices.Sorted(maps.Keys(scopes))
+			}
+			if diff := cmp.Diff(test.WantScopes, got); diff != "" {
+				t.Errorf("scopes mismatch (-want +got):\n%s", diff)
+			}
+			if _, err := os.Stat(dir.Refresh()); test.WantNoFile && !errors.Is(err, os.ErrNotExist) {
+				t.Errorf("refresh file written with nothing to drop: %v", err)
 			}
 		})
 	}

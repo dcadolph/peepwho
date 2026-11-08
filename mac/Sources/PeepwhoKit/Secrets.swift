@@ -26,6 +26,24 @@ public enum SecretName {
     public static let pagerdutyToken = "PEEPWHO_PAGERDUTY_TOKEN"
     // scopes holds what each token source reads, as JSON. The core never asks for it.
     public static let scopes = "PEEPWHO_APP_SCOPES"
+
+    // required names the secrets source cannot run without, none for a source reading a place.
+    public static func required(by source: String) -> [String] {
+        switch source {
+        case "slack":
+            return [slackToken]
+        case "github":
+            return [githubToken]
+        case "jira":
+            return [jiraURL, jiraToken]
+        case "confluence":
+            return [confluenceURL, confluenceToken]
+        case "pagerduty":
+            return [pagerdutyToken]
+        default:
+            return []
+        }
+    }
 }
 
 // KeychainSecrets hands the core the app's Keychain items by name, so the core reads tokens

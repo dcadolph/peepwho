@@ -9,6 +9,18 @@ public enum BookmarkSlot: String, CaseIterable, Sendable {
     // codeowners is the CODEOWNERS file the codeowners source reads.
     case codeowners
 
+    // source is the source that reads this place.
+    public var source: String {
+        switch self {
+        case .git:
+            return "git"
+        case .csv:
+            return "org-csv"
+        case .codeowners:
+            return "codeowners"
+        }
+    }
+
     // storeKey is the name the bookmark lives under in the secret store.
     public var storeKey: String { "bookmark.\(rawValue)" }
 }

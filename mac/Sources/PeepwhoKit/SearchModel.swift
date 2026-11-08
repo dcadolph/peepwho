@@ -18,6 +18,8 @@ public final class SearchModel: ObservableObject {
     @Published public private(set) var changes: [String] = []
     // sample says the index holds the sample company, so the window can say so.
     @Published public var sample = false
+    // refreshFailure says which sources failed their last refresh, nil when none did.
+    @Published public var refreshFailure: String?
 
     // core answers the questions, nil when the data directory did not open.
     private var core: Core?
