@@ -106,7 +106,7 @@ struct SearchTests {
         await model.submit()
         #expect(model.people.isEmpty)
         #expect(opened.urls.isEmpty)
-        #expect(model.message?.first?.isUppercase == true)
+        #expect(model.message == SearchModel.noIndex)
     }
 
     // Test 4: A model with no core shows why and asks nothing.
@@ -117,6 +117,114 @@ struct SearchTests {
         await model.submit()
         #expect(model.message == "Index key: wrong key.")
         #expect(opened.urls.isEmpty)
+    }
+}
+
+// SearchStateTests check that the window never shows or opens what it moved on from.
+@MainActor
+struct SearchStateTests {
+    // Test 0: Core errors read as sentences with no internal prefix and no container path.
+    @Test func describeCleansCoreErrors() {
+        let dir = URL(fileURLWithPath: "/Users/x/Library/Containers/com.dcadolph.peepwho/Data/peepwho")
+        func text(_ message: String) -> String {
+            SearchModel.describe(NSError(domain: "go", code: 1, userInfo: [NSLocalizedDescriptionKey: message]), dataDir: dir)
+        }
+        #expect(text("core: unknown person: a@b.c") == "Unknown person: a@b.c.")
+        #expect(text("core: open \(dir.path)/index.json: boom") == "Open index.json: boom.")
+        #expect(text("core: \(dir.path) is gone") == "The data folder is gone.")
+        #expect(text("core: no index yet: index a source first") == SearchModel.noIndex)
+        #expect(text("Already a sentence.") == "Already a sentence.")
+        #expect(text("") == "Something went wrong.")
+    }
+
+    // Test 1: A new core drops what the old one answered, its changes, and any question waiting.
+    @Test func useClearsEverything() async throws {
+        let dir = tempDir("peepwho-data")
+        let csvDir = tempDir("peepwho-csv")
+        try FileManager.default.createDirectory(at: csvDir, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: dir)
+            try? FileManager.default.removeItem(at: csvDir)
+        }
+        let csv = csvDir.appendingPathComponent("people.csv")
+        let header = "name,email,title,team,topics\n"
+        let jane = "Jane Doe,jane@x.com,Engineer,Billing,retries\n"
+        try (header + jane).write(to: csv, atomically: true, encoding: .utf8)
+        let core = try Core.open(dir: dir, key: "", secrets: KeychainSecrets())
+        let start = Date()
+        _ = try await core.index("org-csv", flags: ["--file", csv.path], now: start)
+        try (header + jane + "Ann Lee,ann@x.com,Engineer,Payments,ledger\n").write(to: csv, atomically: true, encoding: .utf8)
+        _ = try await core.index("org-csv", flags: ["--file", csv.path], now: start.addingTimeInterval(10))
+
+        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        defaults.set(start.addingTimeInterval(1), forKey: SearchModel.lastLookKey)
+        let model = SearchModel(core: core, delay: .milliseconds(200), defaults: defaults) { _ in true }
+        await model.opened(now: start.addingTimeInterval(11))
+        try #require(!model.changes.isEmpty)
+        await model.ask("ledger")
+        try #require(!model.people.isEmpty)
+
+        model.typed("retries")
+        model.use(core)
+        #expect(model.people.isEmpty)
+        #expect(model.changes.isEmpty)
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(model.people.isEmpty)
+    }
+
+    // Test 2: Going back during a lookup, or swapping the core, leaves the window as it is and
+    // opens nothing.
+    @Test func lateLookupIsDropped() async throws {
+        let dir = try demoDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let core = try Core.open(dir: dir, key: "", secrets: KeychainSecrets())
+        let opened = Opened()
+        let model = SearchModel(core: core, opener: opened.open)
+        await model.ask("terraform")
+        let id = try #require(model.people.first?.id)
+
+        async let shown: Void = model.select(id)
+        await Task.yield()
+        model.back()
+        await shown
+        #expect(model.detail == nil)
+
+        async let opening: Void = model.open(id)
+        await Task.yield()
+        model.use(core)
+        await opening
+        #expect(opened.urls.isEmpty)
+
+        await model.select(id)
+        #expect(model.detail != nil)
+    }
+
+    // Test 3: A changes read that fails starts no clock and moves no last look, and the next open
+    // that reads shows what happened in between.
+    @Test func failedReadKeepsLastLook() async throws {
+        let dir = tempDir("peepwho-data")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let core = try Core.open(dir: dir, key: "", secrets: KeychainSecrets())
+        let changes = dir.appendingPathComponent("changes.json")
+        try "{".write(to: changes, atomically: true, encoding: .utf8)
+        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let model = SearchModel(core: core, defaults: defaults) { _ in true }
+
+        await model.opened()
+        model.closed()
+        #expect(defaults.object(forKey: SearchModel.lastLookKey) == nil)
+
+        let last = Date(timeIntervalSince1970: 1000)
+        defaults.set(last, forKey: SearchModel.lastLookKey)
+        await model.opened()
+        model.closed()
+        #expect(defaults.object(forKey: SearchModel.lastLookKey) as? Date == last)
+
+        try FileManager.default.removeItem(at: changes)
+        await model.opened()
+        model.closed(now: last.addingTimeInterval(5))
+        #expect(defaults.object(forKey: SearchModel.lastLookKey) as? Date == last.addingTimeInterval(5))
     }
 }
 

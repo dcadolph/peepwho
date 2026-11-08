@@ -31,8 +31,12 @@ public final class SearchModel: ObservableObject {
     private var pending: Task<Void, Never>?
     // answered is the query the shown results answer.
     private var answered = ""
-    // generation counts questions asked, so an older answer never replaces a newer one.
+    // generation counts questions asked and people looked up, so an older answer never replaces
+    // what the window moved on to.
     private var generation = 0
+    // lookedRead reports whether the last open read the changes, so a close never moves the last
+    // look past changes nobody saw.
+    private var lookedRead = false
 
     // init builds a model over core that opens links with opener. A nil core shows openError.
     public init(core: Core?, openError: String? = nil, delay: Duration = .milliseconds(250),
@@ -49,10 +53,13 @@ public final class SearchModel: ObservableObject {
     // use swaps in core, such as the fresh one a wipe opens, and clears what the old one answered.
     public func use(_ core: Core?, openError: String? = nil) {
         self.core = core
+        pending?.cancel()
+        pending = nil
         generation += 1
         people = []
         channels = []
         detail = nil
+        changes = []
         answered = ""
         message = core == nil ? (openError ?? "The index is not open.") : nil
     }
@@ -61,20 +68,23 @@ public final class SearchModel: ObservableObject {
     public static let lastLookKey = "PeepwhoLastLook"
 
     // opened shows what changed since the last look. The first open ever starts the clock and
-    // shows nothing, since everything would count as new.
+    // shows nothing, since everything would count as new. A read that fails starts nothing and
+    // moves nothing, so what changed still shows on the next open.
     public func opened(now: Date = Date()) async {
+        lookedRead = false
         guard let core else { return }
-        guard let last = defaults.object(forKey: Self.lastLookKey) as? Date else {
+        let last = defaults.object(forKey: Self.lastLookKey) as? Date
+        guard let answer = try? await core.changes(since: last ?? now) else { return }
+        lookedRead = true
+        if last == nil {
             defaults.set(now, forKey: Self.lastLookKey)
-            changes = []
-            return
         }
-        guard let answer = try? await core.changes(since: last) else { return }
-        changes = ChangeSummary.lines(answer.changes)
+        changes = last == nil ? [] : ChangeSummary.lines(answer.changes)
     }
 
-    // closed moves the last look to now.
+    // closed moves the last look to now, if the open that this close ends read the changes.
     public func closed(now: Date = Date()) {
+        guard lookedRead else { return }
         defaults.set(now, forKey: Self.lastLookKey)
     }
 
@@ -126,7 +136,8 @@ public final class SearchModel: ObservableObject {
     // open looks up the person with id and opens their first link, showing them when there is
     // none or it does not open.
     public func open(_ id: String) async {
-        guard let person = await lookUp(id) else { return }
+        let mine = nextGeneration()
+        guard let person = await lookUp(id, mine), mine == generation else { return }
         if let link = person.links?.first, let url = URL(string: link), opener(url) {
             return
         }
@@ -135,12 +146,14 @@ public final class SearchModel: ObservableObject {
 
     // select shows the person with id in place of the results.
     public func select(_ id: String) async {
-        guard let person = await lookUp(id) else { return }
+        let mine = nextGeneration()
+        guard let person = await lookUp(id, mine), mine == generation else { return }
         detail = person
     }
 
-    // back returns from a person to the results.
+    // back returns from a person to the results, and a lookup still running stays out of it.
     public func back() {
+        generation += 1
         detail = nil
     }
 
@@ -152,13 +165,21 @@ public final class SearchModel: ObservableObject {
         }
     }
 
-    // lookUp returns the person with id, or nil after showing why not.
-    private func lookUp(_ id: String) async -> PersonDetail? {
+    // nextGeneration starts a new step in the window and returns its number.
+    private func nextGeneration() -> Int {
+        generation += 1
+        return generation
+    }
+
+    // lookUp returns the person with id, or nil after showing why not, if step mine is still current.
+    private func lookUp(_ id: String, _ mine: Int) async -> PersonDetail? {
         guard let core else { return nil }
         do {
             return try await core.person(id)
         } catch {
-            message = Self.describe(error)
+            if mine == generation {
+                message = Self.describe(error)
+            }
             return nil
         }
     }
@@ -171,10 +192,23 @@ public final class SearchModel: ObservableObject {
         answered = text
     }
 
-    // describe turns a core error into a sentence for the menu.
-    static func describe(_ error: Error) -> String {
-        let text = (error as NSError).localizedDescription
+    // noIndex says where to go when nothing is indexed yet.
+    static let noIndex = "Nothing is indexed yet. Open Settings to pick a folder, add a token, or load the sample company."
+
+    // describe turns a core error into a sentence for the window: no internal prefix, no path into
+    // the app's container, a capital, and an ending. dataDir is where the app keeps its index.
+    static func describe(_ error: Error, dataDir: URL = DataDir.url) -> String {
+        var text = (error as NSError).localizedDescription
+            .replacingOccurrences(of: dataDir.path + "/", with: "")
+            .replacingOccurrences(of: dataDir.path, with: "the data folder")
+        if text.hasPrefix("core: no index yet") {
+            return noIndex
+        }
+        if text.hasPrefix("core: ") {
+            text.removeFirst("core: ".count)
+        }
         guard let first = text.first else { return "Something went wrong." }
-        return first.uppercased() + text.dropFirst()
+        let ending = text.last.map { ".!?".contains($0) } == true ? "" : "."
+        return first.uppercased() + text.dropFirst() + ending
     }
 }

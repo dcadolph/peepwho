@@ -648,6 +648,9 @@ func (h *Handle) Refresh(sources string, nowUnix int64) (string, error) {
 	now := time.Unix(nowUnix, 0)
 	log := &tailLog{max: maxLog}
 	results, err := h.indexer(now, log).Refresh(context.Background(), names, now)
+	if errors.Is(err, engine.ErrNothingRecorded) {
+		return "", engine.ErrNothingRecorded
+	}
 	if err != nil && len(results) == 0 {
 		return "", fmt.Errorf("core: refresh: %w", err)
 	}

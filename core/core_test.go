@@ -669,6 +669,20 @@ func TestStatusNoIndexScopes(t *testing.T) {
 	}
 }
 
+// TestRefreshNothingRecorded verifies a refresh with nothing recorded says so in
+// words a host can show as they are.
+func TestRefreshNothingRecorded(t *testing.T) {
+	t.Parallel()
+	h, err := Open(t.TempDir(), "")
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	_, err = h.Refresh("", 100)
+	if !errors.Is(err, engine.ErrNothingRecorded) || err.Error() != engine.ErrNothingRecorded.Error() {
+		t.Errorf("Refresh = %v, want only %v", err, engine.ErrNothingRecorded)
+	}
+}
+
 // TestImportSample verifies the sample company loads sealed under the handle's key,
 // reads as sample data, blocks real sources until a wipe, and never replaces real data.
 func TestImportSample(t *testing.T) {
@@ -1035,7 +1049,7 @@ func TestHandleRefreshErrors(t *testing.T) {
 		Sources string
 		WantMsg string
 	}{{ // Test 0: Nothing recorded.
-		Want: engine.ErrBadArgs, WantMsg: "nothing to refresh",
+		Want: engine.ErrNothingRecorded, WantMsg: "nothing to refresh",
 	}, { // Test 1: A source name the registry does not know.
 		Sources: "org-csv, nosuch", Want: engine.ErrUnknownSource, WantMsg: "nosuch",
 	}}

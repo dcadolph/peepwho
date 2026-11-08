@@ -136,7 +136,7 @@ func (x *Indexer) Refresh(ctx context.Context, sources []string, now time.Time) 
 		return nil, err
 	}
 	if len(inv) == 0 {
-		return nil, fmt.Errorf("%w: nothing to refresh; run `peepwho index --source ...` at least once first", ErrBadArgs)
+		return nil, fmt.Errorf("%w: %w", ErrBadArgs, ErrNothingRecorded)
 	}
 	names := make([]string, 0, len(inv))
 	for s := range inv {

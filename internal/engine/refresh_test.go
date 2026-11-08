@@ -391,13 +391,13 @@ func TestRefreshAttemptWriteWarns(t *testing.T) {
 }
 
 // TestRefreshNothingRecorded verifies a refresh with no recorded scope is a
-// bad-arguments error that says how to record one.
+// bad-arguments error any host can show, so it names no command line.
 func TestRefreshNothingRecorded(t *testing.T) {
 	t.Parallel()
 	x := &Indexer{Dir: Dir(t.TempDir()), Log: &bytes.Buffer{}}
 	_, err := x.Refresh(context.Background(), nil, time.Now())
-	if !errors.Is(err, ErrBadArgs) || !strings.Contains(err.Error(), "peepwho index --source") {
-		t.Errorf("Refresh = %v, want ErrBadArgs naming peepwho index", err)
+	if !errors.Is(err, ErrBadArgs) || !errors.Is(err, ErrNothingRecorded) || strings.Contains(err.Error(), "peepwho") {
+		t.Errorf("Refresh = %v, want ErrBadArgs and ErrNothingRecorded naming no command", err)
 	}
 }
 
