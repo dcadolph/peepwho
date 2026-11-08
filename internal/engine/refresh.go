@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/peepwho/internal/vault"
 )
 
 // Invocations records, per source and per scope within it, the run an index
@@ -65,7 +66,10 @@ func RefreshScope(source, watermarkScope, file string, repoPaths []string) strin
 	return watermarkScope
 }
 
-// LoadInvocations reads the refresh config. A missing file yields an empty map.
+// LoadInvocations reads the refresh config under the store's codec, since flags
+// name repositories, projects, and sites and a failed try's text can quote them.
+// A missing file yields an empty map. With a nil codec a sealed file returns an
+// error matching vault.ErrEncrypted.
 // A file in an older shape, one flag list per scope or one per source, is folded
 // into runs with no times, the second under an empty scope, so nothing already
 // recorded is dropped.
@@ -77,6 +81,13 @@ func (s *Store) LoadInvocations() (Invocations, error) {
 	}
 	if err != nil {
 		return nil, fmt.Errorf("refresh: read %s: %w", path, err)
+	}
+	codec := s.codec
+	if codec == nil {
+		codec = vault.Plain{}
+	}
+	if raw, err = codec.Decode(raw); err != nil {
+		return nil, fmt.Errorf("refresh: decode %s: %w", path, err)
 	}
 	inv := Invocations{}
 	if err := json.Unmarshal(raw, &inv); err == nil {
@@ -95,12 +106,18 @@ func (s *Store) LoadInvocations() (Invocations, error) {
 	return inv, nil
 }
 
-// SaveInvocations writes the refresh config atomically.
+// SaveInvocations writes the refresh config atomically, sealed under the store's
+// codec when it has one.
 func (s *Store) SaveInvocations(inv Invocations) error {
 	path := s.dir.Refresh()
 	raw, err := json.Marshal(inv)
 	if err != nil {
 		return fmt.Errorf("refresh: encode: %w", err)
+	}
+	if s.codec != nil {
+		if raw, err = s.codec.Encode(raw); err != nil {
+			return fmt.Errorf("refresh: seal: %w", err)
+		}
 	}
 	if err := util.WriteFileAtomic(path, raw, 0o600); err != nil {
 		return fmt.Errorf("refresh: write %s: %w", path, err)
@@ -130,8 +147,7 @@ type RefreshResult struct {
 // written back. now stamps each result and each try. Failing to write a try
 // warns and does not fail the refresh, since the index itself was saved.
 func (x *Indexer) Refresh(ctx context.Context, sources []string, now time.Time) ([]RefreshResult, error) {
-	store := NewStore(x.Dir, nil)
-	inv, err := store.LoadInvocations()
+	inv, err := x.loadInvocations()
 	if err != nil {
 		return nil, err
 	}
@@ -145,6 +161,10 @@ func (x *Indexer) Refresh(ctx context.Context, sources []string, now time.Time) 
 		}
 	}
 	sort.Strings(names)
+	store, err := x.store()
+	if err != nil {
+		return nil, err
+	}
 	var results []RefreshResult
 	failed := 0
 	for _, src := range names {
@@ -282,6 +302,43 @@ func (x *Indexer) replay(ctx context.Context, source string, args []string) erro
 	err = run.Index(ctx, req)
 	x.unlocked = run.unlocked
 	return err
+}
+
+// RewriteInvocations re-persists an existing refresh config under c, reading it
+// with the store's codec, so a vault encrypt seals it and a decrypt opens it. A
+// missing config is left missing.
+func (s *Store) RewriteInvocations(c vault.Codec) error {
+	if _, err := os.Stat(s.dir.Refresh()); errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	inv, err := s.LoadInvocations()
+	if err != nil {
+		return err
+	}
+	return s.WithCodec(c).SaveInvocations(inv)
+}
+
+// loadInvocations reads the refresh config, calling Unlock when it is sealed under
+// a key the store does not have.
+func (x *Indexer) loadInvocations() (Invocations, error) {
+	st, err := x.store()
+	if err != nil {
+		return nil, err
+	}
+	inv, err := st.LoadInvocations()
+	if !errors.Is(err, vault.ErrEncrypted) || x.Unlock == nil {
+		return inv, err
+	}
+	c, err := x.Unlock(IndexPassphrase, func(c vault.Codec) error {
+		var lerr error
+		inv, lerr = st.WithCodec(c).LoadInvocations()
+		return lerr
+	})
+	if err != nil {
+		return nil, err
+	}
+	x.unlocked = c
+	return inv, nil
 }
 
 // RecordInvocation saves flags as what source was indexed with under scope at

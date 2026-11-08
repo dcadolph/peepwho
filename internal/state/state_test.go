@@ -18,10 +18,10 @@ func TestRoundTrip(t *testing.T) {
 	s := New()
 	wm := Watermark{Source: "jira", Scope: "project:SEC,SUP", Cursor: fixedTime, Complete: true, RanAt: fixedTime}
 	s.Set(wm)
-	if err := s.Save(path); err != nil {
+	if err := s.Save(path, nil); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
-	got, err := Load(path)
+	got, err := Load(path, nil)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -38,7 +38,7 @@ func TestRoundTrip(t *testing.T) {
 // than an error, so a first run is a full index.
 func TestLoadMissingIsEmpty(t *testing.T) {
 	t.Parallel()
-	s, err := Load(filepath.Join(t.TempDir(), "absent.json"))
+	s, err := Load(filepath.Join(t.TempDir(), "absent.json"), nil)
 	if err != nil {
 		t.Fatalf("Load missing: %v", err)
 	}
@@ -95,10 +95,10 @@ func TestWatermarkKeepsItsZone(t *testing.T) {
 
 	st := New()
 	st.Set(Watermark{Source: "jira", Scope: "project:K", Cursor: cursor, Complete: true})
-	if err := st.Save(path); err != nil {
+	if err := st.Save(path, nil); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
-	back, err := Load(path)
+	back, err := Load(path, nil)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}

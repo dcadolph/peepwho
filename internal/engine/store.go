@@ -44,8 +44,8 @@ func (d Dir) Refresh() string { return filepath.Join(string(d), "refresh.json") 
 // pays to load them.
 func (d Dir) Episodes() string { return filepath.Join(string(d), "episodes.json") }
 
-// State returns the incremental watermark path. It is a plain sidecar holding
-// only per-source timestamps and scope names, so it is never encrypted.
+// State returns the incremental watermark path. It holds per-source timestamps
+// and scope names, sealed with the same codec as the index.
 func (d Dir) State() string { return filepath.Join(string(d), "index.state.json") }
 
 // Sources returns the path of the per-source records the index was built from.
@@ -173,13 +173,29 @@ func (s *Store) RewriteChanges(c vault.Codec) error {
 
 // LoadState reads the incremental watermark state, returning an empty state
 // when the file is absent so a first run is a full index rather than an error.
+// It is sealed with the same codec as the index, since a scope names what a
+// person reads.
 func (s *Store) LoadState() (*state.State, error) {
-	return state.Load(s.dir.State())
+	return state.Load(s.dir.State(), s.codec)
 }
 
 // SaveState writes the incremental watermark state.
 func (s *Store) SaveState(st *state.State) error {
-	return st.Save(s.dir.State())
+	return st.Save(s.dir.State(), s.codec)
+}
+
+// RewriteState re-persists existing watermarks under c, reading them with the
+// store's codec, so a vault encrypt seals them and a decrypt opens them. A missing
+// file is left missing.
+func (s *Store) RewriteState(c vault.Codec) error {
+	if _, err := os.Stat(s.dir.State()); errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	st, err := s.LoadState()
+	if err != nil {
+		return err
+	}
+	return s.WithCodec(c).SaveState(st)
 }
 
 // NeedsKey reports whether the file at path is sealed under a raw key, which no

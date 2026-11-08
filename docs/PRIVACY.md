@@ -119,9 +119,10 @@ Three things to know:
 - The key is the only way back in. Losing it makes an encrypted index unrecoverable,
   so store it as carefully as any other secret and keep a backup.
 - The vault covers the index, its per-source sidecar, the conversations,
-  `feedback.json` (your queries and votes), `facts.json`, and `changes.json`. Only
-  `index.state.json` stays plain JSON, by design: it holds per-source re-index
-  timestamps and scope names, nothing about people.
+  `feedback.json` (your queries and votes), `facts.json`, `changes.json`, `refresh.json`
+  (the flags each source was indexed with), and `index.state.json` (per-source re-index
+  timestamps and scope names). `sample.json` holds only the time a sample company was
+  loaded, and `attest.key` holds only a signing seed, so both stay plain.
 
 ## Control what a model sees
 

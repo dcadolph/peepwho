@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -223,7 +224,7 @@ func TestStoreSidecars(t *testing.T) {
 			if err := s.SaveState(st); err != nil {
 				t.Fatalf("SaveState: %v", err)
 			}
-			if _, err := state.Load(s.Dir().State()); err != nil {
+			if _, err := s.LoadState(); err != nil {
 				t.Fatalf("state reload: %v", err)
 			}
 
@@ -379,5 +380,161 @@ func TestForgetChangeLabels(t *testing.T) {
 				t.Errorf("count mismatch (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+// TestRecordsSealUnderCodec verifies the refresh config and watermarks seal under the
+// store's codec on write, read back only with it, and open a plain file from before,
+// which seals on its next write.
+func TestRecordsSealUnderCodec(t *testing.T) {
+	t.Parallel()
+	const scope = "project:PLANTED"
+	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	key, err := vault.NewKeyCipher([]byte("0123456789abcdef0123456789abcdef"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := vault.NewKeyCipher([]byte("fedcba9876543210fedcba9876543210"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := Dir(t.TempDir())
+	plain, sealed := NewStore(dir, nil), NewStore(dir, key)
+
+	if err := plain.RecordInvocation("jira", scope, []string{"--jira-project", "PLANTED"}, now); err != nil {
+		t.Fatalf("plain RecordInvocation: %v", err)
+	}
+	wm := state.New()
+	wm.Set(state.Watermark{Source: "jira", Scope: scope, Cursor: now, RanAt: now})
+	if err := plain.SaveState(wm); err != nil {
+		t.Fatalf("plain SaveState: %v", err)
+	}
+	if err := sealed.RecordInvocation("jira", "project:SECOND", []string{"--jira-project", "SECOND"}, now); err != nil {
+		t.Fatalf("sealed RecordInvocation over a plain file: %v", err)
+	}
+	got, err := sealed.LoadState()
+	if err != nil {
+		t.Fatalf("sealed LoadState over a plain file: %v", err)
+	}
+	if err := sealed.SaveState(got); err != nil {
+		t.Fatalf("SaveState: %v", err)
+	}
+
+	for _, path := range []string{dir.Refresh(), dir.State()} {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !vault.IsEncrypted(raw) || bytes.Contains(raw, []byte("PLANTED")) {
+			t.Errorf("%s is not sealed: %s", filepath.Base(path), raw)
+		}
+	}
+	inv, err := sealed.LoadInvocations()
+	if err != nil {
+		t.Fatalf("LoadInvocations: %v", err)
+	}
+	if len(inv["jira"]) != 2 {
+		t.Errorf("refresh holds %d scopes, want the plain one and the new one: %v", len(inv["jira"]), inv)
+	}
+	if back, err := sealed.LoadState(); err != nil {
+		t.Fatalf("LoadState: %v", err)
+	} else if _, ok := back.Get("jira", scope); !ok {
+		t.Errorf("watermark lost across the seal: %v", back.Watermarks)
+	}
+
+	if _, err := plain.LoadInvocations(); !errors.Is(err, vault.ErrEncrypted) {
+		t.Errorf("LoadInvocations with no key = %v, want %v", err, vault.ErrEncrypted)
+	}
+	if _, err := plain.LoadState(); !errors.Is(err, vault.ErrEncrypted) {
+		t.Errorf("LoadState with no key = %v, want %v", err, vault.ErrEncrypted)
+	}
+	wrong := NewStore(dir, other)
+	if _, err := wrong.LoadInvocations(); !errors.Is(err, vault.ErrCorrupt) {
+		t.Errorf("LoadInvocations with the wrong key = %v, want %v", err, vault.ErrCorrupt)
+	}
+	if _, err := wrong.LoadState(); !errors.Is(err, vault.ErrCorrupt) {
+		t.Errorf("LoadState with the wrong key = %v, want %v", err, vault.ErrCorrupt)
+	}
+
+	if err := sealed.RewriteInvocations(nil); err != nil {
+		t.Fatalf("RewriteInvocations: %v", err)
+	}
+	if err := sealed.RewriteState(nil); err != nil {
+		t.Fatalf("RewriteState: %v", err)
+	}
+	if _, err := plain.LoadInvocations(); err != nil {
+		t.Errorf("LoadInvocations after a rewrite to plain: %v", err)
+	}
+	if _, err := plain.LoadState(); err != nil {
+		t.Errorf("LoadState after a rewrite to plain: %v", err)
+	}
+	missing := NewStore(Dir(t.TempDir()), nil)
+	if err := missing.RewriteInvocations(key); err != nil {
+		t.Errorf("RewriteInvocations with no file: %v", err)
+	}
+	if err := missing.RewriteState(key); err != nil {
+		t.Errorf("RewriteState with no file: %v", err)
+	}
+	if _, err := os.Stat(missing.Dir().Refresh()); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("a rewrite made a refresh config from nothing: %v", err)
+	}
+	if _, err := os.Stat(missing.Dir().State()); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("a rewrite made watermarks from nothing: %v", err)
+	}
+}
+
+// TestIndexerUnlocksSealedRecords verifies a run with no configured codec asks Unlock for
+// sealed records, since a terminal passphrase reaches them before it reaches the index,
+// and keeps the codec it gets for what it writes next.
+func TestIndexerUnlocksSealedRecords(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	key, err := vault.NewKeyCipher([]byte("0123456789abcdef0123456789abcdef"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := Dir(t.TempDir())
+	sealed := NewStore(dir, key)
+	if err := sealed.RecordInvocation("jira", "project:A", []string{"--jira-project", "A"}, now); err != nil {
+		t.Fatal(err)
+	}
+	wm := state.New()
+	wm.Set(state.Watermark{Source: "jira", Scope: "project:A", Cursor: now, RanAt: now})
+	if err := sealed.SaveState(wm); err != nil {
+		t.Fatal(err)
+	}
+	unlocks := 0
+	unlock := func(_ string, try func(vault.Codec) error) (vault.Codec, error) {
+		unlocks++
+		return key, try(key)
+	}
+
+	x := &Indexer{Dir: dir, Unlock: unlock}
+	if inv, err := x.loadInvocations(); err != nil || len(inv["jira"]) != 1 {
+		t.Errorf("loadInvocations = %v, %v; want one scope", inv, err)
+	}
+	if _, err := x.loadState(); err != nil {
+		t.Errorf("loadState after an unlock: %v", err)
+	}
+	if unlocks != 1 {
+		t.Errorf("unlocks = %d, want 1", unlocks)
+	}
+
+	y := &Indexer{Dir: dir, Unlock: unlock}
+	if st, err := y.loadState(); err != nil {
+		t.Errorf("loadState = %v", err)
+	} else if _, ok := st.Get("jira", "project:A"); !ok {
+		t.Errorf("loadState lost the watermark: %v", st.Watermarks)
+	}
+	if unlocks != 2 {
+		t.Errorf("unlocks = %d, want 2", unlocks)
+	}
+
+	z := &Indexer{Dir: dir}
+	if _, err := z.loadInvocations(); !errors.Is(err, vault.ErrEncrypted) {
+		t.Errorf("loadInvocations with no way in = %v, want %v", err, vault.ErrEncrypted)
+	}
+	if _, err := z.loadState(); !errors.Is(err, vault.ErrEncrypted) {
+		t.Errorf("loadState with no way in = %v, want %v", err, vault.ErrEncrypted)
 	}
 }

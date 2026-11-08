@@ -33,7 +33,7 @@ func TestJiraIncrementalReindex(t *testing.T) {
 		"--jira-url", srv.URL, "--jira-project", "KAFKA", "--data-dir", dir); err != nil {
 		t.Fatalf("full index: %v\n%s", err, stderr)
 	}
-	st, err := state.Load(filepath.Join(dir, "index.state.json"))
+	st, err := state.Load(filepath.Join(dir, "index.state.json"), nil)
 	if err != nil {
 		t.Fatalf("load state: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestJiraExplicitJQLNotIncremental(t *testing.T) {
 	if _, stderr, err := runCmd(t, base...); err != nil {
 		t.Fatalf("first index: %v\n%s", err, stderr)
 	}
-	st, err := state.Load(filepath.Join(dir, "index.state.json"))
+	st, err := state.Load(filepath.Join(dir, "index.state.json"), nil)
 	if err != nil {
 		t.Fatalf("load state: %v", err)
 	}

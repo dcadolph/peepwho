@@ -35,7 +35,7 @@ func TestConfluenceIncrementalReindex(t *testing.T) {
 		"--confluence-space", "KAFKA", "--data-dir", dir); err != nil {
 		t.Fatalf("full index: %v\n%s", err, stderr)
 	}
-	st, err := state.Load(filepath.Join(dir, "index.state.json"))
+	st, err := state.Load(filepath.Join(dir, "index.state.json"), nil)
 	if err != nil {
 		t.Fatalf("load state: %v", err)
 	}

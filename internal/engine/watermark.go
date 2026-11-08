@@ -1,12 +1,37 @@
 package engine
 
 import (
+	"errors"
 	"time"
 
 	"github.com/dcadolph/peepwho/internal/connector"
 	"github.com/dcadolph/peepwho/internal/state"
 	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/peepwho/internal/vault"
 )
+
+// loadState reads the watermarks, calling Unlock when they are sealed under a key
+// the store does not have, since a run reads them before it loads the index.
+func (x *Indexer) loadState() (*state.State, error) {
+	st, err := x.store()
+	if err != nil {
+		return nil, err
+	}
+	wm, err := st.LoadState()
+	if !errors.Is(err, vault.ErrEncrypted) || x.Unlock == nil {
+		return wm, err
+	}
+	c, err := x.Unlock(IndexPassphrase, func(c vault.Codec) error {
+		var lerr error
+		wm, lerr = st.WithCodec(c).LoadState()
+		return lerr
+	})
+	if err != nil {
+		return nil, err
+	}
+	x.unlocked = c
+	return wm, nil
+}
 
 // incrementalCapable reports whether a source supports incremental
 // re-indexing, fetching only what changed since a watermark. Other sources
@@ -24,7 +49,7 @@ func (x *Indexer) watermark(req *IndexRequest, canInc bool, scope string) (time.
 	if !req.Merge || req.Full || !canInc || !x.indexExists() {
 		return time.Time{}, false, nil
 	}
-	st, err := NewStore(x.Dir, nil).LoadState()
+	st, err := x.loadState()
 	if err != nil {
 		return time.Time{}, false, err
 	}
@@ -58,8 +83,11 @@ func (x *Indexer) updateWatermark(source, scope string, full bool, recs []connec
 		return err
 	}
 	defer unlock()
-	store := NewStore(x.Dir, nil)
-	st, err := store.LoadState()
+	st, err := x.loadState()
+	if err != nil {
+		return err
+	}
+	store, err := x.store()
 	if err != nil {
 		return err
 	}
@@ -80,7 +108,7 @@ func (x *Indexer) gitMarks(merge bool, paths []string) map[string]string {
 	if !merge || !x.indexExists() {
 		return nil
 	}
-	st, err := NewStore(x.Dir, nil).LoadState()
+	st, err := x.loadState()
 	if err != nil {
 		return nil
 	}
@@ -105,8 +133,11 @@ func (x *Indexer) saveGitMarks(marks map[string]string) error {
 		return err
 	}
 	defer unlock()
-	store := NewStore(x.Dir, nil)
-	st, err := store.LoadState()
+	st, err := x.loadState()
+	if err != nil {
+		return err
+	}
+	store, err := x.store()
 	if err != nil {
 		return err
 	}

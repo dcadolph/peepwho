@@ -15,6 +15,7 @@ import (
 	"github.com/dcadolph/peepwho/internal/episode"
 	"github.com/dcadolph/peepwho/internal/keyring"
 	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/peepwho/internal/state"
 	"github.com/dcadolph/peepwho/internal/vault"
 )
 
@@ -436,5 +437,64 @@ func TestKeyModeFileRefusesPassphrasePrompt(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), keyring.EnvPassphrase) {
 		t.Errorf("error = %v, want no pointer at a passphrase no passphrase can open this file", err)
+	}
+}
+
+// TestVaultCoversRefreshAndWatermarks verifies encrypt seals the refresh config and the
+// watermarks, status reports both, decrypt opens them, and a run with no key then replays.
+func TestVaultCoversRefreshAndWatermarks(t *testing.T) {
+	dir := t.TempDir()
+	csv := filepath.Join(t.TempDir(), "people.csv")
+	people := "name,email,title,team,topics\nJane Roe,jane@x.com,Eng,Billing,retries\n"
+	if err := os.WriteFile(csv, []byte(people), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := runCmd(t, "index", "--source", "org-csv", "--file", csv, "--data-dir", dir); err != nil {
+		t.Fatalf("index: %v", err)
+	}
+	refreshPath := filepath.Join(dir, "refresh.json")
+	statePath := filepath.Join(dir, "index.state.json")
+	wm := state.New()
+	wm.Set(state.Watermark{Source: "jira", Scope: "project:PLANTED", Cursor: time.Unix(1000, 0).UTC()})
+	if err := wm.Save(statePath, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	key, _ := keyring.GenerateKey()
+	t.Setenv(keyring.EnvKey, key)
+	if _, _, err := runCmd(t, "vault", "encrypt", "--data-dir", dir); err != nil {
+		t.Fatalf("encrypt: %v", err)
+	}
+	if raw, _ := os.ReadFile(refreshPath); !vault.IsEncrypted(raw) || bytes.Contains(raw, []byte("people.csv")) {
+		t.Errorf("refresh config not sealed after encrypt: %s", raw)
+	}
+	if raw, _ := os.ReadFile(statePath); !vault.IsEncrypted(raw) || bytes.Contains(raw, []byte("PLANTED")) {
+		t.Errorf("watermarks not sealed after encrypt: %s", raw)
+	}
+	out, _, err := runCmd(t, "vault", "status", "--data-dir", dir)
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	for _, re := range []string{`(?m)^refresh:\s+encrypted`, `(?m)^watermarks:\s+encrypted`} {
+		if !regexp.MustCompile(re).Match(out) {
+			t.Errorf("status does not match %s:\n%s", re, out)
+		}
+	}
+	if _, _, err := runCmd(t, "refresh", "--data-dir", dir); err != nil {
+		t.Fatalf("refresh under the key: %v", err)
+	}
+
+	if _, _, err := runCmd(t, "vault", "decrypt", "--data-dir", dir); err != nil {
+		t.Fatalf("decrypt: %v", err)
+	}
+	t.Setenv(keyring.EnvKey, "")
+	if raw, _ := os.ReadFile(refreshPath); vault.IsEncrypted(raw) || !bytes.Contains(raw, []byte("people.csv")) {
+		t.Errorf("refresh config not plain after decrypt: %s", raw)
+	}
+	if raw, _ := os.ReadFile(statePath); vault.IsEncrypted(raw) || !bytes.Contains(raw, []byte("PLANTED")) {
+		t.Errorf("watermarks not plain after decrypt: %s", raw)
+	}
+	if _, _, err := runCmd(t, "refresh", "--data-dir", dir); err != nil {
+		t.Fatalf("refresh with no key after decrypt: %v", err)
 	}
 }

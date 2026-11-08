@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -105,6 +106,8 @@ func vaultStores(opts *options) []vaultStore {
 		{label: "facts", path: opts.factsPath(), absent: "none recorded yet"},
 		{label: "feedback", path: opts.feedbackPath(), absent: "none recorded yet"},
 		{label: "changes", path: opts.changesPath(), absent: "none logged yet"},
+		{label: "refresh", path: opts.dir().Refresh(), absent: "none recorded yet"},
+		{label: "watermarks", path: opts.dir().State(), absent: "none recorded yet"},
 	}
 }
 
@@ -160,7 +163,10 @@ func newVaultEncryptCmd(opts *options) *cobra.Command {
 			if err := rewriteFeedback(opts, w, c, "feedback is already encrypted"); err != nil {
 				return err
 			}
-			return rewriteChanges(opts, w, c, "change log is already encrypted")
+			if err := rewriteChanges(opts, w, c, "change log is already encrypted"); err != nil {
+				return err
+			}
+			return rewriteRecords(opts, w, c, "already encrypted")
 		},
 	}
 }
@@ -207,7 +213,10 @@ func newVaultDecryptCmd(opts *options) *cobra.Command {
 			if err := rewriteFeedback(opts, w, nil, "feedback is already plain JSON"); err != nil {
 				return err
 			}
-			return rewriteChanges(opts, w, nil, "change log is already plain JSON")
+			if err := rewriteChanges(opts, w, nil, "change log is already plain JSON"); err != nil {
+				return err
+			}
+			return rewriteRecords(opts, w, nil, "already plain JSON")
 		},
 	}
 }
@@ -300,6 +309,50 @@ func rewriteChanges(opts *options, w io.Writer, codec vault.Codec, already strin
 	}
 	fmt.Fprintf(w, "%s %s\n", rewriteVerb(codec), opts.changesPath())
 	return nil
+}
+
+// rewriteRecords re-persists the refresh config and the watermarks under codec, each
+// under the lock its own writes take. They name the repositories, projects, and sites
+// a person reads, so an encrypt that skipped them would leave those names in
+// plaintext, and a decrypt that skipped them would strand them sealed and fail the
+// next index.
+func rewriteRecords(opts *options, w io.Writer, codec vault.Codec, already string) error {
+	st, err := opts.store()
+	if err != nil {
+		return err
+	}
+	for _, rec := range []struct {
+		path    string
+		rewrite func(vault.Codec) error
+	}{{opts.dir().Refresh(), st.RewriteInvocations}, {opts.dir().State(), st.RewriteState}} {
+		enc, err := isEncryptedOnDisk(rec.path)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if enc == (codec != nil) {
+			fmt.Fprintf(w, "%s is %s\n", filepath.Base(rec.path), already)
+			continue
+		}
+		if err := rewriteLocked(rec.path, codec, rec.rewrite); err != nil {
+			return err
+		}
+		fmt.Fprintf(w, "%s %s\n", rewriteVerb(codec), rec.path)
+	}
+	return nil
+}
+
+// rewriteLocked runs rewrite under the lock every write of path takes, so a scheduled
+// refresh cannot change the file between the read and the write.
+func rewriteLocked(path string, codec vault.Codec, rewrite func(vault.Codec) error) error {
+	unlock, err := util.LockFile(path + util.LockSuffix)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	return rewrite(codec)
 }
 
 // rewriteVerb names what a rewrite under codec did to a file.

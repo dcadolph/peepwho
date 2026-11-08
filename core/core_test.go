@@ -548,7 +548,7 @@ func TestHandleIndexAndRefresh(t *testing.T) {
 	if !strings.Contains(got, `"people":2`) {
 		t.Errorf("status %s, want two people", got)
 	}
-	inv, err := engine.NewStore(engine.Dir(dir), nil).LoadInvocations()
+	inv, err := h.store.LoadInvocations()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -608,7 +608,7 @@ func TestStatusScopes(t *testing.T) {
 	if _, err := h.Refresh("", failedAt.Unix()); err != nil {
 		t.Fatalf("Refresh: %v", err)
 	}
-	store := engine.NewStore(engine.Dir(dir), nil)
+	store := h.store
 	inv, err := store.LoadInvocations()
 	if err != nil {
 		t.Fatal(err)
@@ -1341,4 +1341,90 @@ func opensWithRescue(fn *ast.FuncDecl) bool {
 	}
 	id, ok := deferred.Call.Fun.(*ast.Ident)
 	return ok && id.Name == "rescue"
+}
+
+// TestKeyedDataDirHoldsNoPlainScope verifies a planted project and site address appear in
+// no file of a keyed data directory, through an index, a refresh that fails and records its
+// error, and one that succeeds. The same run with no key finds them, so the scan can fail.
+func TestKeyedDataDirHoldsNoPlainScope(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		Key       string
+		WantPlain bool
+	}{{ // Test 0: Under a key nothing shows.
+		Key: testKeyB64,
+	}, { // Test 1: With no key the scan finds the same strings.
+		WantPlain: true,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			jira := authJira(t)
+			dir := filepath.Join(t.TempDir(), "data")
+			flags := "--jira-server\n--jira-url=" + jira + "\n--jira-project\nKAFKA"
+			now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC).Unix()
+			h, err := Open(dir, test.Key)
+			if err != nil {
+				t.Fatalf("Open: %v", err)
+			}
+			h.SetSecrets(mapSecrets{engine.JiraTokenEnv: "good"})
+			if _, err := h.Index("jira", flags, now); err != nil {
+				t.Fatalf("Index: %v", err)
+			}
+			h.SetSecrets(mapSecrets{engine.JiraTokenEnv: "wrong"})
+			if _, err := h.Refresh("jira", now+60); err != nil {
+				t.Fatalf("failing Refresh: %v", err)
+			}
+			scanFor(t, dir, test.WantPlain, "KAFKA", strings.TrimPrefix(jira, "http://"))
+			h.SetSecrets(mapSecrets{engine.JiraTokenEnv: "good"})
+			if _, err := h.Refresh("jira", now+120); err != nil {
+				t.Fatalf("Refresh: %v", err)
+			}
+			scanFor(t, dir, test.WantPlain, "KAFKA", strings.TrimPrefix(jira, "http://"))
+			for _, path := range []string{engine.Dir(dir).Refresh(), engine.Dir(dir).State()} {
+				if _, err := os.Stat(path); err != nil {
+					t.Errorf("the run left no %s to scan: %v", filepath.Base(path), err)
+				}
+			}
+			reopened, err := Open(dir, test.Key)
+			if err != nil {
+				t.Fatalf("reopen: %v", err)
+			}
+			raw, err := reopened.Status(now + 180)
+			if err != nil || !strings.Contains(raw, `"scope":"project:KAFKA"`) {
+				t.Errorf("Status after reopening = %s, %v; want the scope", raw, err)
+			}
+		})
+	}
+}
+
+// scanFor reads every file under dir and fails when one of the planted strings shows and
+// wantFound is false, or when none shows and wantFound is true.
+func scanFor(t *testing.T, dir string, wantFound bool, planted ...string) {
+	t.Helper()
+	found := false
+	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for _, s := range planted {
+			if bytes.Contains(raw, []byte(s)) {
+				found = true
+				if !wantFound {
+					t.Errorf("%s holds %q in plain text under a key", filepath.Base(path), s)
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wantFound && !found {
+		t.Errorf("no file under %s holds any of %q", dir, planted)
+	}
 }

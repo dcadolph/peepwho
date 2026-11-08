@@ -1,7 +1,7 @@
 // Package state persists per-source incremental watermarks so a re-index only
-// fetches what changed since the last successful run. It lives in a plain JSON
-// sidecar beside the index, holding timestamps and scope names that are already
-// plaintext command-line arguments, so it is deliberately not encrypted.
+// fetches what changed since the last successful run. It lives in a sidecar
+// beside the index, sealed with the same codec, since a scope names the
+// repositories and projects a person reads.
 package state
 
 import (
@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/peepwho/internal/vault"
 )
 
 // Version is the current state-file schema version.
@@ -82,15 +83,22 @@ func (s *State) Delete(source, scope string) {
 	delete(s.Watermarks, Key(source, scope))
 }
 
-// Load reads state from path, returning an empty state when the file is absent
-// so a first run is a full index rather than an error.
-func Load(path string) (*State, error) {
+// Load reads state from path under codec, returning an empty state when the file
+// is absent so a first run is a full index rather than an error. With a nil codec
+// a sealed file returns an error matching vault.ErrEncrypted.
+func Load(path string, codec vault.Codec) (*State, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return New(), nil
 		}
 		return nil, fmt.Errorf("state: open: %w", err)
+	}
+	if codec == nil {
+		codec = vault.Plain{}
+	}
+	if raw, err = codec.Decode(raw); err != nil {
+		return nil, fmt.Errorf("state: decode: %w", err)
 	}
 	var s State
 	if err := json.Unmarshal(raw, &s); err != nil {
@@ -105,15 +113,20 @@ func Load(path string) (*State, error) {
 	return &s, nil
 }
 
-// Save writes state to path readable only by the owner, through a temporary
-// file and rename so a crash cannot truncate it.
-func (s *State) Save(path string) error {
+// Save writes state to path readable only by the owner, sealed under codec when
+// it is set, through a temporary file and rename so a crash cannot truncate it.
+func (s *State) Save(path string, codec vault.Codec) error {
 	if s.Version == 0 {
 		s.Version = Version
 	}
 	raw, err := json.Marshal(s)
 	if err != nil {
 		return fmt.Errorf("state: encode: %w", err)
+	}
+	if codec != nil {
+		if raw, err = codec.Encode(raw); err != nil {
+			return fmt.Errorf("state: seal: %w", err)
+		}
 	}
 	if err := util.WriteFileAtomic(path, raw, 0o600); err != nil {
 		return fmt.Errorf("state: write: %w", err)
