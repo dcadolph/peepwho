@@ -37,6 +37,16 @@ under the same names the command line reads from the environment. Index Now read
 source set up, Refresh Now replays every scope indexed before, and Wipe deletes the index.
 Tokens and picked folders stay until forgotten one by one.
 
+Settings also shows, per source, when it last indexed and why its last try failed, if it did.
+
+With an empty index, Settings offers Load Sample Company: a simulated company of 223 people
+across eight sources, so every part of the app can be tried without a token. `make mac` builds
+it with `peepwho demo --big --save-index` and bundles only `index.json` and `episodes.json` in
+the app as data, so the core links none of the simulator, which `make core-deps` enforces.
+Loading seals it under the app's key and writes a `sample.json` marker. Settings and the menu
+both say it is sample data. Index and Refresh refuse while it is there, automatic refresh skips
+it, and Wipe removes it like any index. A load never replaces real data.
+
 The app refreshes on its own when the index is older than six hours: when the menu opens,
 when the Mac wakes, and on a timer while it runs. A failed refresh waits a full interval
 before it runs again. The interval is a default in seconds:

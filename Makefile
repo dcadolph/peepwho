@@ -28,9 +28,10 @@ fmt:
 lint:
 	golangci-lint run
 
-# core-deps fails when the app core links the command line or a keychain. The
-# host supplies every secret, and a sandboxed app cannot shell to a keychain.
-CORE_BANNED := spf13/cobra|internal/secret|zalando/go-keyring|internal/keyring
+# core-deps fails when the app core links the command line, a keychain, or the
+# simulated company. The host supplies every secret, a sandboxed app cannot shell
+# to a keychain, and the app bundles the sample company as data.
+CORE_BANNED := spf13/cobra|internal/secret|zalando/go-keyring|internal/keyring|internal/simorg|net/http/httptest
 
 core-deps:
 	@bad=$$(go list -deps ./core | grep -E '$(CORE_BANNED)'); \

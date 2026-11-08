@@ -29,6 +29,7 @@ import (
 	"github.com/dcadolph/peepwho/internal/engine"
 	"github.com/dcadolph/peepwho/internal/episode"
 	"github.com/dcadolph/peepwho/internal/index"
+	"github.com/dcadolph/peepwho/internal/model"
 	"github.com/dcadolph/peepwho/internal/policy"
 	"github.com/dcadolph/peepwho/internal/recall"
 	"github.com/dcadolph/peepwho/internal/vault"
@@ -327,8 +328,13 @@ type statusView struct {
 	BuiltAt string `json:"built_at,omitempty"`
 	// AgeSeconds is how long before now the index was written.
 	AgeSeconds int64 `json:"age_seconds"`
-	// Scopes lists each recorded index run in source then scope order.
+	// Scopes lists each recorded index run in source then scope order, or each
+	// source once under the scope "sample" when the index holds sample data.
 	Scopes []scopeView `json:"scopes"`
+	// Sample reports whether the index holds the sample company.
+	Sample bool `json:"sample"`
+	// LoadedAt is when the sample company was loaded, RFC 3339, empty when it was not.
+	LoadedAt string `json:"loaded_at,omitempty"`
 }
 
 // scopeView is one recorded index run in the JSON Status returns.
@@ -384,21 +390,41 @@ func (h *Handle) Status(nowUnix int64) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	loadedAt, err := h.store.LoadSample()
+	if err != nil {
+		return "", fmt.Errorf("core: status: %w", err)
+	}
+	v := statusView{Sources: map[string]int{}, Sealed: h.sealed, Scopes: scopes, Sample: !loadedAt.IsZero()}
+	if v.Sample {
+		v.LoadedAt = loadedAt.UTC().Format(time.RFC3339)
+	}
 	l := h.current()
 	if l == nil {
-		return toJSON(statusView{Sources: map[string]int{}, Sealed: h.sealed, Scopes: scopes})
+		return toJSON(v)
 	}
 	st := l.eng.Status(now)
-	v := statusView{
-		People: st.People, Channels: st.Channels, Teams: st.Teams,
-		Subjects: st.Subjects, Words: st.Words, Sources: st.Sources,
-		Embeddings: st.Embeddings, Conversations: l.episodes.Len(), Sealed: h.sealed, Scopes: scopes,
-	}
+	v.People, v.Channels, v.Teams, v.Subjects, v.Words = st.People, st.Channels, st.Teams, st.Subjects, st.Words
+	v.Sources, v.Embeddings, v.Conversations = st.Sources, st.Embeddings, l.episodes.Len()
 	if !st.BuiltAt.IsZero() {
 		v.BuiltAt = st.BuiltAt.UTC().Format(time.RFC3339)
 		v.AgeSeconds = int64(st.Age / time.Second)
 	}
+	if v.Sample {
+		v.Scopes = sampleScopes(st.Sources, loadedAt, now)
+	}
 	return toJSON(v)
+}
+
+// sampleScopes lists each source of a sample index once, as loaded at loadedAt.
+func sampleScopes(sources map[string]int, loadedAt, now time.Time) []scopeView {
+	views := []scopeView{}
+	for _, source := range slices.Sorted(maps.Keys(sources)) {
+		views = append(views, scopeView{
+			Source: source, Scope: "sample", RanAt: loadedAt.UTC().Format(time.RFC3339),
+			AgeSeconds: max(0, int64(now.Sub(loadedAt)/time.Second)),
+		})
+	}
+	return views
 }
 
 // changesView is the JSON shape ChangesSince returns.
@@ -548,6 +574,9 @@ func (h *Handle) Index(source, flags string, nowUnix int64) (string, error) {
 	run.Request.Merge = true
 	h.writeMu.Lock()
 	defer h.writeMu.Unlock()
+	if err := h.refuseSample(); err != nil {
+		return "", err
+	}
 	log := &tailLog{max: maxLog}
 	now := time.Unix(nowUnix, 0)
 	x := h.indexer(now, log)
@@ -613,6 +642,9 @@ func (h *Handle) Refresh(sources string, nowUnix int64) (string, error) {
 	}
 	h.writeMu.Lock()
 	defer h.writeMu.Unlock()
+	if err := h.refuseSample(); err != nil {
+		return "", err
+	}
 	now := time.Unix(nowUnix, 0)
 	log := &tailLog{max: maxLog}
 	results, err := h.indexer(now, log).Refresh(context.Background(), names, now)
@@ -639,6 +671,102 @@ func (h *Handle) Refresh(sources string, nowUnix int64) (string, error) {
 	}
 	v.Log = log.String()
 	return toJSON(v)
+}
+
+// refuseSample returns engine.ErrSample when the index holds sample data, so real
+// sources never merge into it.
+func (h *Handle) refuseSample() error {
+	loadedAt, err := h.store.LoadSample()
+	if err != nil {
+		return fmt.Errorf("core: %w", err)
+	}
+	if !loadedAt.IsZero() {
+		return engine.ErrSample
+	}
+	return nil
+}
+
+// sampleView is the JSON shape ImportSample returns.
+type sampleView struct {
+	// People is the number of people the sample holds.
+	People int `json:"people"`
+	// Channels is the number of channels the sample holds.
+	Channels int `json:"channels"`
+	// Sources is the number of sources the sample was built from.
+	Sources int `json:"sources"`
+	// LoadedAt is when the sample was loaded, RFC 3339.
+	LoadedAt string `json:"loaded_at"`
+}
+
+// ImportSample copies the sample company at dir, a plain index.json and
+// episodes.json the app bundles, into the data directory under the handle's key
+// at nowUnix, the host's clock in seconds since the Unix epoch. It refuses a
+// directory holding real data, and loading over an earlier sample replaces it.
+// The marker goes first, so an import cut short can never leave sample data that
+// reads as real. Until a wipe, Index and Refresh refuse, since nothing about a
+// simulated company can be refreshed.
+func (h *Handle) ImportSample(dir string, nowUnix int64) (string, error) {
+	if err := h.ready(); err != nil {
+		return "", err
+	}
+	h.writeMu.Lock()
+	defer h.writeMu.Unlock()
+	earlier, err := h.store.LoadSample()
+	if err != nil {
+		return "", fmt.Errorf("core: load sample: %w", err)
+	}
+	old := h.current()
+	if old != nil && earlier.IsZero() {
+		return "", engine.ErrRealIndex
+	}
+	now := time.Unix(nowUnix, 0)
+	src := engine.NewStore(engine.Dir(dir), nil).WithNow(func() time.Time { return now })
+	ix, err := src.LoadIndex()
+	if err != nil {
+		return "", fmt.Errorf("core: load sample: %w", err)
+	}
+	eps, err := src.LoadEpisodes()
+	if err != nil {
+		return "", fmt.Errorf("core: load sample: %w", err)
+	}
+	if err := h.store.SaveSample(now); err != nil {
+		return "", fmt.Errorf("core: load sample: %w", err)
+	}
+	if err := h.saveSample(ix, eps, old, now); err != nil {
+		return "", fmt.Errorf("core: load sample: %w", err)
+	}
+	if err := h.reload(); err != nil {
+		return "", fmt.Errorf("core: load sample: saved, but it would not load: %w", err)
+	}
+	st := h.current().eng.Status(now)
+	return toJSON(sampleView{
+		People: st.People, Channels: st.Channels, Sources: len(st.Sources),
+		LoadedAt: now.UTC().Format(time.RFC3339),
+	})
+}
+
+// saveSample writes the sample under the handle's key and logs who it adds beside
+// old, the sample it replaces, nil when there was none.
+func (h *Handle) saveSample(ix *index.Index, eps *episode.Store, old *loaded, now time.Time) error {
+	if err := h.store.SaveIndex(ix); err != nil {
+		return err
+	}
+	if err := h.store.SaveEpisodes(eps); err != nil {
+		return err
+	}
+	var prev *model.Graph
+	if old != nil {
+		prev = old.eng.Index().Graph
+	}
+	changes := index.Diff(prev, ix.Graph)
+	if changes.Empty() {
+		return nil
+	}
+	entries, err := h.store.LoadChanges()
+	if err != nil {
+		return err
+	}
+	return h.store.SaveChanges(append(entries, engine.ChangeEntry{At: now, Changes: changes}))
 }
 
 // wipeView is the JSON shape Wipe returns.

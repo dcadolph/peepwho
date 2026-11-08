@@ -16,6 +16,8 @@ public final class SearchModel: ObservableObject {
     @Published public private(set) var message: String?
     // changes say who and what joined or left since the menu last closed.
     @Published public private(set) var changes: [String] = []
+    // sample says the index holds the sample company, so the window can say so.
+    @Published public var sample = false
 
     // core answers the questions, nil when the data directory did not open.
     private var core: Core?

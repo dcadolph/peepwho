@@ -91,6 +91,15 @@ func TestSwiftFixtures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open folded: %v", err)
 	}
+	sample := filepath.Join(t.TempDir(), "sample")
+	if err := os.MkdirAll(sample, 0o700); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	copySample(t, h.store.Dir(), sample)
+	sampled, err := Open(filepath.Join(t.TempDir(), "sampled"), "")
+	if err != nil {
+		t.Fatalf("Open sampled: %v", err)
+	}
 	calls := []struct {
 		Name string
 		Call func() (string, error)
@@ -104,6 +113,8 @@ func TestSwiftFixtures(t *testing.T) {
 		{"refresh", func() (string, error) { return w.Refresh("", now.Add(time.Hour).Unix()) }},
 		{"changes", func() (string, error) { return f.ChangesSince(0) }},
 		{"wipe", func() (string, error) { return Wipe(fresh) }},
+		{"import_sample", func() (string, error) { return sampled.ImportSample(sample, now.Unix()) }},
+		{"status_sample", func() (string, error) { return sampled.Status(now.Unix() + 180) }},
 	}
 	// The calls run in order because index, refresh, and wipe share one directory.
 	for testNum, c := range calls {
@@ -136,6 +147,20 @@ func TestSwiftFixtures(t *testing.T) {
 		if diff := cmp.Diff(want, got); diff != "" {
 			t.Errorf("test %d %s: shape changed, rewrite with -update-swift and update the app (-want +got):\n%s",
 				testNum, c.Name, diff)
+		}
+	}
+}
+
+// copySample copies the plain index and conversations from src to dir, as the app bundles them.
+func copySample(t *testing.T, src engine.Dir, dir string) {
+	t.Helper()
+	for _, path := range []string{src.Index(), src.Episodes()} {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, filepath.Base(path)), raw, 0o600); err != nil {
+			t.Fatalf("write %s: %v", path, err)
 		}
 	}
 }

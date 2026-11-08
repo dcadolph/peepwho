@@ -58,11 +58,14 @@ func (d Dir) Changes() string { return filepath.Join(string(d), "changes.json") 
 // AttestKey returns the path of the seed every sealed finding is signed with.
 func (d Dir) AttestKey() string { return filepath.Join(string(d), "attest.key") }
 
+// Sample returns the path of the marker that says the index holds sample data.
+func (d Dir) Sample() string { return filepath.Join(string(d), "sample.json") }
+
 // Files returns every file peepwho keeps in the directory, in a fixed order.
 func (d Dir) Files() []string {
 	return []string{
 		d.Index(), d.Sources(), d.State(), d.Episodes(), d.Feedback(), d.Facts(),
-		d.Changes(), d.Refresh(), d.AttestKey(),
+		d.Changes(), d.Refresh(), d.AttestKey(), d.Sample(),
 	}
 }
 

@@ -131,12 +131,14 @@ public struct SourceAge: Equatable, Sendable, Identifiable {
     public var id: String { source }
 
     // rows groups scopes by source in name order. A source is as old as its oldest scope, and is
-    // of unknown age when any scope is. now is the clock the ages were read at.
-    public static func rows(_ scopes: [IndexScope], now: Date) -> [SourceAge] {
-        Dictionary(grouping: scopes, by: \.source).sorted { $0.key < $1.key }.map { source, group in
+    // of unknown age when any scope is. A sample source reads as loaded, not indexed. now is the
+    // clock the ages were read at.
+    public static func rows(_ scopes: [IndexScope], sample: Bool = false, now: Date) -> [SourceAge] {
+        let verb = sample ? "Loaded" : "Indexed"
+        return Dictionary(grouping: scopes, by: \.source).sorted { $0.key < $1.key }.map { source, group in
             let known = group.allSatisfy { $0.ranAt != nil }
             let oldest = group.map(\.ageSeconds).max() ?? 0
-            var detail = known ? "Indexed \(Age.words(oldest))." : "Indexed, time unknown."
+            var detail = known ? "\(verb) \(Age.words(oldest))." : "\(verb), time unknown."
             if let failure = lastFailure(group, now: now) {
                 detail += " \(failure)"
             }
@@ -185,6 +187,8 @@ public final class SettingsModel: ObservableObject {
     private var lastAttempt: Date?
     // onCore hears every core the model opens, so the search follows a wipe.
     public var onCore: ((Core?) -> Void)?
+    // onSample hears whether the index holds the sample company after each status read.
+    public var onSample: ((Bool) -> Void)?
 
     // dir is the data directory Wipe removes.
     private let dir: URL
@@ -196,11 +200,14 @@ public final class SettingsModel: ObservableObject {
     private let places: PlaceStore
     // defaults stores the scopes.
     private let defaults: UserDefaults
+    // sampleDir is the sample company the app bundles, nil when it has none.
+    private let sampleDir: URL?
 
     // init opens dir with open and reads which secrets and places are saved.
     public init(dir: URL, open: @escaping () throws -> Core, secrets: SecretStore, places: PlaceStore,
-                defaults: UserDefaults = .standard) {
+                defaults: UserDefaults = .standard, sampleDir: URL? = nil) {
         self.dir = dir
+        self.sampleDir = sampleDir
         self.open = open
         self.secrets = secrets
         self.places = places
@@ -290,6 +297,22 @@ public final class SettingsModel: ObservableObject {
         }
     }
 
+    // canLoadSample reports whether the sample company can load now: the app bundles one and the
+    // index is empty or already holds it, so real data is never in the way.
+    public var canLoadSample: Bool {
+        guard sampleDir != nil, let status else { return false }
+        return status.builtAt == nil || status.sample
+    }
+
+    // loadSample loads the bundled sample company.
+    public func loadSample() async {
+        guard let sampleDir else { return }
+        await run("Loading the sample company") { core in
+            let got = try await core.importSample(from: sampleDir)
+            return ["Loaded the sample company: \(got.people) people from \(got.sources) sources. Wipe removes it."]
+        }
+    }
+
     // intervalKey is the UserDefaults key for how many seconds old the index may get before
     // refreshIfStale refreshes it.
     public static let intervalKey = "PeepwhoRefreshIntervalSeconds"
@@ -323,7 +346,7 @@ public final class SettingsModel: ObservableObject {
         if let lastAttempt, now.timeIntervalSince(lastAttempt) < interval {
             return false
         }
-        guard let status = try? await core.status(now: now), status.builtAt != nil,
+        guard let status = try? await core.status(now: now), status.builtAt != nil, !status.sample,
               TimeInterval(status.ageSeconds) >= interval, busy == nil
         else { return false }
         lastAttempt = now
@@ -362,11 +385,27 @@ public final class SettingsModel: ObservableObject {
             status = nil
             lines = [SearchModel.describe(error)]
         }
+        onSample?(status?.sample == true)
+    }
+
+    // summary says how much the index holds and how old it is.
+    public var summary: String {
+        guard let s = status else { return "The index is not open." }
+        guard s.builtAt != nil else {
+            let sample = canLoadSample ? ", or load the sample company to look around." : "."
+            return "Nothing indexed yet. Pick a folder or add a token, then Index Now\(sample)"
+        }
+        let counts = "\(s.people) people, \(s.teams) teams, \(s.channels) channels."
+        let sealed = s.sealed ? " Encrypted on disk." : ""
+        if s.sample {
+            return "Sample company, not real people. \(counts) Loaded \(Age.words(s.ageSeconds)).\(sealed)"
+        }
+        return "\(counts) Indexed \(Age.words(s.ageSeconds)).\(sealed)"
     }
 
     // sourceAges says how fresh each recorded source is, as of the last status read.
     public var sourceAges: [SourceAge] {
-        SourceAge.rows(status?.scopes ?? [], now: statusAt)
+        SourceAge.rows(status?.scopes ?? [], sample: status?.sample == true, now: statusAt)
     }
 
     // has reports whether a secret is stored under name.

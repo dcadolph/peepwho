@@ -236,7 +236,7 @@ func soleHeld(places []resolve.Place) int {
 func saveDemo(
 	cmd *cobra.Command, ix *index.Index, eps *episode.Store, dir string, embed bool, cfg webConfig,
 ) error {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("demo: %w", err)
 	}
 	if embed {

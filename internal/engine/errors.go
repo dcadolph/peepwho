@@ -22,3 +22,9 @@ var ErrShrunkSource = errors.New("source returned much less than before")
 // replacing index from writing an empty result over a good one, which is what
 // an expired token would otherwise do silently.
 var ErrNoRecords = errors.New("nothing was read from any source")
+
+// ErrSample indicates a write that would mix real sources into sample data.
+var ErrSample = errors.New("the index holds sample data: wipe it before indexing your own sources")
+
+// ErrRealIndex indicates a sample load that would replace an index of real data.
+var ErrRealIndex = errors.New("the index holds your own data: wipe it before loading the sample company")

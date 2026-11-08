@@ -439,7 +439,7 @@ func TestUnbuiltHandle(t *testing.T) {
 		t.Fatalf("Status: %v", err)
 	}
 	if diff := cmp.Diff(`{"people":0,"channels":0,"teams":0,"subjects":0,"words":0,"sources":{},`+
-		`"embeddings":false,"conversations":0,"sealed":true,"age_seconds":0,"scopes":[]}`, raw); diff != "" {
+		`"embeddings":false,"conversations":0,"sealed":true,"age_seconds":0,"scopes":[],"sample":false}`, raw); diff != "" {
 		t.Errorf("status mismatch (-want +got):\n%s", diff)
 	}
 	if raw, err := h.ChangesSince(0); err != nil || raw != `{"entries":0,"changes":{}}` {
@@ -666,6 +666,179 @@ func TestStatusNoIndexScopes(t *testing.T) {
 	}
 	if _, err := h.Status(0); err == nil {
 		t.Error("Status over a damaged refresh config returned nil")
+	}
+}
+
+// TestImportSample verifies the sample company loads sealed under the handle's key,
+// reads as sample data, blocks real sources until a wipe, and never replaces real data.
+func TestImportSample(t *testing.T) {
+	t.Parallel()
+	bundled := t.TempDir()
+	copySample(t, engine.Dir(newTestDataDir(t, nil)), bundled)
+	if err := os.Chmod(bundled, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(bundled, 0o700) })
+	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	dir := filepath.Join(t.TempDir(), "data")
+	h, err := Open(dir, testKeyB64)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	raw, err := h.ImportSample(bundled, now.Unix())
+	if err != nil {
+		t.Fatalf("ImportSample: %v", err)
+	}
+	var got sampleView
+	if err := json.Unmarshal([]byte(raw), &got); err != nil {
+		t.Fatalf("unmarshal %s: %v", raw, err)
+	}
+	want := sampleView{People: 12, Channels: 4, Sources: 8, LoadedAt: now.Format(time.RFC3339)}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("import mismatch (-want +got):\n%s", diff)
+	}
+	ans, err := h.Ask("terraform", 3)
+	if err != nil || !strings.Contains(ans, "Carol Lee") {
+		t.Errorf("Ask after import = %s, %v; want Carol Lee", ans, err)
+	}
+	for _, path := range []string{engine.Dir(dir).Index(), engine.Dir(dir).Episodes(), engine.Dir(dir).Changes()} {
+		stored, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(stored), "Carol") {
+			t.Errorf("%s holds a name in plain text under a key", path)
+		}
+	}
+	if _, err := os.Stat(engine.Dir(dir).Sources()); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("import wrote a sources sidecar: %v", err)
+	}
+
+	later := now.Add(3 * time.Minute)
+	raw, err = h.Status(later.Unix())
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+	var st statusView
+	if err := json.Unmarshal([]byte(raw), &st); err != nil {
+		t.Fatalf("unmarshal %s: %v", raw, err)
+	}
+	if !st.Sample || st.LoadedAt != now.Format(time.RFC3339) || st.AgeSeconds != 180 {
+		t.Errorf("status sample %v, loaded %q, age %d; want true, %s, 180", st.Sample, st.LoadedAt, st.AgeSeconds, now)
+	}
+	if len(st.Scopes) != 8 || st.Scopes[0] != (scopeView{
+		Source: "codeowners", Scope: "sample", RanAt: now.Format(time.RFC3339), AgeSeconds: 180,
+	}) {
+		t.Errorf("status scopes = %+v, want eight sample scopes", st.Scopes)
+	}
+
+	if _, err := h.Index("org-csv", "--file=x.csv", later.Unix()); !errors.Is(err, engine.ErrSample) {
+		t.Errorf("Index over sample = %v, want ErrSample", err)
+	}
+	if _, err := h.Refresh("", later.Unix()); !errors.Is(err, engine.ErrSample) {
+		t.Errorf("Refresh over sample = %v, want ErrSample", err)
+	}
+
+	before, err := h.ChangesSince(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(before, `"entries":1`) {
+		t.Errorf("changes after import = %s, want one entry", before)
+	}
+	if _, err := h.ImportSample(bundled, later.Unix()); err != nil {
+		t.Fatalf("second ImportSample: %v", err)
+	}
+	if after, err := h.ChangesSince(0); err != nil || after != before {
+		t.Errorf("a second import logged changes: %s, %v; want %s", after, err, before)
+	}
+
+	wiped, err := Wipe(dir)
+	if err != nil {
+		t.Fatalf("Wipe: %v", err)
+	}
+	if !strings.Contains(wiped, "sample.json") {
+		t.Errorf("wipe %s does not name the marker", wiped)
+	}
+	if _, err := os.Stat(dir); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("wipe left the directory: %v", err)
+	}
+}
+
+// TestImportSampleRefused verifies a load over real data or from a missing sample
+// fails and changes nothing, and a real index reads as no sample.
+func TestImportSampleRefused(t *testing.T) {
+	t.Parallel()
+	bundled := t.TempDir()
+	copySample(t, engine.Dir(newTestDataDir(t, nil)), bundled)
+	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	tests := []struct {
+		Want     error
+		WantText string
+		Real     bool
+		From     string
+	}{{ // Test 0: Real data stays.
+		Real: true, From: bundled, Want: engine.ErrRealIndex,
+	}, { // Test 1: A sample that is not there leaves no marker behind.
+		From: filepath.Join(bundled, "missing"), WantText: "core: load sample: ",
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			dir := filepath.Join(t.TempDir(), "data")
+			h, err := Open(dir, "")
+			if err != nil {
+				t.Fatalf("Open: %v", err)
+			}
+			if test.Real {
+				if _, err := h.Index("git", "--repo-path\n"+newGitRepo(t)+"\n--git-since-days=10000\n", now.Unix()); err != nil {
+					t.Fatalf("Index: %v", err)
+				}
+			}
+			_, err = h.ImportSample(test.From, now.Unix())
+			if test.Want != nil && !errors.Is(err, test.Want) {
+				t.Errorf("ImportSample = %v, want %v", err, test.Want)
+			}
+			if err == nil || !strings.Contains(err.Error(), test.WantText) {
+				t.Errorf("ImportSample = %v, want text %q", err, test.WantText)
+			}
+			if _, err := os.Stat(engine.Dir(dir).Sample()); !errors.Is(err, os.ErrNotExist) {
+				t.Errorf("a refused import left the marker: %v", err)
+			}
+			st, err := h.Status(now.Unix())
+			if err != nil || strings.Contains(st, `"sample":true`) {
+				t.Errorf("status %s, %v; want no sample", st, err)
+			}
+		})
+	}
+}
+
+// TestImportSampleCutShort verifies an import that stops partway still reads as
+// sample data, so it can never pass for a real index, and a second load finishes it.
+func TestImportSampleCutShort(t *testing.T) {
+	t.Parallel()
+	bundled := t.TempDir()
+	copySample(t, engine.Dir(newTestDataDir(t, nil)), bundled)
+	dir := filepath.Join(t.TempDir(), "data")
+	h, err := Open(dir, "")
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	if err := os.MkdirAll(engine.Dir(dir).Episodes(), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.ImportSample(bundled, 100); err == nil {
+		t.Fatal("ImportSample with no way to save conversations returned nil")
+	}
+	st, err := h.Status(100)
+	if err != nil || !strings.Contains(st, `"sample":true`) {
+		t.Errorf("status %s, %v; want sample", st, err)
+	}
+	if err := os.Remove(engine.Dir(dir).Episodes()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.ImportSample(bundled, 200); err != nil {
+		t.Errorf("ImportSample after the fault cleared: %v", err)
 	}
 }
 

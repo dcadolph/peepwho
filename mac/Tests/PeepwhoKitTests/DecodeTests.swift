@@ -64,6 +64,22 @@ struct DecodeTests {
         #expect(slack.error == nil)
     }
 
+    // sample decodes the load result and a status that reads as sample data.
+    @Test func sample() throws {
+        let got: SampleResult = try Core.decode(fixture("import_sample"))
+        #expect(got.people > 0)
+        #expect(got.loadedAt.isEmpty == false)
+        let status: IndexStatus = try Core.decode(fixture("status_sample"))
+        #expect(status.sample)
+        #expect(status.loadedAt?.isEmpty == false)
+        #expect(status.scopes.count == 8)
+        #expect(status.scopes.first?.scope == "sample")
+        #expect(status.scopes.first?.ageSeconds == 180)
+        let real: IndexStatus = try Core.decode(fixture("status"))
+        #expect(!real.sample)
+        #expect(real.loadedAt == nil)
+    }
+
     // changes decodes the merged changes and when they ran.
     @Test func changes() throws {
         let got: ChangesAnswer = try Core.decode(fixture("changes"))

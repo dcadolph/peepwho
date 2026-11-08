@@ -13,6 +13,7 @@ struct PeepwhoApp: App {
         MenuBarExtra("peepwho", systemImage: "person.2") {
             SearchView(model: app.search) {
                 app.settings.reopenIfClosed()
+                await app.settings.loadStatus()
                 await app.settings.refreshIfStale()
             }
         }
@@ -43,10 +44,12 @@ final class AppModel: ObservableObject {
             dir: dir,
             open: { try Core.open(dir: dir, key: try IndexKey.load(), secrets: KeychainSecrets()) },
             secrets: KeychainStore(),
-            places: BookmarkStore()
+            places: BookmarkStore(),
+            sampleDir: Bundle.main.url(forResource: "SampleCompany", withExtension: nil)
         )
         search = SearchModel(core: settings.core, openError: settings.lines.first) { NSWorkspace.shared.open($0) }
         settings.onCore = { [weak search] core in search?.use(core) }
+        settings.onSample = { [weak search] sample in search?.sample = sample }
         let tick = max(15, min(settings.refreshInterval / 4, 300))
         timer = Timer.scheduledTimer(withTimeInterval: tick, repeats: true) { [weak self] _ in
             Task { @MainActor in await self?.settings.refreshIfStale() }

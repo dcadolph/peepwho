@@ -206,10 +206,15 @@ public struct IndexStatus: Codable, Sendable {
     public let ageSeconds: Int64
     // scopes are the recorded index runs in source then scope order.
     public let scopes: [IndexScope]
+    // sample reports whether the index holds the sample company.
+    public let sample: Bool
+    // loadedAt is when the sample company was loaded, RFC 3339, absent when it was not.
+    public let loadedAt: String?
 
     // CodingKeys maps the core's snake case names.
     enum CodingKeys: String, CodingKey {
-        case people, teams, subjects, channels, words, conversations, sources, embeddings, sealed, scopes
+        case people, teams, subjects, channels, words, conversations, sources, embeddings, sealed, scopes, sample
+        case loadedAt = "loaded_at"
         case builtAt = "built_at"
         case ageSeconds = "age_seconds"
     }
@@ -325,6 +330,24 @@ public struct RefreshResult: Codable, Sendable {
     public let results: [RefreshScope]
     // log is the run's progress text.
     public let log: String
+}
+
+// SampleResult is what loading the sample company put in the index.
+public struct SampleResult: Codable, Sendable {
+    // people is how many people the sample holds.
+    public let people: Int
+    // channels is how many channels the sample holds.
+    public let channels: Int
+    // sources is how many sources the sample was built from.
+    public let sources: Int
+    // loadedAt is when the sample was loaded, RFC 3339.
+    public let loadedAt: String
+
+    // CodingKeys maps the core's snake case names.
+    enum CodingKeys: String, CodingKey {
+        case people, channels, sources
+        case loadedAt = "loaded_at"
+    }
 }
 
 // WipeResult lists what a wipe removed.

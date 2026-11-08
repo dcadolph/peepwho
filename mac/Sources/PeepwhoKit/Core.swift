@@ -78,6 +78,11 @@ public final class Core: @unchecked Sendable {
         return try await run(on: writes) { self.handle.refresh(joined, nowUnix: Self.unix(now), error: $0) }
     }
 
+    // importSample loads the sample company bundled at dir into the data directory.
+    public func importSample(from dir: URL, now: Date = Date()) async throws -> SampleResult {
+        try await run(on: writes) { self.handle.importSample(dir.path, nowUnix: Self.unix(now), error: $0) }
+    }
+
     // run calls body on queue, the read queue unless given, and decodes its JSON answer.
     private func run<T: Decodable>(on queue: DispatchQueue? = nil,
                                    _ body: @escaping (NSErrorPointer) -> String) async throws -> T {

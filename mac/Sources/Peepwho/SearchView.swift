@@ -19,6 +19,9 @@ struct SearchView: View {
                 .focused($focused)
                 .onSubmit { Task { await model.submit() } }
                 .onChange(of: model.query) { _, text in model.typed(text) }
+            if model.sample {
+                Text("Sample company").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            }
             if !model.changes.isEmpty, model.detail == nil {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Changed since you last looked").font(.caption.weight(.semibold))

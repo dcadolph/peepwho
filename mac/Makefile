@@ -6,6 +6,7 @@ APP := .build/Peepwho.app
 DMG := .build/Peepwho.dmg
 ICONSET := .build/AppIcon.iconset
 ICNS := .build/AppIcon.icns
+SAMPLE := .build/SampleCompany
 
 .PHONY: build test host app dmg run-host run clean
 
@@ -32,7 +33,14 @@ app: build $(ICNS)
 	cp "$(BIN)/Peepwho" $(APP)/Contents/MacOS/Peepwho
 	cp Sources/Peepwho/Info.plist $(APP)/Contents/Info.plist
 	cp $(ICNS) $(APP)/Contents/Resources/AppIcon.icns
+	rm -rf $(SAMPLE)
+	cd .. && go run . demo --big --save-index mac/$(SAMPLE)
+	mkdir -p $(APP)/Contents/Resources/SampleCompany
+	install -m 644 $(SAMPLE)/index.json $(SAMPLE)/episodes.json $(APP)/Contents/Resources/SampleCompany/
 	codesign --force --options runtime $(TIMESTAMP) --entitlements Sources/Peepwho/Peepwho.entitlements --sign "$(SIGN_ID)" $(APP)
+
+# The sample company is built from the simulated company at app build time and bundled as data,
+# so the app links no simorg. The sources sidecar stays out since a sample never merges.
 
 # The app icon is the site's favicon tile inset to the macOS icon grid, rendered at build time so
 # no binary art is committed.

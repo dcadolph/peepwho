@@ -14,7 +14,7 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Index") {
-                Text(summary).fixedSize(horizontal: false, vertical: true)
+                Text(model.summary).fixedSize(horizontal: false, vertical: true)
                 if let counts = sourceCounts {
                     Text(counts).font(.caption).foregroundStyle(.secondary)
                 }
@@ -31,8 +31,14 @@ struct SettingsView: View {
                     .font(.caption)
                 }
                 HStack {
-                    Button("Index Now") { Task { await model.indexAll() } }
-                    Button("Refresh Now") { Task { await model.refresh() } }
+                    Group {
+                        Button("Index Now") { Task { await model.indexAll() } }
+                        Button("Refresh Now") { Task { await model.refresh() } }
+                    }
+                    .disabled(model.status?.sample == true)
+                    if model.canLoadSample {
+                        Button("Load Sample Company") { Task { await model.loadSample() } }
+                    }
                     Spacer()
                     Button("Wipe…", role: .destructive) { confirmingWipe = true }
                 }
@@ -85,14 +91,6 @@ struct SettingsView: View {
         }
     }
 
-    // summary says how much the index holds and how old it is.
-    private var summary: String {
-        guard let s = model.status else { return "The index is not open." }
-        guard s.builtAt != nil else { return "Nothing indexed yet. Pick a folder or add a token, then Index Now." }
-        let sealed = s.sealed ? " Encrypted on disk." : ""
-        return "\(s.people) people, \(s.teams) teams, \(s.channels) channels. Indexed \(Age.words(s.ageSeconds)).\(sealed)"
-    }
-
     // sourceCounts lists the records each source holds, nil when there are none.
     private var sourceCounts: String? {
         guard let sources = model.status?.sources, !sources.isEmpty else { return nil }
@@ -115,7 +113,7 @@ struct PlaceRow: View {
             Text(label)
             Spacer()
             Text(model.placeNames[slot] ?? "None").foregroundStyle(.secondary)
-            Button("Pick…") { pick() }.disabled(model.busy != nil)
+            Button("Pick…") { pick() }.disabled(model.busy != nil || model.status?.sample == true)
             if model.placeNames[slot] != nil {
                 Button("Forget") { model.forgetPlace(slot) }
             }

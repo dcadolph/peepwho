@@ -47,7 +47,7 @@ func testKeyCipher(t *testing.T) vault.Codec {
 func TestDirPaths(t *testing.T) {
 	t.Parallel()
 	d := Dir(filepath.Join("data", "dir"))
-	got := []string{d.Index(), d.Feedback(), d.Facts(), d.Refresh(), d.Episodes(), d.State(), d.Changes()}
+	got := []string{d.Index(), d.Feedback(), d.Facts(), d.Refresh(), d.Episodes(), d.State(), d.Changes(), d.Sample()}
 	want := []string{
 		filepath.Join("data", "dir", "index.json"),
 		filepath.Join("data", "dir", "feedback.json"),
@@ -56,6 +56,7 @@ func TestDirPaths(t *testing.T) {
 		filepath.Join("data", "dir", "episodes.json"),
 		filepath.Join("data", "dir", "index.state.json"),
 		filepath.Join("data", "dir", "changes.json"),
+		filepath.Join("data", "dir", "sample.json"),
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("paths mismatch (-want +got):\n%s", diff)

@@ -38,13 +38,13 @@ func TestWipe(t *testing.T) {
 	}{{ // Test 0: Every kept file, a lock, and a temporary write all go, then the directory.
 		Files: []string{
 			"index.json", "index.sources.json", "index.state.json", "episodes.json", "feedback.json",
-			"facts.json", "changes.json", "refresh.json", "attest.key",
+			"facts.json", "changes.json", "refresh.json", "attest.key", "sample.json",
 			"index.json" + util.LockSuffix, "changes.json.tmp-123",
 		},
 		WantPlan: []string{
 			"index.json", "index.json" + util.LockSuffix, "index.sources.json", "index.state.json",
 			"episodes.json", "feedback.json", "facts.json", "changes.json", "changes.json.tmp-123",
-			"refresh.json", "attest.key",
+			"refresh.json", "attest.key", "sample.json",
 		},
 	}, { // Test 1: A file peepwho did not write survives, and so does the directory.
 		Files:    []string{"index.json", "notes.txt"},

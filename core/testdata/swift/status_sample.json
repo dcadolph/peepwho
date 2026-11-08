@@ -1,0 +1,74 @@
+{
+  "age_seconds": 180,
+  "built_at": "2026-11-01T12:00:00Z",
+  "channels": 4,
+  "conversations": 6,
+  "embeddings": false,
+  "loaded_at": "2026-11-01T12:00:00Z",
+  "people": 12,
+  "sample": true,
+  "scopes": [
+    {
+      "age_seconds": 180,
+      "ran_at": "2026-11-01T12:00:00Z",
+      "scope": "sample",
+      "source": "codeowners"
+    },
+    {
+      "age_seconds": 180,
+      "ran_at": "2026-11-01T12:00:00Z",
+      "scope": "sample",
+      "source": "confluence"
+    },
+    {
+      "age_seconds": 180,
+      "ran_at": "2026-11-01T12:00:00Z",
+      "scope": "sample",
+      "source": "git"
+    },
+    {
+      "age_seconds": 180,
+      "ran_at": "2026-11-01T12:00:00Z",
+      "scope": "sample",
+      "source": "github"
+    },
+    {
+      "age_seconds": 180,
+      "ran_at": "2026-11-01T12:00:00Z",
+      "scope": "sample",
+      "source": "jira"
+    },
+    {
+      "age_seconds": 180,
+      "ran_at": "2026-11-01T12:00:00Z",
+      "scope": "sample",
+      "source": "org-csv"
+    },
+    {
+      "age_seconds": 180,
+      "ran_at": "2026-11-01T12:00:00Z",
+      "scope": "sample",
+      "source": "pagerduty"
+    },
+    {
+      "age_seconds": 180,
+      "ran_at": "2026-11-01T12:00:00Z",
+      "scope": "sample",
+      "source": "slack"
+    }
+  ],
+  "sealed": false,
+  "sources": {
+    "codeowners": 1,
+    "confluence": 2,
+    "git": 3,
+    "github": 3,
+    "jira": 3,
+    "org-csv": 12,
+    "pagerduty": 2,
+    "slack": 17
+  },
+  "subjects": 20,
+  "teams": 7,
+  "words": 71
+}
