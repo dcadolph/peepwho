@@ -119,7 +119,7 @@ struct ChannelRow: View {
 
     // body shows the channel name, as a link when it has one.
     var body: some View {
-        if let url = channel.url {
+        if let url = channel.url, SearchModel.openable(url) != nil {
             Button("#\(channel.name)") { model.openLink(url) }.buttonStyle(.link)
         } else {
             Text("#\(channel.name)")

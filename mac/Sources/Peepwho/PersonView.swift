@@ -5,8 +5,8 @@ import SwiftUI
 struct PersonView: View {
     // person is the person shown.
     let person: PersonDetail
-    // model opens links and goes back.
-    let model: SearchModel
+    // model opens links, goes back, and says when a link would not open.
+    @ObservedObject var model: SearchModel
 
     // body lays out the name, role, manager, topics, channels, and links.
     var body: some View {
@@ -29,8 +29,11 @@ struct PersonView: View {
             if let channels = person.channels, !channels.isEmpty {
                 Field(label: "Active in", value: channels.prefix(6).map { "#\($0)" }.joined(separator: ", "))
             }
-            ForEach(person.links ?? [], id: \.self) { link in
+            ForEach((person.links ?? []).filter { SearchModel.openable($0) != nil }, id: \.self) { link in
                 Button(Self.title(link)) { model.openLink(link) }
+            }
+            if let message = model.message {
+                Text(message).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
         }
     }

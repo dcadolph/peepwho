@@ -228,6 +228,76 @@ struct SearchStateTests {
     }
 }
 
+// LinkTests check that the app opens only the link schemes it allows, since links come from
+// servers and Enter opens without asking.
+@MainActor
+struct LinkTests {
+    // Test 0: Only https, http, slack, and mailto reach the opener, in any letter case.
+    @Test(arguments: [
+        ("https://x.example/a", true),
+        ("HTTPS://x.example/a", true),
+        ("http://x.example/a", true),
+        ("slack://user?team=T1&id=U1", true),
+        ("mailto:a@x.example", true),
+        ("file:///etc/passwd", false),
+        ("FILE:///etc/passwd", false),
+        ("javascript:alert(1)", false),
+        ("x-custom-app://run?cmd=1", false),
+        ("ssh://x.example", false),
+        ("no scheme here", false),
+        ("", false),
+    ])
+    func openLinkAllowsOnlySafeSchemes(link: String, allowed: Bool) {
+        let opened = Opened()
+        let model = SearchModel(core: nil, opener: opened.open)
+        model.openLink(link)
+        #expect(opened.urls.count == (allowed ? 1 : 0))
+        #expect(model.message == (allowed ? nil : "Could not open \(link)."))
+    }
+
+    // Test 1: Enter on a person whose only link is refused opens nothing and shows the person.
+    @Test func enterRefusesUnsafeLink() async throws {
+        let dir = try demoDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try editIndex(dir) { $0.replacingOccurrences(of: "\"slack://user?", with: "\"file:///etc/passwd?") }
+        let opened = Opened()
+        let core = try Core.open(dir: dir, key: "", secrets: KeychainSecrets())
+        let model = SearchModel(core: core, opener: opened.open)
+        model.query = "terraform"
+        await model.submit()
+        let first = try #require(model.people.first)
+        #expect(try await core.person(first.id).links?.first?.hasPrefix("file:") == true)
+        #expect(opened.urls.isEmpty)
+        #expect(model.detail?.id == first.id)
+    }
+
+    // Test 2: Enter skips a refused link and opens the first allowed one.
+    @Test func enterSkipsToAllowedLink() async throws {
+        let dir = try demoDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try editIndex(dir) { $0.replacingOccurrences(of: "\"slack://user?", with: "\"x-custom-app://run\",\"slack://user?") }
+        let opened = Opened()
+        let core = try Core.open(dir: dir, key: "", secrets: KeychainSecrets())
+        let model = SearchModel(core: core, opener: opened.open)
+        model.query = "terraform"
+        await model.submit()
+        let first = try #require(model.people.first)
+        #expect(try await core.person(first.id).links?.first?.hasPrefix("x-custom-app:") == true)
+        #expect(opened.urls.count == 1)
+        #expect(opened.urls.first?.scheme == "slack")
+        #expect(model.detail == nil)
+    }
+
+    // editIndex rewrites the plain index in dir through change, and fails if change does nothing.
+    private func editIndex(_ dir: URL, _ change: (String) -> String) throws {
+        let file = dir.appendingPathComponent("index.json")
+        let before = try String(contentsOf: file, encoding: .utf8)
+        let after = change(before)
+        try #require(after != before, "the index holds no link to edit")
+        try after.write(to: file, atomically: true, encoding: .utf8)
+    }
+}
+
 // ConcurrencyTests check that a question never waits behind an index run.
 struct ConcurrencyTests {
     // Test 0: An ask started after a long index run starts finishes before it.

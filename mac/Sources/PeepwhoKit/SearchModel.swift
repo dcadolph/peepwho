@@ -133,36 +133,49 @@ public final class SearchModel: ObservableObject {
         await open(first.id)
     }
 
-    // open looks up the person with id and opens their first link, showing them when there is
-    // none or it does not open.
+    // open looks up the person with id and opens their first link the app allows, showing them
+    // when there is none or it does not open.
     public func open(_ id: String) async {
         let mine = nextGeneration()
         guard let person = await lookUp(id, mine), mine == generation else { return }
-        if let link = person.links?.first, let url = URL(string: link), opener(url) {
+        if let url = person.links?.lazy.compactMap(Self.openable).first, opener(url) {
             return
         }
-        detail = person
+        show(person)
     }
 
     // select shows the person with id in place of the results.
     public func select(_ id: String) async {
         let mine = nextGeneration()
         guard let person = await lookUp(id, mine), mine == generation else { return }
-        detail = person
+        show(person)
     }
 
     // back returns from a person to the results, and a lookup still running stays out of it.
     public func back() {
         generation += 1
         detail = nil
+        message = nil
     }
 
-    // openLink opens one of the shown person's links.
+    // openLink opens one of the shown links, or says it could not.
     public func openLink(_ link: String) {
-        guard let url = URL(string: link) else { return }
-        if !opener(url) {
+        guard let url = Self.openable(link), opener(url) else {
             message = "Could not open \(link)."
+            return
         }
+        message = nil
+    }
+
+    // openableSchemes are the only link schemes the app opens, since links come from servers and
+    // Enter opens without asking.
+    private static let openableSchemes: Set<String> = ["https", "http", "slack", "mailto"]
+
+    // openable returns link as a URL when its scheme is one the app opens, and nil otherwise.
+    public static func openable(_ link: String) -> URL? {
+        guard let url = URL(string: link), let scheme = url.scheme?.lowercased(),
+              openableSchemes.contains(scheme) else { return nil }
+        return url
     }
 
     // nextGeneration starts a new step in the window and returns its number.
@@ -182,6 +195,12 @@ public final class SearchModel: ObservableObject {
             }
             return nil
         }
+    }
+
+    // show puts person in place of the results and clears any older message.
+    private func show(_ person: PersonDetail) {
+        detail = person
+        message = nil
     }
 
     // show replaces the result list with the answer to text.
