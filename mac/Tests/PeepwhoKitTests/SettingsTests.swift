@@ -463,7 +463,8 @@ struct SettingsTests {
         while model.busy == nil { await Task.yield() }
         model.cancel()
         await all
-        #expect(started.duration(to: clock.now) < .seconds(10))
+        // A lost cancel waits out the 120 second client timeout. A busy machine can take 18 seconds.
+        #expect(started.duration(to: clock.now) < .seconds(60))
         #expect(model.lines == ["Canceled."])
         #expect(model.status?.builtAt == nil)
         #expect(model.busy == nil)
