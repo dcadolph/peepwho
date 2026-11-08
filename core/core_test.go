@@ -7,6 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -1171,4 +1174,171 @@ func TestWipe(t *testing.T) {
 	if _, err := Wipe(" "); err == nil {
 		t.Error("Wipe of an empty path succeeded")
 	}
+}
+
+// panicSecrets is a Secrets whose every read panics, standing in for a bug below a call.
+type panicSecrets struct{}
+
+// Get panics.
+func (panicSecrets) Get(string) string { panic("secret read blew up") }
+
+// panicCodec is a Codec whose every use panics, standing in for a bug below a read or write.
+type panicCodec struct{}
+
+// Encode panics.
+func (panicCodec) Encode([]byte) ([]byte, error) { panic("encode blew up") }
+
+// Decode panics.
+func (panicCodec) Decode([]byte) ([]byte, error) { panic("decode blew up") }
+
+// TestPanicBecomesError verifies a panic under each exported call comes back as an error
+// naming the call, with no answer, and never reaches the host.
+func TestPanicBecomesError(t *testing.T) {
+	t.Parallel()
+	const now = int64(1_800_000_000)
+	noEngine := func(t *testing.T) *Handle {
+		t.Helper()
+		return &Handle{store: engine.NewStore(engine.Dir(t.TempDir()), nil), loaded: &loaded{}}
+	}
+	badCodec := func(t *testing.T) *Handle {
+		t.Helper()
+		dir := engine.Dir(t.TempDir())
+		if err := os.WriteFile(dir.Changes(), []byte("[]"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return &Handle{store: engine.NewStore(dir, panicCodec{})}
+	}
+	tests := []struct {
+		Handle  func(*testing.T) *Handle
+		Call    func(*testing.T, *Handle) (string, error)
+		WantMsg string
+	}{{ // Test 0: Ask.
+		Handle: noEngine, WantMsg: "ask: ",
+		Call: func(_ *testing.T, h *Handle) (string, error) { return h.Ask("terraform", 1) },
+	}, { // Test 1: Search.
+		Handle: noEngine, WantMsg: "search: ",
+		Call: func(_ *testing.T, h *Handle) (string, error) { return h.Search("terraform", 1) },
+	}, { // Test 2: Person.
+		Handle: noEngine, WantMsg: "person: ",
+		Call: func(_ *testing.T, h *Handle) (string, error) { return h.Person("a@example.com") },
+	}, { // Test 3: Recall.
+		Handle: noEngine, WantMsg: "recall: ",
+		Call: func(_ *testing.T, h *Handle) (string, error) { return h.Recall("a@example.com", "x", 1) },
+	}, { // Test 4: Status.
+		Handle: noEngine, WantMsg: "status: ",
+		Call: func(_ *testing.T, h *Handle) (string, error) { return h.Status(now) },
+	}, { // Test 5: ChangesSince.
+		Handle: badCodec, WantMsg: "changes: ",
+		Call: func(_ *testing.T, h *Handle) (string, error) { return h.ChangesSince(0) },
+	}, { // Test 6: ImportSample.
+		Handle: badCodec, WantMsg: "load sample: ",
+		Call: func(t *testing.T, h *Handle) (string, error) {
+			t.Helper()
+			bundled := t.TempDir()
+			copySample(t, engine.Dir(newTestDataDir(t, nil)), bundled)
+			return h.ImportSample(bundled, now)
+		},
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			out, err := test.Call(t, test.Handle(t))
+			if !errors.Is(err, errPanic) || !strings.Contains(err.Error(), test.WantMsg) {
+				t.Errorf("error = %v, want %v naming %q", err, errPanic, test.WantMsg)
+			}
+			if out != "" {
+				t.Errorf("answer = %q, want none", out)
+			}
+		})
+	}
+}
+
+// TestPanicInWriteLeavesHandleUsable verifies a Secrets that panics during Index and
+// Refresh fails those calls and holds no lock, so the next write on the handle runs.
+func TestPanicInWriteLeavesHandleUsable(t *testing.T) {
+	t.Parallel()
+	flags := "--jira-server\n--jira-url=" + authJira(t) + "\n--jira-project\nKAFKA"
+	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC).Unix()
+	h, err := Open(t.TempDir(), "")
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	h.SetSecrets(panicSecrets{})
+	if _, err := h.Index("jira", flags, now); !errors.Is(err, errPanic) || !strings.Contains(err.Error(), "secret read blew up") {
+		t.Errorf("Index error = %v, want %v naming the panic", err, errPanic)
+	}
+	h.SetSecrets(mapSecrets{engine.JiraTokenEnv: "good"})
+	if _, err := h.Index("jira", flags, now); err != nil {
+		t.Fatalf("Index after a panic: %v", err)
+	}
+	h.SetSecrets(panicSecrets{})
+	if _, err := h.Refresh("jira", now+60); !errors.Is(err, errPanic) {
+		t.Errorf("Refresh error = %v, want %v", err, errPanic)
+	}
+	h.SetSecrets(mapSecrets{engine.JiraTokenEnv: "good"})
+	raw, err := h.Refresh("jira", now+120)
+	if err != nil || !strings.Contains(raw, `"ok":true`) {
+		t.Errorf("Refresh after a panic = %s, %v; want ok", raw, err)
+	}
+	if _, err := h.Ask("rebalance", 1); err != nil {
+		t.Errorf("Ask after a panic: %v", err)
+	}
+}
+
+// TestEveryExportedCallRescues verifies each exported function in core.go that can return an
+// error opens with defer rescue, so a new call cannot leave a way for a panic to reach the
+// host. Open and Wipe have no seam to panic under, so this is what covers them.
+func TestEveryExportedCallRescues(t *testing.T) {
+	t.Parallel()
+	file, err := parser.ParseFile(token.NewFileSet(), "core.go", nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, decl := range file.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || !fn.Name.IsExported() || fn.Type.Results == nil || !onHandle(fn) {
+			continue
+		}
+		last := fn.Type.Results.List[len(fn.Type.Results.List)-1]
+		if id, ok := last.Type.(*ast.Ident); !ok || id.Name != "error" {
+			continue
+		}
+		got = append(got, fn.Name.Name)
+		if !opensWithRescue(fn) {
+			t.Errorf("%s does not open with defer rescue", fn.Name.Name)
+		}
+	}
+	want := []string{"Open", "Ask", "Search", "Person", "Recall", "Status", "ChangesSince", "Index", "Refresh",
+		"ImportSample", "Wipe"}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("exported calls mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// onHandle reports whether fn crosses to the host: a plain function, or a method on Handle
+// and not on a type gomobile never binds.
+func onHandle(fn *ast.FuncDecl) bool {
+	if fn.Recv == nil {
+		return true
+	}
+	star, ok := fn.Recv.List[0].Type.(*ast.StarExpr)
+	if !ok {
+		return false
+	}
+	id, ok := star.X.(*ast.Ident)
+	return ok && id.Name == "Handle"
+}
+
+// opensWithRescue reports whether fn's first statement is a deferred call to rescue.
+func opensWithRescue(fn *ast.FuncDecl) bool {
+	if fn.Body == nil || len(fn.Body.List) == 0 {
+		return false
+	}
+	deferred, ok := fn.Body.List[0].(*ast.DeferStmt)
+	if !ok {
+		return false
+	}
+	id, ok := deferred.Call.Fun.(*ast.Ident)
+	return ok && id.Name == "rescue"
 }

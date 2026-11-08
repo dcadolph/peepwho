@@ -111,7 +111,8 @@ func (h *Handle) secret(name string) string {
 // here with an error that names the key, rather than on the first question. A
 // directory with no index yet, or none at all, opens unbuilt: Index or Refresh
 // builds it, and until then a question says there is no index yet.
-func Open(dir, key string) (*Handle, error) {
+func Open(dir, key string) (h *Handle, err error) {
+	defer rescue("open", &err)
 	if strings.TrimSpace(dir) == "" {
 		return nil, errors.New("core: data directory is empty")
 	}
@@ -186,6 +187,20 @@ func openError(path string, codec vault.Codec, err error) error {
 	}
 }
 
+// errPanic is returned by a call that panicked. A panic that reached gomobile would
+// kill the host app, so every exported call turns one into this error instead.
+var errPanic = errors.New("core: internal error")
+
+// rescue turns a panic in the exported call name into errPanic in err. It runs only
+// as that call's deferred function and reaches panics on the call's own goroutine. A
+// panic on a goroutine a connector starts, and a fatal runtime error, still end the
+// process.
+func rescue(name string, err *error) {
+	if r := recover(); r != nil {
+		*err = fmt.Errorf("%w: %s: %v", errPanic, name, r)
+	}
+}
+
 // errNotOpen is returned by a handle Swift built directly instead of with Open.
 var errNotOpen = errors.New("core: handle is not open: get one from Open")
 
@@ -244,7 +259,8 @@ func toJSON(v any) (string, error) {
 
 // Ask answers who to talk to and where to ask about query, ranked by keyword,
 // with up to limit results per section.
-func (h *Handle) Ask(query string, limit int) (string, error) {
+func (h *Handle) Ask(query string, limit int) (out string, err error) {
+	defer rescue("ask", &err)
 	l, err := h.built()
 	if err != nil {
 		return "", err
@@ -261,7 +277,8 @@ func (h *Handle) Ask(query string, limit int) (string, error) {
 }
 
 // Search finds people and channels by name, email, title, team, or topic.
-func (h *Handle) Search(query string, limit int) (string, error) {
+func (h *Handle) Search(query string, limit int) (out string, err error) {
+	defer rescue("search", &err)
 	l, err := h.built()
 	if err != nil {
 		return "", err
@@ -274,7 +291,8 @@ func (h *Handle) Search(query string, limit int) (string, error) {
 }
 
 // Person returns the full profile of the person with canonical id.
-func (h *Handle) Person(id string) (string, error) {
+func (h *Handle) Person(id string) (out string, err error) {
+	defer rescue("person", &err)
 	l, err := h.built()
 	if err != nil {
 		return "", err
@@ -289,7 +307,8 @@ func (h *Handle) Person(id string) (string, error) {
 // Recall finds past conversations about query that person took part in. person
 // is an email or a source identifier such as slack:U123; the answer covers only
 // that person's own conversations.
-func (h *Handle) Recall(person, query string, limit int) (string, error) {
+func (h *Handle) Recall(person, query string, limit int) (out string, err error) {
+	defer rescue("recall", &err)
 	l, err := h.built()
 	if err != nil {
 		return "", err
@@ -381,7 +400,8 @@ func (h *Handle) scopeViews(now time.Time) ([]scopeView, error) {
 // Status reports what the index holds and how old it is at nowUnix, the host's
 // clock in seconds since the Unix epoch. A directory with no index yet reports
 // zero counts and no build time.
-func (h *Handle) Status(nowUnix int64) (string, error) {
+func (h *Handle) Status(nowUnix int64) (out string, err error) {
+	defer rescue("status", &err)
 	if err := h.ready(); err != nil {
 		return "", err
 	}
@@ -440,7 +460,8 @@ type changesView struct {
 // ChangesSince reports what changed in the index after sinceUnix, seconds since
 // the Unix epoch, merged into one set of changes. Zero means everything the
 // log holds. The host keeps its own last-look time and passes it in.
-func (h *Handle) ChangesSince(sinceUnix int64) (string, error) {
+func (h *Handle) ChangesSince(sinceUnix int64) (out string, err error) {
+	defer rescue("changes", &err)
 	if err := h.ready(); err != nil {
 		return "", err
 	}
@@ -554,7 +575,8 @@ type indexView struct {
 // so a second source adds to the first; to start over, Wipe then Index.
 // Credentials come from the handle's Secrets. --policy is refused, since the
 // core runs only under the strict policy.
-func (h *Handle) Index(source, flags string, nowUnix int64) (string, error) {
+func (h *Handle) Index(source, flags string, nowUnix int64) (out string, err error) {
+	defer rescue("index", &err)
 	if err := h.ready(); err != nil {
 		return "", err
 	}
@@ -624,7 +646,8 @@ type refreshView struct {
 // or empty for every recorded source. One scope failing, such as on an expired
 // token, does not stop the others: the answer lists each scope with its error,
 // and ok is false. An error is returned only when nothing could run.
-func (h *Handle) Refresh(sources string, nowUnix int64) (string, error) {
+func (h *Handle) Refresh(sources string, nowUnix int64) (out string, err error) {
+	defer rescue("refresh", &err)
 	if err := h.ready(); err != nil {
 		return "", err
 	}
@@ -708,7 +731,8 @@ type sampleView struct {
 // The marker goes first, so an import cut short can never leave sample data that
 // reads as real. Until a wipe, Index and Refresh refuse, since nothing about a
 // simulated company can be refreshed.
-func (h *Handle) ImportSample(dir string, nowUnix int64) (string, error) {
+func (h *Handle) ImportSample(dir string, nowUnix int64) (out string, err error) {
+	defer rescue("load sample", &err)
 	if err := h.ready(); err != nil {
 		return "", err
 	}
@@ -783,7 +807,8 @@ type wipeView struct {
 // key never blocks a wipe. Files peepwho did not write are left in place. A
 // handle open on dir still answers from memory afterward, so drop it. The
 // host's own Keychain items are the host's to delete.
-func Wipe(dir string) (string, error) {
+func Wipe(dir string) (out string, err error) {
+	defer rescue("wipe", &err)
 	if strings.TrimSpace(dir) == "" {
 		return "", errors.New("core: data directory is empty")
 	}
