@@ -13,6 +13,27 @@ struct SettingsView: View {
     // body lays out the index summary above the sources.
     var body: some View {
         Form {
+            Section("General") {
+                if let login = model.login {
+                    Toggle("Open at login", isOn: Binding(
+                        get: { login != .off },
+                        set: { model.setOpensAtLogin($0) }
+                    ))
+                }
+                if let note = model.loginNote {
+                    HStack {
+                        Text(note).font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer()
+                        Button("Open System Settings") { SystemLoginItem.openSettings() }.controlSize(.small)
+                    }
+                }
+                HStack {
+                    Text(version).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("About peepwho") { showAbout() }
+                }
+            }
             Section("Index") {
                 Text(model.summary).fixedSize(horizontal: false, vertical: true)
                 if let counts = sourceCounts {
@@ -100,6 +121,25 @@ struct SettingsView: View {
         } message: {
             Text("This deletes everything peepwho has indexed on this Mac. Tokens and picked folders stay.")
         }
+    }
+
+    // version is the version the build stamped into the bundle.
+    private var version: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "unknown"
+        let build = info?["CFBundleVersion"] as? String ?? "unknown"
+        return "Version \(short) (\(build))"
+    }
+
+    // showAbout opens the standard panel, which reads the version and copyright from the bundle.
+    // The app has no menu bar of its own to hold it.
+    private func showAbout() {
+        let credits = NSAttributedString(string: "peepwho.app", attributes: [
+            .link: URL(string: "https://peepwho.app") as Any,
+            .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+        ])
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "peepwho", .credits: credits])
     }
 
     // sourceCounts lists the records each source holds, nil when there are none.

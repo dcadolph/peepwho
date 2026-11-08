@@ -64,6 +64,10 @@ before it runs again. The interval is a default in seconds:
 defaults write com.dcadolph.peepwho PeepwhoRefreshIntervalSeconds -int 3600
 ```
 
+Settings has an Open at login switch, off until a person turns it on, which adds the app to the
+system's Login Items. A person who turned the app off in System Settings has to approve it there,
+and the switch says so. About peepwho shows the version and copyright.
+
 The index lives in
 `~/Library/Containers/com.dcadolph.peepwho/Data/Library/Application Support/peepwho`, sealed
 with a key the app makes on first launch and keeps in its Keychain. It is the app's own
@@ -71,10 +75,15 @@ index, and the sandbox keeps it from reading the command line's `~/.peepwho`.
 
 ## Release the app
 
-The app carries its own version, `CFBundleShortVersionString` in
-`mac/Sources/Peepwho/Info.plist`, and an integer `CFBundleVersion` that goes up with every
-build shipped. The notarized disk image is attached to the current command line release.
+The app's version is stamped from the newest `v*` tag when it is built, so cut the release
+first and build from its tag: `make -C mac dmg` refuses a tree that is not clean on the tag the
+app says it is. `CFBundleVersion` in `mac/Sources/Peepwho/Info.plist` is an integer that goes up
+with every build shipped. The notarized disk image is attached to that release.
 `NOTARY_PROFILE` names a `notarytool store-credentials` profile for the signing team.
+
+The app is universal, one build per architecture joined with `lipo`, with the core's own arm64
+and x86_64 slices inside. `make -C mac app` ends by running `verify-bundle.sh`, which fails on a
+missing slice, a wrong version or macOS floor, or a missing category or copyright.
 
 ```sh
 make mac

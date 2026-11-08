@@ -171,6 +171,8 @@ public final class SettingsModel: ObservableObject {
     @Published public private(set) var progress: String?
     // canCancel reports whether the run going now can be stopped.
     @Published public private(set) var canCancel = false
+    // login says whether the app opens at login, nil when it has no login item.
+    @Published public private(set) var login: LoginState?
     // scopes are what the token sources read, saved on every change.
     @Published public var scopes: Scopes {
         didSet { saveScopes() }
@@ -201,12 +203,16 @@ public final class SettingsModel: ObservableObject {
     private let defaults: UserDefaults
     // sampleDir is the sample company the app bundles, nil when it has none.
     private let sampleDir: URL?
+    // loginItem turns opening at login on and off, nil when the app has none.
+    private let loginItem: LoginItem?
 
     // init opens dir with open and reads which secrets and places are saved.
     public init(dir: URL, open: @escaping () throws -> Core, secrets: SecretStore, places: PlaceStore,
-                defaults: UserDefaults = .standard, sampleDir: URL? = nil) {
+                defaults: UserDefaults = .standard, sampleDir: URL? = nil, loginItem: LoginItem? = nil) {
         self.dir = dir
         self.sampleDir = sampleDir
+        self.loginItem = loginItem
+        login = loginItem?.state
         self.open = open
         self.secrets = secrets
         self.places = places
@@ -214,6 +220,30 @@ public final class SettingsModel: ObservableObject {
         scopes = Scopes.load(secrets)
         reopen()
         readSaved()
+    }
+
+    // setOpensAtLogin asks the system to change the setting, then shows what the system says, so
+    // a refusal never reads as done. Turning it on after a person turned it off in System Settings
+    // is refused with an approval state, which loginNote explains better than the error does.
+    public func setOpensAtLogin(_ on: Bool) {
+        guard let loginItem else { return }
+        do {
+            if on {
+                try loginItem.enable()
+            } else {
+                try loginItem.disable()
+            }
+        } catch {
+            if !on || loginItem.state != .needsApproval {
+                lines = ["Could not change opening at login: \(error)."]
+            }
+        }
+        login = loginItem.state
+    }
+
+    // loginNote says what a person has to do before the app opens at login, nil when nothing.
+    public var loginNote: String? {
+        login == .needsApproval ? "Turn peepwho on in System Settings, under General, Login Items." : nil
     }
 
     // saveScopes keeps the scopes in the secret store, or says why it could not.
@@ -401,6 +431,7 @@ public final class SettingsModel: ObservableObject {
 
     // loadStatus reads what the index holds at now.
     public func loadStatus(now: Date = Date()) async {
+        login = loginItem?.state
         guard let core else {
             status = nil
             onRefreshFailure?(nil)

@@ -45,7 +45,8 @@ final class AppModel: ObservableObject {
             open: { try Core.open(dir: dir, key: try IndexKey.load(), secrets: KeychainSecrets()) },
             secrets: KeychainStore(),
             places: BookmarkStore(),
-            sampleDir: Bundle.main.url(forResource: "SampleCompany", withExtension: nil)
+            sampleDir: Bundle.main.url(forResource: "SampleCompany", withExtension: nil),
+            loginItem: SystemLoginItem()
         )
         search = SearchModel(core: settings.core, openError: settings.lines.first) { NSWorkspace.shared.open($0) }
         settings.onCore = { [weak search] core in search?.use(core) }
