@@ -82,7 +82,7 @@ public struct IndexJob: Equatable, Sendable {
             jobs.append(IndexJob(source: "jira", flags: server + projects.flatMap { ["--jira-project", $0] }))
         }
         let spaces = list(scopes.confluenceSpaces)
-        if has(SecretName.confluenceToken), !spaces.isEmpty {
+        if has(SecretName.confluenceURL), has(SecretName.confluenceToken), !spaces.isEmpty {
             let server = scopes.confluenceServer ? ["--confluence-server"] : []
             jobs.append(IndexJob(source: "confluence", flags: server + spaces.flatMap { ["--confluence-space", $0] }))
         }
@@ -193,6 +193,7 @@ public final class SettingsModel: ObservableObject {
 
     // pick remembers url for slot and indexes it.
     public func pick(_ url: URL, as slot: BookmarkSlot) async {
+        guard refuseWhileBusy() else { return }
         do {
             try places.save(url, in: slot)
         } catch {
@@ -283,7 +284,7 @@ public final class SettingsModel: ObservableObject {
             return false
         }
         guard let status = try? await core.status(now: now), status.builtAt != nil,
-              TimeInterval(status.ageSeconds) >= interval
+              TimeInterval(status.ageSeconds) >= interval, busy == nil
         else { return false }
         lastAttempt = now
         await refresh()
@@ -293,6 +294,7 @@ public final class SettingsModel: ObservableObject {
     // wipe deletes the data directory and opens a fresh, empty one in its place. Tokens and
     // picked places stay until forgotten one by one.
     public func wipe() async {
+        guard refuseWhileBusy() else { return }
         busy = "Wiping"
         core = nil
         onCore?(nil)
@@ -321,9 +323,18 @@ public final class SettingsModel: ObservableObject {
         saved.contains(name)
     }
 
+    // refuseWhileBusy reports whether the model is idle, and says what to wait for when it is not.
+    // Actions never overlap, so a wipe cannot run under an index that would write its files back.
+    private func refuseWhileBusy() -> Bool {
+        guard let busy else { return true }
+        lines = ["\(busy) is still running. Try again when it finishes."]
+        return false
+    }
+
     // run marks the model busy with label, runs body on the open core, shows its lines, and
     // reads the status again.
     private func run(_ label: String, _ body: (Core) async throws -> [String]) async {
+        guard refuseWhileBusy() else { return }
         guard let core else {
             lines = ["The index is not open."]
             return

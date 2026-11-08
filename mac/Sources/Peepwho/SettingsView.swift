@@ -103,7 +103,7 @@ struct PlaceRow: View {
             Text(label)
             Spacer()
             Text(model.placeNames[slot] ?? "None").foregroundStyle(.secondary)
-            Button("Pick…") { pick() }
+            Button("Pick…") { pick() }.disabled(model.busy != nil)
             if model.placeNames[slot] != nil {
                 Button("Forget") { model.forgetPlace(slot) }
             }

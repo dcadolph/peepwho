@@ -88,7 +88,7 @@ struct SettingsTests {
         scopes.confluenceSpaces = "ENG"
         let all: Set<String> = [
             SecretName.slackToken, SecretName.githubToken, SecretName.jiraURL, SecretName.jiraToken,
-            SecretName.confluenceToken, SecretName.pagerdutyToken,
+            SecretName.confluenceURL, SecretName.confluenceToken, SecretName.pagerdutyToken,
         ]
         let got = IndexJob.forTokens(scopes) { all.contains($0) }
         #expect(got == [
@@ -179,6 +179,33 @@ struct SettingsTests {
         #expect(model.lines == ["Nothing to index yet. Pick a folder or add a token first."])
         await model.refresh()
         #expect(model.lines == ["Nothing to refresh yet. Index something first."])
+    }
+
+    // Test 6: A wipe or a second index started while an index runs is refused, so the running
+    // index cannot write its files back after the wipe.
+    @Test func actionsNeverOverlap() async throws {
+        let repo = try gitRepo()
+        let dir = tempDir("peepwho-data")
+        defer {
+            try? FileManager.default.removeItem(at: repo)
+            try? FileManager.default.removeItem(at: dir)
+        }
+        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let places = MemoryPlaces()
+        let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+                                  secrets: MemorySecrets(), places: places, defaults: defaults)
+        async let picked: Void = model.pick(repo, as: .git)
+        await Task.yield()
+        #expect(model.busy != nil)
+        await model.wipe()
+        #expect(model.lines.first?.hasSuffix("is still running. Try again when it finishes.") == true)
+        await model.indexAll()
+        #expect(model.lines.first?.hasSuffix("is still running. Try again when it finishes.") == true)
+        await picked
+        #expect(model.busy == nil)
+        #expect(model.status?.sources["git"] != nil)
+        #expect(FileManager.default.fileExists(atPath: dir.path))
+        #expect(places.open == 0)
     }
 
     // Test 5: An open that failed, such as under a locked Keychain, opens on the next try, hands
