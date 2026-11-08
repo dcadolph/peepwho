@@ -26,6 +26,10 @@ func newTagsServer(t *testing.T, code int) string {
 	return srv.URL
 }
 
+// deadBase is a loopback address nothing listens on. A test cannot take a port below 1024, so
+// no parallel test can start answering here the way one can on a port that was picked and freed.
+const deadBase = "http://127.0.0.1:1"
+
 // TestOllamaUp verifies a local Ollama counts as up only when its tag list
 // answers, and a remote one is trusted without a probe.
 func TestOllamaUp(t *testing.T) {
@@ -38,7 +42,7 @@ func TestOllamaUp(t *testing.T) {
 	}, { // Test 1: The tag list fails.
 		Base: newTagsServer(t, http.StatusInternalServerError),
 	}, { // Test 2: Nothing is listening.
-		Base: "http://" + freeAddr(t),
+		Base: deadBase,
 	}, { // Test 3: A remote host is trusted without a probe.
 		Base: "http://ollama.internal.test:11434", Want: true,
 	}, { // Test 4: An unparsable base.
@@ -65,7 +69,6 @@ func TestModeReadiness(t *testing.T) {
 		t.Fatalf("build: %v", err)
 	}
 	up := newTagsServer(t, http.StatusOK)
-	down := "http://" + freeAddr(t)
 
 	priv := modeReadiness(context.Background(), ix, policy.Default(), webConfig{ollamaURL: up})
 	if !priv.Modes["keyword"].Ready {
@@ -84,7 +87,7 @@ func TestModeReadiness(t *testing.T) {
 	}
 
 	pub := modeReadiness(context.Background(), ix, policy.Default(),
-		webConfig{ollamaURL: down, public: true, provider: "openai"})
+		webConfig{ollamaURL: deadBase, public: true, provider: "openai"})
 	if pub.Provider != "openai" {
 		t.Errorf("provider = %q, want openai", pub.Provider)
 	}
@@ -106,8 +109,7 @@ func TestModeReadiness(t *testing.T) {
 func TestDemoRepoServes(t *testing.T) {
 	t.Parallel()
 	repo := newOwnersRepo(t)
-	addr := freeAddr(t)
-	stop := serveCmd(t, "demo", "--open=false", "--addr", addr, "--repo", repo, "--data-dir", t.TempDir())
+	addr, stop := serveCmd(t, "demo", "--open=false", "--repo", repo, "--data-dir", t.TempDir())
 	if got := getOK(t, addr, "/api/exposure"); !strings.Contains(string(got), "billing") {
 		t.Errorf("exposure over the repository does not name billing: %.200s", got)
 	}

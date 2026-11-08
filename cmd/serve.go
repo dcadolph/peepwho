@@ -308,6 +308,10 @@ func listenAndServe(cmd *cobra.Command, handler http.Handler, addr string) error
 	ctx := cmd.Context()
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.Serve(ln) }()
+	// A port of zero means the system picked one, and only the listener knows which.
+	if _, port, err := net.SplitHostPort(addr); err == nil && port == "0" {
+		addr = ln.Addr().String()
+	}
 	fmt.Fprintf(cmd.ErrOrStderr(), "peepwho serving on http://%s (Ctrl-C to stop)\n", addr)
 
 	select {

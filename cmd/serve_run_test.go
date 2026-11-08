@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -20,38 +21,69 @@ import (
 	"github.com/dcadolph/peepwho/internal/simorg"
 )
 
-// freeAddr returns a loopback address with a port nothing is listening on.
-func freeAddr(t *testing.T) string {
-	t.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen: %v", err)
-	}
-	addr := ln.Addr().String()
-	if err := ln.Close(); err != nil {
-		t.Fatalf("close: %v", err)
-	}
-	return addr
+// serveLog is the stderr of a server under test. It tells announced the address from the
+// first serving line, since the server writes it from another goroutine.
+type serveLog struct {
+	// mu guards buf.
+	mu sync.Mutex
+	// buf holds everything written.
+	buf bytes.Buffer
+	// announced receives the address the server says it bound.
+	announced chan string
+	// once sends announced at most one address.
+	once sync.Once
 }
 
-// serveCmd runs the root command with args in the background until stop is
-// called, which cancels it and returns its stderr and error.
-func serveCmd(t *testing.T, args ...string) (stop func() (string, error)) {
+// Write keeps p and looks for the serving line.
+func (l *serveLog) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	n, err := l.buf.Write(p)
+	const mark = "serving on http://"
+	if _, rest, found := strings.Cut(l.buf.String(), mark); found {
+		if addr, _, whole := strings.Cut(rest, " "); whole {
+			l.once.Do(func() { l.announced <- addr })
+		}
+	}
+	return n, err
+}
+
+// String returns everything written so far.
+func (l *serveLog) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.buf.String()
+}
+
+// serveCmd runs the root command with args in the background on a port the system picks, waits
+// until it serves, and returns the address it bound and a stop func, which cancels it and
+// returns its stderr and error. A port picked here and handed over would be free only until
+// another parallel test took it, so the system picks during the bind itself.
+func serveCmd(t *testing.T, args ...string) (addr string, stop func() (string, error)) {
 	t.Helper()
-	var out, errBuf bytes.Buffer
+	var out bytes.Buffer
+	errLog := &serveLog{announced: make(chan string, 1)}
 	root := newRootCmd()
 	root.SetOut(&out)
-	root.SetErr(&errBuf)
+	root.SetErr(errLog)
 	root.SetIn(strings.NewReader(""))
-	root.SetArgs(args)
+	root.SetArgs(append(args, "--addr", "127.0.0.1:0"))
 	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
 	done := make(chan error, 1)
 	go func() { done <- root.ExecuteContext(ctx) }()
-	return func() (string, error) {
+	select {
+	case addr = <-errLog.announced:
+	case err := <-done:
+		t.Fatalf("server exited before serving: %v\n%s", err, errLog.String())
+	case <-time.After(30 * time.Second):
+		t.Fatalf("server did not start:\n%s", errLog.String())
+	}
+	return addr, func() (string, error) {
 		cancel()
 		select {
 		case err := <-done:
-			return errBuf.String(), err
+			return errLog.String(), err
 		case <-time.After(30 * time.Second):
 			t.Fatal("server did not stop")
 			return "", nil
@@ -59,37 +91,32 @@ func serveCmd(t *testing.T, args ...string) (stop func() (string, error)) {
 	}
 }
 
-// getOK fetches path from the server at addr, waiting for it to come up, and
-// returns the body of a 200 response.
+// getOK fetches path from the server at addr and returns the body of a 200 response.
 func getOK(t *testing.T, addr, path string) []byte {
 	t.Helper()
-	deadline := time.Now().Add(30 * time.Second)
-	for {
-		resp, err := http.Get("http://" + addr + path)
-		if err == nil {
-			body, readErr := io.ReadAll(resp.Body)
-			_ = resp.Body.Close()
-			if readErr != nil {
-				t.Fatalf("read %s: %v", path, readErr)
-			}
-			if resp.StatusCode != http.StatusOK {
-				t.Fatalf("GET %s: status %d: %s", path, resp.StatusCode, body)
-			}
-			return body
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("GET %s: %v", path, err)
-		}
-		time.Sleep(50 * time.Millisecond)
+	resp, err := http.Get("http://" + addr + path)
+	if err != nil {
+		t.Fatalf("GET %s: %v", path, err)
 	}
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET %s: status %d: %s", path, resp.StatusCode, body)
+	}
+	return body
 }
 
 // TestDemoServesAndStops runs the simulated-company demo on a free port, reads
 // every surface the demo wires, and checks it shuts down cleanly on cancel.
 func TestDemoServesAndStops(t *testing.T) {
 	t.Parallel()
-	addr := freeAddr(t)
-	stop := serveCmd(t, "demo", "--open=false", "--addr", addr, "--data-dir", t.TempDir())
+	addr, stop := serveCmd(t, "demo", "--open=false", "--data-dir", t.TempDir())
+	if strings.HasSuffix(addr, ":0") {
+		t.Errorf("serving line names port zero: %s", addr)
+	}
 
 	var ans resolve.JSONAnswer
 	body := getOK(t, addr, "/api/ask?q="+url.QueryEscape("billing retries"))
