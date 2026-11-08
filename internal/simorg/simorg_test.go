@@ -42,9 +42,9 @@ func TestFullPipeline(t *testing.T) {
 	}
 
 	// Eve joined through the alias file and remembers her GitHub identity.
-	eve := ix.Graph.People["eve@corp.com"]
+	eve := ix.Graph.People["eve@example.com"]
 	if eve == nil {
-		t.Fatal("missing eve@corp.com")
+		t.Fatal("missing eve@example.com")
 		return
 	}
 	if !slices.Contains(eve.Identities, model.ID("github:eve-dev")) {
@@ -56,12 +56,12 @@ func TestFullPipeline(t *testing.T) {
 		Query      string
 		WantPerson model.ID
 	}{
-		{"billing retries", "angela@corp.com"},
-		{"kafka streaming", "bob@corp.com"},
-		{"sso login", "dan@corp.com"},
-		{"react frontend", "eve@corp.com"},
-		{"embeddings model serving", "frank@corp.com"},
-		{"terraform", "carol@corp.com"},
+		{"billing retries", "angela@example.com"},
+		{"kafka streaming", "bob@example.com"},
+		{"sso login", "dan@example.com"},
+		{"react frontend", "eve@example.com"},
+		{"embeddings model serving", "frank@example.com"},
+		{"terraform", "carol@example.com"},
 	}
 	for _, ask := range asks {
 		got := ix.Search(ask.Query, 3)
@@ -77,7 +77,7 @@ func TestFullPipeline(t *testing.T) {
 
 	// Recency: Carol's fresh terraform work outranks Victor's old volume.
 	terraform := ix.Search("terraform", 5)
-	carolRank, victorRank := rank(terraform, "carol@corp.com"), rank(terraform, "victor@corp.com")
+	carolRank, victorRank := rank(terraform, "carol@example.com"), rank(terraform, "victor@example.com")
 	if carolRank != 1 || victorRank == 0 || victorRank < carolRank {
 		t.Errorf("terraform ranks: carol %d victor %d, want carol first and victor present",
 			carolRank, victorRank)
@@ -88,23 +88,23 @@ func TestFullPipeline(t *testing.T) {
 	if len(channels) == 0 || channels[0].Channel.Name != "payments" {
 		t.Fatalf("channels top = %+v, want payments", channels)
 	}
-	if !slices.Contains(channels[0].Channel.Members, model.ID("angela@corp.com")) {
+	if !slices.Contains(channels[0].Channel.Members, model.ID("angela@example.com")) {
 		t.Errorf("payments members = %v, want angela", channels[0].Channel.Members)
 	}
 
 	// Feedback tunes but does not bury: votes for Victor keep Carol first.
 	ix.SetFeedback([]feedback.Entry{
-		{Query: "terraform", Person: "victor@corp.com", Vote: feedback.Helpful},
-		{Query: "terraform", Person: "victor@corp.com", Vote: feedback.Helpful},
+		{Query: "terraform", Person: "victor@example.com", Vote: feedback.Helpful},
+		{Query: "terraform", Person: "victor@example.com", Vote: feedback.Helpful},
 	})
 	after := ix.Search("terraform", 5)
-	if after[0].Person.ID != "carol@corp.com" {
+	if after[0].Person.ID != "carol@example.com" {
 		t.Errorf("terraform top after votes = %s; capped feedback must not bury recency",
 			after[0].Person.ID)
 	}
-	if rank(after, "victor@corp.com") > victorRank {
+	if rank(after, "victor@example.com") > victorRank {
 		t.Errorf("victor fell after helpful votes: %d -> %d",
-			victorRank, rank(after, "victor@corp.com"))
+			victorRank, rank(after, "victor@example.com"))
 	}
 }
 

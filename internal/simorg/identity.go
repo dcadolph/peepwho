@@ -112,7 +112,7 @@ func GenerateIdentity(spec IdentitySpec) *IdentityOrg {
 		given := givenNames[i%len(givenNames)]
 		family := familyNames[(i/len(givenNames)+i)%len(familyNames)]
 		name := given + " " + family
-		email := fmt.Sprintf("%s.%s%d@corp.com",
+		email := fmt.Sprintf("%s.%s%d@example.com",
 			strings.ToLower(asciiFold(given)), strings.ToLower(asciiFold(family)), i)
 		handle := fmt.Sprintf("%s-%s%d",
 			strings.ToLower(asciiFold(given)), strings.ToLower(asciiFold(family)), i)
@@ -144,8 +144,8 @@ func GenerateIdentity(spec IdentitySpec) *IdentityOrg {
 		}
 		name = fmt.Sprintf("%s%d", name, i/2)
 		flat := strings.ToLower(strings.ReplaceAll(name, " ", "-"))
-		aEmail := fmt.Sprintf("twin.a%d@corp.com", i)
-		bEmail := fmt.Sprintf("twin.b%d@corp.com", i)
+		aEmail := fmt.Sprintf("twin.a%d@example.com", i)
+		bEmail := fmt.Sprintf("twin.b%d@example.com", i)
 		aSlack := fmt.Sprintf("T%04da", i)
 		bSlack := fmt.Sprintf("T%04db", i)
 
@@ -177,7 +177,7 @@ func GenerateIdentity(spec IdentitySpec) *IdentityOrg {
 		if i >= len(roles) {
 			role = fmt.Sprintf("%s-%d", role, i/len(roles))
 		}
-		email := role + "@corp.com"
+		email := role + "@example.com"
 		slackID := fmt.Sprintf("R%04d", i)
 		users = append(users, slackUser(slackID, role, email, "Service Account"))
 		home := channelIDs[i%len(channelIDs)]

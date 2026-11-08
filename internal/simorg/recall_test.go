@@ -28,7 +28,7 @@ func TestRecallPipeline(t *testing.T) {
 
 	res := recall.New(store, ix)
 	ans := res.Resolve(context.Background(), recall.Query{
-		Text: "certificate renewal failing", Person: "angela@corp.com", Explain: true,
+		Text: "certificate renewal failing", Person: "angela@example.com", Explain: true,
 	})
 	if len(ans.Episodes) == 0 {
 		t.Fatalf("no conversation found; scope = %+v", ans.Scope)
@@ -72,7 +72,7 @@ func TestRecallPipeline(t *testing.T) {
 
 	// Someone who was not in the conversation must not reach it.
 	other := res.Resolve(context.Background(), recall.Query{
-		Text: "certificate renewal failing", Person: "dan@corp.com", Explain: true,
+		Text: "certificate renewal failing", Person: "dan@example.com", Explain: true,
 	})
 	for _, e := range other.Episodes {
 		if e.Place == "infra" && e.Solution != nil {
@@ -137,17 +137,17 @@ func TestRecallFindsCrossSourceWork(t *testing.T) {
 	}{
 		{
 			Name: "merged change", Query: "billing retry backoff",
-			Person: "angela@corp.com", WantSource: "github",
+			Person: "angela@example.com", WantSource: "github",
 			WantLink: "https://github.com/corp/billing-service/pull/412",
 		},
 		{
 			Name: "resolved ticket", Query: "kafka consumer lag",
-			Person: "bob@corp.com", WantSource: "jira",
+			Person: "bob@example.com", WantSource: "jira",
 			WantLink: "/browse/DAT-1",
 		},
 		{
 			Name: "resolved incident", Query: "billing api latency",
-			Person: "angela@corp.com", WantSource: "pagerduty",
+			Person: "angela@example.com", WantSource: "pagerduty",
 			WantLink: "https://corp.pagerduty.com/incidents/PINC1",
 		},
 	}

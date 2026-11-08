@@ -126,7 +126,7 @@ A row needs at least a name or an email. Topics are split on semicolons by
 default. A minimal file looks like this:
 
     name,email,title,team,topics
-    Angela Malone,angela@corp.com,Staff Engineer,Payments,billing;retries
+    Angela Malone,angela@example.com,Staff Engineer,Payments,billing;retries
 
 Index it:
 
@@ -218,14 +218,14 @@ least-bad answer never dresses up as a sure one.
 When an answer is right, say so; when it is wrong, say that too. Votes adjust
 future rankings for that question and its close variants:
 
-    peepwho feedback record "billing retries" --person alice@corp.com --helpful
+    peepwho feedback record "billing retries" --person alice@example.com --helpful
     peepwho feedback record "billing retries" --channel payments --not-helpful \
       --comment "bot answers there now"
 
 Review or undo what has been taught, and tune how hard votes move ranking:
 
     peepwho feedback list --pretty
-    peepwho feedback clear --person alice@corp.com
+    peepwho feedback clear --person alice@example.com
     peepwho ask --feedback high "billing retries"
 
 The web UI has the same buttons on every result. Votes live in
@@ -558,7 +558,7 @@ human shows up as two entries. An alias file declares which identifiers belong
 to the same person:
 
     {
-      "alice@corp.com": ["github:alice", "codeowners:alice"]
+      "alice@example.com": ["github:alice", "codeowners:alice"]
     }
 
 Pass it once with `--aliases` and the index joins the entries, including ones

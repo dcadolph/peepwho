@@ -160,7 +160,7 @@ func buildBigPeople(spec Spec) []person {
 	people := make([]person, n)
 	for i := range n {
 		g, f := mixName(given, family, i)
-		email := fmt.Sprintf("%s.%s%d@corp.com",
+		email := fmt.Sprintf("%s.%s%d@example.com",
 			strings.ToLower(asciiFold(g)), strings.ToLower(asciiFold(f)), i)
 		people[i] = person{
 			id:    fmt.Sprintf("U%04d", i),
@@ -409,9 +409,9 @@ func buildIndexFrom(dir string, spec Spec, only map[string]bool) (*index.Index, 
 			github.New("ghp-demo", github.WithBaseURL(githubSrv.URL)),
 			connector.GitHubOptions{Repos: repos, ResolveEmails: true})},
 		{"jira", connector.NewJiraWithClient(
-			jira.New(jiraSrv.URL, "demo@corp.com", "token"), connector.JiraOptions{})},
+			jira.New(jiraSrv.URL, "demo@example.com", "token"), connector.JiraOptions{})},
 		{"confluence", connector.NewConfluenceWithClient(
-			confluence.New(confluenceSrv.URL, "demo@corp.com", "token"), connector.ConfluenceOptions{})},
+			confluence.New(confluenceSrv.URL, "demo@example.com", "token"), connector.ConfluenceOptions{})},
 		{"pagerduty", connector.NewPagerDutyWithClient(
 			pagerduty.New("token", pagerduty.WithBaseURL(pagerdutySrv.URL)), connector.PagerDutyOptions{})},
 		{"git", connector.NewGitHistory(connector.GitOptions{Paths: []string{repoDir}, SinceDays: 900})},
@@ -467,7 +467,7 @@ func BuildBigEpisodes(ix *index.Index) (*episode.Store, error) {
 			github.New("ghp-demo", github.WithBaseURL(githubSrv.URL)),
 			connector.GitHubOptions{Repos: repos, Episodes: true, ResolveEmails: true})},
 		{"jira", connector.NewJiraWithClient(
-			jira.New(jiraSrv.URL, "demo@corp.com", "token"), connector.JiraOptions{Episodes: true})},
+			jira.New(jiraSrv.URL, "demo@example.com", "token"), connector.JiraOptions{Episodes: true})},
 		{"pagerduty", connector.NewPagerDutyWithClient(
 			pagerduty.New("token", pagerduty.WithBaseURL(pagerdutySrv.URL)),
 			connector.PagerDutyOptions{Episodes: true})},

@@ -167,7 +167,7 @@ func TestHandleAskMatchesEngine(t *testing.T) {
 	if diff := cmp.Diff(string(want), got); diff != "" {
 		t.Errorf("ask mismatch (-want +got):\n%s", diff)
 	}
-	if !strings.Contains(got, `"angela@corp.com"`) {
+	if !strings.Contains(got, `"angela@example.com"`) {
 		t.Errorf("ask answer does not name the billing owner: %s", got)
 	}
 }
@@ -186,15 +186,15 @@ func TestHandleCalls(t *testing.T) {
 	}{{ // Test 0: Empty question.
 		Call: func() (string, error) { return h.Ask(" ", 5) }, WantErr: "needs a question",
 	}, { // Test 1: Search by name.
-		Call: func() (string, error) { return h.Search("angela", 3) }, WantContains: `"angela@corp.com"`,
+		Call: func() (string, error) { return h.Search("angela", 3) }, WantContains: `"angela@example.com"`,
 	}, { // Test 2: Empty search.
 		Call: func() (string, error) { return h.Search("", 3) }, WantErr: "needs a query",
 	}, { // Test 3: Known person.
-		Call: func() (string, error) { return h.Person("angela@corp.com") }, WantContains: `"Angela Malone"`,
+		Call: func() (string, error) { return h.Person("angela@example.com") }, WantContains: `"Angela Malone"`,
 	}, { // Test 4: Unknown person.
 		Call: func() (string, error) { return h.Person("nobody@nowhere.example") }, WantErr: "unknown person",
 	}, { // Test 5: Recall for the demo person.
-		Call:         func() (string, error) { return h.Recall("angela@corp.com", "billing retries", 5) },
+		Call:         func() (string, error) { return h.Recall("angela@example.com", "billing retries", 5) },
 		WantContains: `"episodes":[{`,
 	}, { // Test 6: Recall with no person.
 		Call: func() (string, error) { return h.Recall("", "billing", 5) }, WantErr: "needs a person",
@@ -256,8 +256,8 @@ func TestUnopenedHandle(t *testing.T) {
 		calls := []func() (string, error){
 			func() (string, error) { return h.Ask("billing", 5) },
 			func() (string, error) { return h.Search("billing", 5) },
-			func() (string, error) { return h.Person("angela@corp.com") },
-			func() (string, error) { return h.Recall("angela@corp.com", "billing", 5) },
+			func() (string, error) { return h.Person("angela@example.com") },
+			func() (string, error) { return h.Recall("angela@example.com", "billing", 5) },
 			func() (string, error) { return h.Status(0) },
 			func() (string, error) { return h.ChangesSince(0) },
 			func() (string, error) { return h.Index("org-csv", "--file=people.csv", 0) },
@@ -427,8 +427,8 @@ func TestUnbuiltHandle(t *testing.T) {
 	for i, call := range []func() (string, error){
 		func() (string, error) { return h.Ask("billing", 5) },
 		func() (string, error) { return h.Search("billing", 5) },
-		func() (string, error) { return h.Person("angela@corp.com") },
-		func() (string, error) { return h.Recall("angela@corp.com", "billing", 5) },
+		func() (string, error) { return h.Person("angela@example.com") },
+		func() (string, error) { return h.Recall("angela@example.com", "billing", 5) },
 	} {
 		if _, err := call(); !errors.Is(err, errNoIndex) {
 			t.Errorf("call %d = %v, want %v", i, err, errNoIndex)

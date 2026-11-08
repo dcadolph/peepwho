@@ -97,8 +97,8 @@ func TestSwiftFixtures(t *testing.T) {
 	}{
 		{"ask", func() (string, error) { return h.Ask("terraform", 3) }},
 		{"search", func() (string, error) { return h.Search("angela", 3) }},
-		{"person", func() (string, error) { return h.Person("angela@corp.com") }},
-		{"recall", func() (string, error) { return h.Recall("angela@corp.com", "billing retries", 2) }},
+		{"person", func() (string, error) { return h.Person("angela@example.com") }},
+		{"recall", func() (string, error) { return h.Recall("angela@example.com", "billing retries", 2) }},
 		{"status", func() (string, error) { return h.Status(built.Unix() + 3600) }},
 		{"index", func() (string, error) { return w.Index("git", flags, now.Unix()) }},
 		{"refresh", func() (string, error) { return w.Refresh("", now.Add(time.Hour).Unix()) }},

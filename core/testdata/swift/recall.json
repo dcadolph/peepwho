@@ -12,7 +12,7 @@
       "place": "corp/billing-service",
       "source": "github",
       "strength": 1,
-      "when": "2026-11-03T02:43:20Z"
+      "when": "2026-11-06T21:32:04Z"
     },
     {
       "id": "pagerduty:PINC1",
@@ -22,7 +22,7 @@
       ],
       "people": [
         {
-          "email": "grace@corp.com",
+          "email": "grace@example.com",
           "name": "Grace Kim",
           "title": "Site Reliability Engineer"
         }
@@ -31,15 +31,15 @@
       "place": "Billing API",
       "source": "pagerduty",
       "strength": 0.5,
-      "when": "2026-10-06T01:43:20Z"
+      "when": "2026-10-09T20:32:04Z"
     }
   ],
-  "person": "angela@corp.com",
+  "person": "angela@example.com",
   "query": "billing retries",
   "scope": {
     "episodes": 6,
     "note": "Covers what peepwho has indexed from github, jira, pagerduty, and slack, within each source's history window. Slack covers channels the bot can read; direct messages are not indexed.",
-    "oldest": "2026-08-07",
+    "oldest": "2026-08-10",
     "sources": [
       "github",
       "jira",

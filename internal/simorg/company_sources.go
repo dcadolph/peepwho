@@ -289,7 +289,7 @@ func (c *company) confluenceServer() *httptest.Server {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/wiki/rest/api/user/current", jsonHandler(map[string]any{"accountId": "c-me", "email": "demo@corp.com"}))
+	mux.HandleFunc("/wiki/rest/api/user/current", jsonHandler(map[string]any{"accountId": "c-me", "email": "demo@example.com"}))
 	mux.HandleFunc("/wiki/rest/api/user", func(w http.ResponseWriter, r *http.Request) {
 		if u, ok := users[r.URL.Query().Get("accountId")]; ok {
 			writeJSON(w, u)

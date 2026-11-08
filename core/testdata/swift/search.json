@@ -2,8 +2,8 @@
   "query": "angela",
   "results": [
     {
-      "email": "angela@corp.com",
-      "id": "angela@corp.com",
+      "email": "angela@example.com",
+      "id": "angela@example.com",
       "kind": "person",
       "matched": [
         "name",

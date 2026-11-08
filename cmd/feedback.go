@@ -25,9 +25,9 @@ its close variants, a not-helpful vote lowers it, capped so feedback tunes
 answers without burying the evidence. Votes live in feedback.json next to the
 index and survive re-indexing.
 
-  peepwho feedback record "billing retries" --person alice@corp.com --helpful
+  peepwho feedback record "billing retries" --person alice@example.com --helpful
   peepwho feedback list
-  peepwho feedback clear --person alice@corp.com`,
+  peepwho feedback clear --person alice@example.com`,
 	}
 	cmd.AddCommand(newFeedbackRecordCmd(opts), newFeedbackListCmd(opts), newFeedbackClearCmd(opts),
 		newFeedbackBundleCmd(opts), newFeedbackSummaryCmd(opts))

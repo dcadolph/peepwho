@@ -112,7 +112,7 @@ func (r *Resolver) Restore(pairs map[model.ID]model.ID) {
 
 // LoadFile merges an alias file into the resolver. The file is a JSON object
 // mapping a canonical identifier to the list of identifiers that belong to
-// the same person, for example {"alice@corp.com": ["github:alice"]}.
+// the same person, for example {"alice@example.com": ["github:alice"]}.
 func (r *Resolver) LoadFile(path string) error {
 	raw, err := os.ReadFile(path)
 	if err != nil {

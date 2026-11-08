@@ -513,7 +513,7 @@ var commonGivenNames = map[string]bool{
 // people of one name apart with a number.
 //
 // It is the shape mailboxesAgree was written around, applied as a veto where
-// only the name is doing the work. js1@corp.com and js2@corp.com spell the same
+// only the name is doing the work. js1@example.com and js2@example.com spell the same
 // thing and differ only by a digit each, which is an issued convention rather
 // than one person's two mailboxes: nobody numbers themselves twice. A noreply
 // account number is not that, so the login is what gets compared.
@@ -530,7 +530,7 @@ func numberedColleagues(a, b string) bool {
 //
 // It is the one collision a distinctive local cannot rule out, because an
 // initial and a surname is a convention a company issues rather than a name
-// somebody chose: John Smith at jsmith@corp.com and Jane Smith at
+// somebody chose: John Smith at jsmith@example.com and Jane Smith at
 // jsmith@partner.com share a local for the same reason they share a surname,
 // and the rule's own argument, that a matching local across domains is one
 // person's two addresses, does not hold for an address neither of them picked.

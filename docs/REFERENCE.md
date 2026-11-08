@@ -614,7 +614,7 @@ place without writing anything.
 
 Purges one person from everything peepwho stores on this machine.
 
-    peepwho forget jane@corp.com
+    peepwho forget jane@example.com
     peepwho forget "Jane Roe" --yes
 
 | Flag    | What it does           |

@@ -42,7 +42,7 @@ func TestHostileQueries(t *testing.T) {
 		{"name suffix with nothing", " know about"},
 		{"repeated at signs", strings.Repeat("@", 500)},
 		{"lone at", "@"},
-		{"email shaped junk", "@@@@@@@@@@@@@@@@@@@@@@@@corp.com"},
+		{"email shaped junk", "@@@@@@@@@@@@@@@@@@@@@@@@example.com"},
 		{"negative-looking", "-1e999"},
 		{"windows newline flood", strings.Repeat("\r\n", 5000)},
 	}

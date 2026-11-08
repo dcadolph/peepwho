@@ -74,7 +74,7 @@ The CSV needs a header row. Column order does not matter and names are matched
 loosely, so `Job Title` and `role` both map to title. A minimal file:
 
     name,email,title,team,topics
-    Angela Malone,angela@corp.com,Staff Engineer,Payments,billing;retries
+    Angela Malone,angela@example.com,Staff Engineer,Payments,billing;retries
 
 Recognized columns: `name`, `email`, `title`, `team`, `org`, `manager`, and
 `topics` (semicolon-separated). A row needs at least a name or an email. See the

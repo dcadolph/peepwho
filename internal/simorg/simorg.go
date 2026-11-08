@@ -37,41 +37,41 @@ import (
 // OrgCSV returns the org chart in the org-csv source format.
 func OrgCSV() string {
 	return `name,email,title,team,topics,manager
-Oscar Scott,oscar@corp.com,Engineering Manager,Payments,billing;roadmap,
-Angela Malone,angela@corp.com,Staff Engineer,Payments,billing;retries,oscar@corp.com
-Kevin Novak,kevin@corp.com,Software Engineer,Payments,retries,angela@corp.com
-Pam Vance,pam@corp.com,Support Lead,Payments,billing;support,oscar@corp.com
-Bob Smith,bob@corp.com,Senior Engineer,Data Platform,kafka;streaming,oscar@corp.com
-Carol Lee,carol@corp.com,Site Reliability Engineer,Infrastructure,deploys,oscar@corp.com
-Victor Old,victor@corp.com,Systems Engineer,Infrastructure,,carol@corp.com
-Grace Kim,grace@corp.com,Site Reliability Engineer,Infrastructure,oncall;incidents,carol@corp.com
-Dan Park,dan@corp.com,Security Engineer,Security,oauth;sso,oscar@corp.com
-Eve Ng,eve@corp.com,Frontend Engineer,Web,react;frontend,oscar@corp.com
-Frank Ito,frank@corp.com,Machine Learning Engineer,ML Platform,embeddings;models,oscar@corp.com
-Heidi Cho,heidi@corp.com,Search Engineer,Search,relevance,oscar@corp.com
+Oscar Scott,oscar@example.com,Engineering Manager,Payments,billing;roadmap,
+Angela Malone,angela@example.com,Staff Engineer,Payments,billing;retries,oscar@example.com
+Kevin Novak,kevin@example.com,Software Engineer,Payments,retries,angela@example.com
+Pam Vance,pam@example.com,Support Lead,Payments,billing;support,oscar@example.com
+Bob Smith,bob@example.com,Senior Engineer,Data Platform,kafka;streaming,oscar@example.com
+Carol Lee,carol@example.com,Site Reliability Engineer,Infrastructure,deploys,oscar@example.com
+Victor Old,victor@example.com,Systems Engineer,Infrastructure,,carol@example.com
+Grace Kim,grace@example.com,Site Reliability Engineer,Infrastructure,oncall;incidents,carol@example.com
+Dan Park,dan@example.com,Security Engineer,Security,oauth;sso,oscar@example.com
+Eve Ng,eve@example.com,Frontend Engineer,Web,react;frontend,oscar@example.com
+Frank Ito,frank@example.com,Machine Learning Engineer,ML Platform,embeddings;models,oscar@example.com
+Heidi Cho,heidi@example.com,Search Engineer,Search,relevance,oscar@example.com
 `
 }
 
 // CodeOwners returns a CODEOWNERS file owning terraform paths by email.
 func CodeOwners() string {
-	return "*.tf carol@corp.com\ninfra/ carol@corp.com\n"
+	return "*.tf carol@example.com\ninfra/ carol@example.com\n"
 }
 
 // Aliases returns the alias file joining Eve's email-less GitHub login.
 func Aliases() string {
-	return `{"eve@corp.com": ["github:eve-dev"]}`
+	return `{"eve@example.com": ["github:eve-dev"]}`
 }
 
 // SlackServer serves users, channels, and history in Slack's wire format. The
 // first history call returns HTTP 429 so the client's retry path runs.
 func SlackServer() *httptest.Server {
 	users := []map[string]any{
-		slackUser("U1", "Angela Malone", "angela@corp.com", "Staff Engineer"),
-		slackUser("U2", "Bob Smith", "bob@corp.com", "Senior Engineer"),
-		slackUser("U3", "Carol Lee", "carol@corp.com", "Site Reliability Engineer"),
-		slackUser("U4", "Dan Park", "dan@corp.com", "Security Engineer"),
-		slackUser("U5", "Grace Kim", "grace@corp.com", "Site Reliability Engineer"),
-		slackUser("U6", "Oscar Scott", "oscar@corp.com", "Engineering Manager"),
+		slackUser("U1", "Angela Malone", "angela@example.com", "Staff Engineer"),
+		slackUser("U2", "Bob Smith", "bob@example.com", "Senior Engineer"),
+		slackUser("U3", "Carol Lee", "carol@example.com", "Site Reliability Engineer"),
+		slackUser("U4", "Dan Park", "dan@example.com", "Security Engineer"),
+		slackUser("U5", "Grace Kim", "grace@example.com", "Site Reliability Engineer"),
+		slackUser("U6", "Oscar Scott", "oscar@example.com", "Engineering Manager"),
 	}
 	channels := []map[string]any{
 		slackChannel("C1", "payments", "billing and payment questions"),
@@ -204,10 +204,10 @@ func GitHubServer() *httptest.Server {
 		})
 	}
 	mux.HandleFunc("/users/bsmith", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, map[string]any{"login": "bsmith", "name": "Bob Smith", "email": "bob@corp.com"})
+		writeJSON(w, map[string]any{"login": "bsmith", "name": "Bob Smith", "email": "bob@example.com"})
 	})
 	mux.HandleFunc("/users/amalone", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, map[string]any{"login": "amalone", "name": "Angela Malone", "email": "angela@corp.com"})
+		writeJSON(w, map[string]any{"login": "amalone", "name": "Angela Malone", "email": "angela@example.com"})
 	})
 	mux.HandleFunc("/users/eve-dev", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, map[string]any{"login": "eve-dev", "name": "Eve Ng"})
@@ -238,9 +238,9 @@ func JiraServer() *httptest.Server {
 		}
 		return map[string]any{"key": key, "fields": fields}
 	}
-	bob := map[string]any{"accountId": "j-bob", "displayName": "Bob Smith", "emailAddress": "bob@corp.com"}
-	dan := map[string]any{"accountId": "j-dan", "displayName": "Dan Park", "emailAddress": "dan@corp.com"}
-	frank := map[string]any{"accountId": "j-frank", "displayName": "Frank Ito", "emailAddress": "frank@corp.com"}
+	bob := map[string]any{"accountId": "j-bob", "displayName": "Bob Smith", "emailAddress": "bob@example.com"}
+	dan := map[string]any{"accountId": "j-dan", "displayName": "Dan Park", "emailAddress": "dan@example.com"}
+	frank := map[string]any{"accountId": "j-frank", "displayName": "Frank Ito", "emailAddress": "frank@example.com"}
 	resolve := func(m map[string]any, ago int) map[string]any {
 		f, _ := m["fields"].(map[string]any)
 		f["resolutiondate"] = jiraDaysAgo(ago)
@@ -281,13 +281,13 @@ func ConfluenceServer() *httptest.Server {
 	}
 	spaceName := map[string]string{"sp-sec": "Security", "sp-ml": "ML Platform"}
 	users := map[string]map[string]any{
-		"c-dan":   {"accountId": "c-dan", "displayName": "Dan Park", "email": "dan@corp.com"},
-		"c-frank": {"accountId": "c-frank", "displayName": "Frank Ito", "email": "frank@corp.com"},
+		"c-dan":   {"accountId": "c-dan", "displayName": "Dan Park", "email": "dan@example.com"},
+		"c-frank": {"accountId": "c-frank", "displayName": "Frank Ito", "email": "frank@example.com"},
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/wiki/rest/api/user/current", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, map[string]any{"accountId": "c-me", "email": "demo@corp.com"})
+		writeJSON(w, map[string]any{"accountId": "c-me", "email": "demo@example.com"})
 	})
 	mux.HandleFunc("/wiki/rest/api/user", func(w http.ResponseWriter, r *http.Request) {
 		if u, ok := users[r.URL.Query().Get("accountId")]; ok {
@@ -347,20 +347,20 @@ func PagerDutyServer() *httptest.Server {
 				"service": map[string]any{"id": "S1", "summary": "Billing API"},
 				"assignments": []map[string]any{
 					{"assignee": map[string]any{
-						"id": "P1", "name": "Angela Malone", "email": "angela@corp.com"}},
+						"id": "P1", "name": "Angela Malone", "email": "angela@example.com"}},
 				},
 				"acknowledgements": []map[string]any{
 					{"acknowledger": map[string]any{
-						"id": "P2", "name": "Grace Kim", "email": "grace@corp.com"}},
+						"id": "P2", "name": "Grace Kim", "email": "grace@example.com"}},
 				},
 			},
 		}})
 	})
 	mux.HandleFunc("/oncalls", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, map[string]any{"more": false, "oncalls": []map[string]any{
-			{"user": map[string]any{"id": "P1", "name": "Angela Malone", "email": "angela@corp.com"},
+			{"user": map[string]any{"id": "P1", "name": "Angela Malone", "email": "angela@example.com"},
 				"escalation_policy": map[string]any{"id": "EP1"}},
-			{"user": map[string]any{"id": "P2", "name": "Grace Kim", "email": "grace@corp.com"},
+			{"user": map[string]any{"id": "P2", "name": "Grace Kim", "email": "grace@example.com"},
 				"escalation_policy": map[string]any{"id": "EP2"}},
 		}})
 	})
@@ -400,14 +400,14 @@ func BuildGitRepo(dir string) error {
 		rel, content, name, email string
 		when                      time.Time
 	}{
-		{"infra/vpc.tf", "v1", "Victor Old", "victor@corp.com", now.AddDate(-2, 0, 0)},
-		{"infra/cluster.tf", "v1", "Victor Old", "victor@corp.com", now.AddDate(-2, 0, 3)},
-		{"infra/dns.tf", "v1", "Victor Old", "victor@corp.com", now.AddDate(-2, 0, 6)},
-		{"infra/iam.tf", "v1", "Victor Old", "victor@corp.com", now.AddDate(-2, 0, 9)},
-		{"infra/vpc.tf", "v2", "Victor Old", "victor@corp.com", now.AddDate(-2, 0, 12)},
-		{"infra/cluster.tf", "v2", "Carol Lee", "carol@corp.com", now.AddDate(0, 0, -14)},
-		{"infra/nodepool.tf", "v1", "Carol Lee", "carol@corp.com", now.AddDate(0, 0, -3)},
-		{"internal/search/rank.go", "v1", "Heidi Cho", "heidi@corp.com", now.AddDate(0, 0, -7)},
+		{"infra/vpc.tf", "v1", "Victor Old", "victor@example.com", now.AddDate(-2, 0, 0)},
+		{"infra/cluster.tf", "v1", "Victor Old", "victor@example.com", now.AddDate(-2, 0, 3)},
+		{"infra/dns.tf", "v1", "Victor Old", "victor@example.com", now.AddDate(-2, 0, 6)},
+		{"infra/iam.tf", "v1", "Victor Old", "victor@example.com", now.AddDate(-2, 0, 9)},
+		{"infra/vpc.tf", "v2", "Victor Old", "victor@example.com", now.AddDate(-2, 0, 12)},
+		{"infra/cluster.tf", "v2", "Carol Lee", "carol@example.com", now.AddDate(0, 0, -14)},
+		{"infra/nodepool.tf", "v1", "Carol Lee", "carol@example.com", now.AddDate(0, 0, -3)},
+		{"internal/search/rank.go", "v1", "Heidi Cho", "heidi@example.com", now.AddDate(0, 0, -7)},
 		{"go.sum", "v1", "dependabot[bot]", "1+dependabot[bot]@users.noreply.github.com",
 			now.AddDate(0, 0, -1)},
 	}
@@ -475,9 +475,9 @@ func BuildIndex(dir string) (*index.Index, error) {
 				Repos: []string{"corp/billing-service", "corp/webapp"}, ResolveEmails: true,
 			})},
 		{"jira", connector.NewJiraWithClient(
-			jira.New(jiraSrv.URL, "demo@corp.com", "token"), connector.JiraOptions{})},
+			jira.New(jiraSrv.URL, "demo@example.com", "token"), connector.JiraOptions{})},
 		{"confluence", connector.NewConfluenceWithClient(
-			confluence.New(confluenceSrv.URL, "demo@corp.com", "token"),
+			confluence.New(confluenceSrv.URL, "demo@example.com", "token"),
 			connector.ConfluenceOptions{})},
 		{"pagerduty", connector.NewPagerDutyWithClient(
 			pagerduty.New("token", pagerduty.WithBaseURL(pagerdutySrv.URL)),
@@ -539,7 +539,7 @@ func BuildEpisodes(ix *index.Index) (*episode.Store, error) {
 				Episodes: true, ResolveEmails: true,
 			})},
 		{"jira", connector.NewJiraWithClient(
-			jira.New(jiraSrv.URL, "demo@corp.com", "token"),
+			jira.New(jiraSrv.URL, "demo@example.com", "token"),
 			connector.JiraOptions{Episodes: true})},
 		{"pagerduty", connector.NewPagerDutyWithClient(
 			pagerduty.New("token", pagerduty.WithBaseURL(pagerdutySrv.URL)),

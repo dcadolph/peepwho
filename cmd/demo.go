@@ -23,7 +23,7 @@ import (
 
 // demoPerson is who the demo's recall view starts as: the engineer the sample
 // conversations involve.
-const demoPerson = "angela@corp.com"
+const demoPerson = "angela@example.com"
 
 // demoQuery is the question the demo opens with, so the first thing a new
 // user sees is an answered page.

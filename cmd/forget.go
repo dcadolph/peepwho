@@ -36,7 +36,7 @@ Two caveats:
     keep them out, remove them at the source or stop indexing it.
 
 Examples:
-  peepwho forget jane@corp.com
+  peepwho forget jane@example.com
   peepwho forget "Jane Roe" --yes`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

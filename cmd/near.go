@@ -23,7 +23,7 @@ more than a broad channel, org-wide groups are ignored, and permission tiers of
 one group (store-admin, store-write) are folded together. PERSON is an email, an
 id, or an exact name.
 
-  peepwho near alice@corp.com
+  peepwho near alice@example.com
   peepwho near "Kim Ray" --limit 5`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

@@ -23,7 +23,7 @@ struct DecodeTests {
     // search decodes matches with their kind.
     @Test func search() throws {
         let got: SearchAnswer = try Core.decode(fixture("search"))
-        #expect(got.results?.first?.id == "angela@corp.com")
+        #expect(got.results?.first?.id == "angela@example.com")
         #expect(got.results?.first?.kind.isEmpty == false)
     }
 
@@ -38,7 +38,7 @@ struct DecodeTests {
     // recall decodes episodes and the store's scope.
     @Test func recall() throws {
         let got: RecallAnswer = try Core.decode(fixture("recall"))
-        #expect(got.person == "angela@corp.com")
+        #expect(got.person == "angela@example.com")
         #expect(got.episodes?.isEmpty == false)
         #expect(got.scope.episodes > 0)
     }

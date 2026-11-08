@@ -146,7 +146,7 @@ func identityKeys(people map[model.ID]*model.Person) map[model.ID]bool {
 }
 
 // personKeys returns every identifier one person answers to. A role mailbox is
-// not one of them: two automation accounts can share ci@corp.com without being
+// not one of them: two automation accounts can share ci@example.com without being
 // the same account, and treating that as identity would hide one of them
 // leaving behind the other joining.
 func personKeys(id model.ID, p *model.Person) []model.ID {

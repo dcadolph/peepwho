@@ -38,7 +38,7 @@ func TestEngineAsk(t *testing.T) {
 		WantFirstID   string
 		WantNoResults bool
 	}{{ // Test 0: Keyword answer names the billing owner first.
-		Query: "billing retries", WantFirstID: "angela@corp.com",
+		Query: "billing retries", WantFirstID: "angela@example.com",
 	}, { // Test 1: A query no one matches.
 		Query: "zzqx nothing", WantNoResults: true,
 	}, { // Test 2: Unknown mode.
@@ -108,7 +108,7 @@ func TestEngineSearchAndPerson(t *testing.T) {
 		WantName string
 		WantOK   bool
 	}{{ // Test 0: Known person.
-		ID: "angela@corp.com", WantName: "Angela Malone", WantOK: true,
+		ID: "angela@example.com", WantName: "Angela Malone", WantOK: true,
 	}, { // Test 1: Unknown person.
 		ID: "nobody@nowhere.example",
 	}}
@@ -125,8 +125,8 @@ func TestEngineSearchAndPerson(t *testing.T) {
 		})
 	}
 	hits := eng.Search("angela", 5)
-	if len(hits) == 0 || hits[0].ID != "angela@corp.com" {
-		t.Errorf("Search(angela) = %+v, want angela@corp.com first", hits)
+	if len(hits) == 0 || hits[0].ID != "angela@example.com" {
+		t.Errorf("Search(angela) = %+v, want angela@example.com first", hits)
 	}
 }
 
@@ -176,9 +176,9 @@ func TestEngineRecaller(t *testing.T) {
 		t.Fatalf("simorg.BuildEpisodes: %v", err)
 	}
 	res := New(ix, policy.Default()).Recaller(eps)
-	who := res.Who("angela@corp.com")
+	who := res.Who("angela@example.com")
 	if who == "" {
-		t.Fatal("Recaller does not know angela@corp.com")
+		t.Fatal("Recaller does not know angela@example.com")
 	}
 	ans := res.Resolve(context.Background(), recall.Query{Text: "billing retries", Person: who, Limit: 5})
 	if len(ans.Episodes) == 0 {

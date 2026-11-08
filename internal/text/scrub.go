@@ -53,7 +53,7 @@ var secretPatterns = []secretPattern{
 	{re: regexp.MustCompile(`\bAIza[0-9A-Za-z_-]{35}\b`)},
 	// JWTs: three dot-separated base64url parts, first decoding to '{"'.
 	{re: regexp.MustCompile(`\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b`)},
-	// URL userinfo passwords: https://alice:hunter2@db.corp.com. No label and
+	// URL userinfo passwords: https://alice:hunter2@db.example.com. No label and
 	// no known prefix, so nothing else here would catch it, and it is one of
 	// the commonest paste shapes in incident channels. The scheme and user
 	// survive; the password goes. The value class stops at /, ? and # so a

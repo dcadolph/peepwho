@@ -1,6 +1,6 @@
 {
   "age_seconds": 3599,
-  "built_at": "2026-11-08T21:21:51Z",
+  "built_at": "2026-11-08T21:32:04Z",
   "channels": 4,
   "conversations": 6,
   "embeddings": false,
@@ -8,9 +8,9 @@
   "scopes": [
     {
       "age_seconds": 3599,
-      "attempted_at": "2026-11-08T21:51:51Z",
+      "attempted_at": "2026-11-08T22:02:04Z",
       "error": "repository not found",
-      "ran_at": "2026-11-08T21:21:51Z",
+      "ran_at": "2026-11-08T21:32:04Z",
       "scope": "repo:/src/app",
       "source": "git"
     },

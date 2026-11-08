@@ -378,7 +378,7 @@ func generatePeople(spec Spec, rng *rand.Rand) []person {
 		g := given[i%len(given)]
 		f := family[(i/len(given)+i)%len(family)]
 		name := g + " " + f
-		email := fmt.Sprintf("%s.%s%d@corp.com",
+		email := fmt.Sprintf("%s.%s%d@example.com",
 			strings.ToLower(asciiFold(g)), strings.ToLower(asciiFold(f)), i)
 		out = append(out, person{
 			id:    fmt.Sprintf("U%04d", i),

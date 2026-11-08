@@ -3,8 +3,8 @@
     "infra",
     "payments"
   ],
-  "email": "angela@corp.com",
-  "id": "angela@corp.com",
+  "email": "angela@example.com",
+  "id": "angela@example.com",
   "identities": [
     "github:amalone",
     "pagerduty:p1",
@@ -14,7 +14,7 @@
     "slack://user?team=T0\u0026id=U1"
   ],
   "manager": {
-    "email": "oscar@corp.com",
+    "email": "oscar@example.com",
     "name": "Oscar Scott"
   },
   "name": "Angela Malone",
