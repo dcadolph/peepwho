@@ -1,4 +1,7 @@
+import Combine
+import Darwin
 import Foundation
+import PeepwhoCore
 import Security
 import Testing
 
@@ -60,6 +63,51 @@ final class MemoryPlaces: PlaceStore {
 
     // has reports whether slot holds a place.
     func has(_ slot: BookmarkSlot) -> Bool { urls[slot] != nil }
+}
+
+// CoreMemorySecrets hands the core what a MemorySecrets holds.
+final class CoreMemorySecrets: NSObject, CoreSecretsProtocol {
+    // store holds the secrets.
+    private let store: MemorySecrets
+
+    // init reads from store.
+    init(_ store: MemorySecrets) {
+        self.store = store
+    }
+
+    // get returns the value stored under name, or empty when there is none.
+    func get(_ name: String?) -> String { name.flatMap(store.get) ?? "" }
+}
+
+// SilentServer listens on a local port and never answers, so a request to it waits until the
+// client gives up.
+final class SilentServer {
+    // socket is the listening socket.
+    private let socket: Int32
+    // url is where it listens.
+    let url: String
+
+    // init starts listening on a free local port.
+    init() throws {
+        let fd = Darwin.socket(AF_INET, SOCK_STREAM, 0)
+        var addr = sockaddr_in()
+        addr.sin_family = sa_family_t(AF_INET)
+        addr.sin_addr.s_addr = inet_addr("127.0.0.1")
+        var size = socklen_t(MemoryLayout<sockaddr_in>.size)
+        let bound = withUnsafeMutablePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                bind(fd, $0, size) == 0 && listen(fd, 8) == 0 && getsockname(fd, $0, &size) == 0
+            }
+        }
+        guard fd >= 0, bound else { throw POSIXError(.EADDRNOTAVAIL) }
+        socket = fd
+        url = "http://127.0.0.1:\(UInt16(bigEndian: addr.sin_port))"
+    }
+
+    // close stops listening.
+    func close() {
+        _ = Darwin.close(socket)
+    }
 }
 
 // tempDir returns a fresh directory path under the temporary directory, not yet created.
@@ -335,6 +383,107 @@ struct SettingsTests {
         #expect(model.status?.sources["git"] != nil)
         #expect(FileManager.default.fileExists(atPath: dir.path))
         #expect(places.open == 0)
+    }
+
+    // Test 7: Progress lines show during a run with no path into the data directory.
+    @Test func progressShowsNoDataPath() async throws {
+        let repo = try gitRepo()
+        let dir = tempDir("peepwho-data")
+        defer {
+            try? FileManager.default.removeItem(at: repo)
+            try? FileManager.default.removeItem(at: dir)
+        }
+        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+                                  secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
+        var seen: [String] = []
+        let watching = model.$progress.sink { line in
+            if let line { seen.append(line) }
+        }
+        defer { watching.cancel() }
+        await model.pick(repo, as: .git)
+        #expect(!seen.isEmpty)
+        #expect(!seen.contains { $0.contains(dir.path) })
+        #expect(seen.contains { $0.contains("index.json") })
+        #expect(model.progress == nil)
+    }
+
+    // Test 8: A cancel between jobs leaves the next job unrun and clears the run's state, and
+    // every place is released.
+    @Test func cancelStopsTheJobLoop() async throws {
+        let repo = try gitRepo()
+        let dir = tempDir("peepwho-data")
+        let csv = tempDir("peepwho-roster").appendingPathExtension("csv")
+        defer {
+            try? FileManager.default.removeItem(at: repo)
+            try? FileManager.default.removeItem(at: dir)
+            try? FileManager.default.removeItem(at: csv)
+        }
+        try "name,email,title,team,topics\nAnn Lee,ann@x.com,Engineer,Billing,ledger\n"
+            .write(to: csv, atomically: true, encoding: .utf8)
+        let places = MemoryPlaces()
+        places.urls = [.git: repo, .csv: csv]
+        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+                                  secrets: MemorySecrets(), places: places, defaults: defaults)
+        async let all: Void = model.indexAll()
+        while model.busy == nil { await Task.yield() }
+        #expect(model.canCancel)
+        model.cancel()
+        #expect(model.progress == "Canceling")
+        await all
+        #expect(model.lines.last == "Canceled.")
+        #expect(!model.lines.contains { $0.hasPrefix("org-csv") })
+        #expect(model.status?.sources["org-csv"] == nil)
+        #expect(model.busy == nil)
+        #expect(model.progress == nil)
+        #expect(!model.canCancel)
+        #expect(places.open == 0)
+    }
+
+    // Test 9: Cancel reaches a run stuck on a server that never answers, even when pressed the
+    // moment the run starts, and the run saves nothing.
+    @Test func cancelReachesAStuckServer() async throws {
+        let server = try SilentServer()
+        defer { server.close() }
+        let dir = tempDir("peepwho-data")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let secrets = MemorySecrets()
+        secrets.values = [SecretName.jiraURL: server.url, SecretName.jiraToken: "token"]
+        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: CoreMemorySecrets(secrets)) },
+                                  secrets: secrets, places: MemoryPlaces(), defaults: defaults)
+        var scopes = model.scopes
+        scopes.jiraProjects = "KAFKA"
+        scopes.jiraServer = true
+        model.scopes = scopes
+        let clock = ContinuousClock()
+        let started = clock.now
+        async let all: Void = model.indexAll()
+        while model.busy == nil { await Task.yield() }
+        model.cancel()
+        await all
+        #expect(started.duration(to: clock.now) < .seconds(10))
+        #expect(model.lines == ["Canceled."])
+        #expect(model.status?.builtAt == nil)
+        #expect(model.busy == nil)
+    }
+
+    // Test 10: Cancel does nothing with no run going, and nothing it did reaches the next run.
+    @Test func cancelWithNoRun() async throws {
+        let repo = try gitRepo()
+        let dir = tempDir("peepwho-data")
+        defer {
+            try? FileManager.default.removeItem(at: repo)
+            try? FileManager.default.removeItem(at: dir)
+        }
+        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+                                  secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
+        model.cancel()
+        #expect(model.progress == nil)
+        await model.pick(repo, as: .git)
+        #expect(model.lines == ["git: indexed repo:\(repo.path)."])
     }
 
     // Test 5: An open that failed, such as under a locked Keychain, opens on the next try, hands

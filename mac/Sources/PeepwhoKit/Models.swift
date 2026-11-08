@@ -326,6 +326,8 @@ public struct RefreshScope: Codable, Sendable {
 public struct RefreshResult: Codable, Sendable {
     // ok reports whether every scope succeeded.
     public let ok: Bool
+    // canceled reports that the person stopped the run before every scope ran.
+    public let canceled: Bool?
     // results are the scopes, one each.
     public let results: [RefreshScope]
     // log is the run's progress text.

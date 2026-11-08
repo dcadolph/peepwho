@@ -36,6 +36,9 @@ git folder, org chart CSV, and CODEOWNERS file it reads. Tokens go to the app's 
 under the same names the command line reads from the environment. Scopes and picked places
 go there too, since they name what a person reads and the preferences file is plain. Index Now reads every
 source set up, Refresh Now replays every scope indexed before, and Wipe deletes the index.
+While either runs, Settings shows the source it is on and its newest progress line, and Cancel
+stops it. A canceled Index saves nothing for the source it was on, and a canceled Refresh keeps
+the scopes that finished and records no failed try for the one it stopped.
 Tokens and picked folders stay until forgotten one by one.
 
 Settings also shows, per source, when it last indexed and why its last try failed, if it did.

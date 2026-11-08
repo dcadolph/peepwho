@@ -145,7 +145,9 @@ type RefreshResult struct {
 // failing scope leaves the others' results in place. A replay is never
 // recorded again: the record is what it replays, and only how each try went is
 // written back. now stamps each result and each try. Failing to write a try
-// warns and does not fail the refresh, since the index itself was saved.
+// warns and does not fail the refresh, since the index itself was saved. A
+// canceled context stops the run where it is: it returns the results so far and
+// the context's error, and writes nothing for the scope it was on.
 func (x *Indexer) Refresh(ctx context.Context, sources []string, now time.Time) ([]RefreshResult, error) {
 	inv, err := x.loadInvocations()
 	if err != nil {
@@ -170,12 +172,19 @@ func (x *Indexer) Refresh(ctx context.Context, sources []string, now time.Time) 
 	for _, src := range names {
 		scopes := slices.Sorted(maps.Keys(inv[src]))
 		for _, scope := range scopes {
+			if err := ctx.Err(); err != nil {
+				return results, err
+			}
 			what := src
 			if scope != "" {
 				what += " (" + scope + ")"
 			}
 			fmt.Fprintf(x.log(), "refreshing %s...\n", what)
 			err := x.replay(ctx, src, inv[src][scope].Flags)
+			// A person stopping the run is not this scope failing, so its record stays as it was.
+			if err != nil && ctx.Err() != nil {
+				return results, ctx.Err()
+			}
 			if err != nil {
 				failed++
 				fmt.Fprintf(x.log(), "refresh %s failed: %v\n", what, err)

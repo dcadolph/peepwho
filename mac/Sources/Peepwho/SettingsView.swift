@@ -44,7 +44,18 @@ struct SettingsView: View {
                 }
                 .disabled(model.busy != nil)
                 if let busy = model.busy {
-                    HStack { ProgressView().controlSize(.small); Text("\(busy)…") }
+                    HStack {
+                        ProgressView().controlSize(.small)
+                        Text("\(busy)…")
+                        Spacer()
+                        if model.canCancel {
+                            Button("Cancel") { model.cancel() }.controlSize(.small)
+                        }
+                    }
+                    if let progress = model.progress {
+                        Text(progress).font(.caption).foregroundStyle(.secondary)
+                            .lineLimit(1).truncationMode(.middle)
+                    }
                 }
                 ForEach(model.lines, id: \.self) { line in
                     Text(line).font(.caption).textSelection(.enabled)

@@ -167,6 +167,10 @@ public final class SettingsModel: ObservableObject {
     @Published public private(set) var saved: Set<String> = []
     // placeNames are the names of the picked places, by slot.
     @Published public private(set) var placeNames: [BookmarkSlot: String] = [:]
+    // progress is the newest line of the run going now, nil when there is none yet.
+    @Published public private(set) var progress: String?
+    // canCancel reports whether the run going now can be stopped.
+    @Published public private(set) var canCancel = false
     // scopes are what the token sources read, saved on every change.
     @Published public var scopes: Scopes {
         didSet { saveScopes() }
@@ -189,6 +193,8 @@ public final class SettingsModel: ObservableObject {
     private let secrets: SecretStore
     // places stores the picked folders and files.
     private let places: PlaceStore
+    // canceled reports that the person stopped the run going now.
+    private var canceled = false
     // defaults stores the refresh interval.
     private let defaults: UserDefaults
     // sampleDir is the sample company the app bundles, nil when it has none.
@@ -271,13 +277,18 @@ public final class SettingsModel: ObservableObject {
             guard !jobs.isEmpty else { return ["Nothing to index yet. Pick a folder or add a token first."] }
             var out: [String] = []
             for job in jobs {
+                guard !self.canceled else { break }
+                self.busy = "Indexing \(job.source)"
+                self.progress = nil
                 do {
                     out.append(try await self.index(core, job))
                 } catch {
+                    guard !self.canceled else { break }
                     out.append("\(job.source): \(SearchModel.describe(error))")
                 }
+                self.lines = out
             }
-            return out
+            return self.canceled ? out + ["Canceled."] : out
         }
     }
 
@@ -291,9 +302,10 @@ public final class SettingsModel: ObservableObject {
             let opened = try self.resolveAll()
             defer { opened.values.forEach(self.places.release) }
             let result = try await core.refresh()
-            return result.results.map { r in
+            let done = result.results.map { r in
                 r.ok ? "\(r.source): refreshed \(r.scope)." : "\(r.source): \(r.error ?? "failed")."
             }
+            return result.canceled == true ? done + ["Canceled."] : done
         }
     }
 
@@ -307,7 +319,7 @@ public final class SettingsModel: ObservableObject {
     // loadSample loads the bundled sample company.
     public func loadSample() async {
         guard let sampleDir else { return }
-        await run("Loading the sample company") { core in
+        await run("Loading the sample company", cancelable: false) { core in
             let got = try await core.importSample(from: sampleDir)
             return ["Loaded the sample company: \(got.people) people from \(got.sources) sources. Wipe removes it."]
         }
@@ -422,21 +434,62 @@ public final class SettingsModel: ObservableObject {
     }
 
     // run marks the model busy with label, runs body on the open core, shows its lines, and
-    // reads the status again.
-    private func run(_ label: String, _ body: (Core) async throws -> [String]) async {
+    // reads the status again. A cancelable body can be stopped with cancel.
+    private func run(_ label: String, cancelable: Bool = true, _ body: (Core) async throws -> [String]) async {
         guard refuseWhileBusy() else { return }
         guard let core else {
             lines = ["The index is not open."]
             return
         }
         busy = label
+        canceled = false
+        canCancel = cancelable
         do {
             lines = try await body(core)
         } catch {
             lines = [SearchModel.describe(error)]
         }
         busy = nil
+        progress = nil
+        canCancel = false
         await loadStatus()
+    }
+
+    // cancel stops the run going now and any job still waiting behind it. Nothing a finished job
+    // saved is lost.
+    public func cancel() {
+        guard canCancel else { return }
+        canceled = true
+        canCancel = false
+        progress = "Canceling"
+        Task { await keepCanceling() }
+    }
+
+    // keepCanceling calls the core's cancel until the run ends, since a call landing in the moment
+    // before the run registers with the core reaches nothing. A new run clears canceled, so this
+    // never reaches a later one.
+    private func keepCanceling() async {
+        while canceled, busy != nil {
+            core?.cancel()
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+    }
+
+    // showProgress shows line from the core as the newest step, with no path into the app's
+    // container. Once a run is canceling, the line stays.
+    private func showProgress(_ line: String) {
+        guard busy != nil, !canceled else { return }
+        progress = line.replacingOccurrences(of: dir.path + "/", with: "")
+            .replacingOccurrences(of: dir.path, with: "the data folder")
+    }
+
+    // follow sends core's progress lines to the main queue, which keeps them in order.
+    private func follow(_ core: Core?) {
+        core?.observeProgress { [weak self] line in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { self?.showProgress(line) }
+            }
+        }
     }
 
     // index runs job and says what it read.
@@ -467,6 +520,7 @@ public final class SettingsModel: ObservableObject {
             core = nil
             lines = ["The index did not open: \(SearchModel.describe(error))"]
         }
+        follow(core)
         onCore?(core)
     }
 

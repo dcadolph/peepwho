@@ -29,5 +29,8 @@ var ErrSample = errors.New("the index holds sample data: wipe it before indexing
 // ErrRealIndex indicates a sample load that would replace an index of real data.
 var ErrRealIndex = errors.New("the index holds your own data: wipe it before loading the sample company")
 
+// ErrCanceled indicates a run the person stopped, which is not a failure.
+var ErrCanceled = errors.New("canceled")
+
 // ErrNothingRecorded indicates a refresh with no recorded index run to replay.
 var ErrNothingRecorded = errors.New("nothing to refresh: index a source at least once first")

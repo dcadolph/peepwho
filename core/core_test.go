@@ -17,7 +17,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1426,5 +1429,286 @@ func scanFor(t *testing.T, dir string, wantFound bool, planted ...string) {
 	}
 	if wantFound && !found {
 		t.Errorf("no file under %s holds any of %q", dir, planted)
+	}
+}
+
+// heardLines is a Progress that keeps what it hears.
+type heardLines struct {
+	// mu guards lines.
+	mu sync.Mutex
+	// lines are the lines heard, in order.
+	lines []string
+}
+
+// Line keeps text.
+func (l *heardLines) Line(text string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.lines = append(l.lines, text)
+}
+
+// got returns the lines heard so far.
+func (l *heardLines) got() []string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return append([]string(nil), l.lines...)
+}
+
+// TestTailLogLines verifies a log tells its Progress each complete line once, in order,
+// however the writes split them.
+func TestTailLogLines(t *testing.T) {
+	t.Parallel()
+	long := strings.Repeat("x", maxLog+1)
+	tests := []struct {
+		Writes    []string
+		WantLines []string
+	}{{ // Test 0: One line in one write.
+		Writes: []string{"one\n"}, WantLines: []string{"one"},
+	}, { // Test 1: A line split across writes is told once, whole.
+		Writes: []string{"on", "e\ntw", "o\n"}, WantLines: []string{"one", "two"},
+	}, { // Test 2: Many lines in one write keep their order.
+		Writes: []string{"one\ntwo\nthree\n"}, WantLines: []string{"one", "two", "three"},
+	}, { // Test 3: Blank lines are skipped and space is trimmed.
+		Writes: []string{"\n  \n  one  \r\n\n"}, WantLines: []string{"one"},
+	}, { // Test 4: A line with no ending yet is not told.
+		Writes: []string{"one\ntw"}, WantLines: []string{"one"},
+	}, { // Test 5: A line past the cap is dropped and the next one is whole.
+		Writes: []string{long, "\nnext\n"}, WantLines: []string{"next"},
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			heard := &heardLines{}
+			log := &tailLog{max: maxLog, progress: heard}
+			for _, w := range test.Writes {
+				if n, err := log.Write([]byte(w)); n != len(w) || err != nil {
+					t.Fatalf("Write = %d, %v", n, err)
+				}
+			}
+			if diff := cmp.Diff(test.WantLines, heard.got(), cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("lines mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestProgressHearsIndex verifies Progress hears the lines of a real index in the order
+// the answer's log holds them, and a nil Progress is safe.
+func TestProgressHearsIndex(t *testing.T) {
+	t.Parallel()
+	people, err := filepath.Abs("../examples/people.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, err := Open(t.TempDir(), "")
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	heard := &heardLines{}
+	h.SetProgress(heard)
+	raw, err := h.Index("org-csv", "--file="+people, 0)
+	if err != nil {
+		t.Fatalf("Index: %v", err)
+	}
+	var v indexView
+	if err := json.Unmarshal([]byte(raw), &v); err != nil {
+		t.Fatalf("unmarshal %s: %v", raw, err)
+	}
+	var want []string
+	for line := range strings.Lines(v.Log) {
+		if s := strings.TrimSpace(line); s != "" {
+			want = append(want, s)
+		}
+	}
+	if len(want) == 0 {
+		t.Fatalf("index logged nothing: %s", raw)
+	}
+	if diff := cmp.Diff(want, heard.got()); diff != "" {
+		t.Errorf("lines mismatch (-want +got):\n%s", diff)
+	}
+	h.SetProgress(nil)
+	if _, err := h.Index("org-csv", "--file="+people, 60); err != nil {
+		t.Errorf("Index with no Progress: %v", err)
+	}
+}
+
+// stallingJira serves a fake Jira Server site that, once stall is set, holds every request
+// until the client goes away, and closes reached when the first one arrives.
+func stallingJira(t *testing.T) (site string, stall *atomic.Bool, reached <-chan struct{}) {
+	t.Helper()
+	target, err := url.Parse(authJira(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxy := httputil.NewSingleHostReverseProxy(target)
+	stall = &atomic.Bool{}
+	arrived := make(chan struct{})
+	var once sync.Once
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !stall.Load() {
+			proxy.ServeHTTP(w, r)
+			return
+		}
+		once.Do(func() { close(arrived) })
+		<-r.Context().Done()
+	}))
+	t.Cleanup(srv.Close)
+	return srv.URL, stall, arrived
+}
+
+// finishes returns the result of run, failing the test if it takes more than a few seconds.
+func finishes(t *testing.T, run <-chan error) error {
+	t.Helper()
+	select {
+	case err := <-run:
+		return err
+	case <-time.After(10 * time.Second):
+		t.Fatal("the run did not stop on Cancel")
+		return nil
+	}
+}
+
+// TestCancelIndex verifies Cancel stops an index stuck on a server: it returns ErrCanceled
+// within seconds with no index and no recorded run, and the next run is not canceled.
+func TestCancelIndex(t *testing.T) {
+	t.Parallel()
+	site, stall, reached := stallingJira(t)
+	dir := t.TempDir()
+	h, err := Open(dir, "")
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	h.SetSecrets(mapSecrets{engine.JiraTokenEnv: "good"})
+	flags := "--jira-server\n--jira-url=" + site + "\n--jira-project\nKAFKA"
+	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC).Unix()
+	stall.Store(true)
+	run := make(chan error, 1)
+	go func() {
+		_, err := h.Index("jira", flags, now)
+		run <- err
+	}()
+	<-reached
+	h.Cancel()
+	if err := finishes(t, run); !errors.Is(err, engine.ErrCanceled) {
+		t.Errorf("Index error = %v, want %v", err, engine.ErrCanceled)
+	}
+	for _, file := range engine.Dir(dir).Files() {
+		if _, err := os.Stat(file); !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("a canceled index left %s: %v", filepath.Base(file), err)
+		}
+	}
+	stall.Store(false)
+	if _, err := h.Index("jira", flags, now); err != nil {
+		t.Errorf("Index after a cancel: %v", err)
+	}
+}
+
+// TestCancelRefresh verifies a cancel records no attempt for the scope it stopped, keeps what
+// finished, and says which of the two it was: a run with nothing finished is ErrCanceled.
+func TestCancelRefresh(t *testing.T) {
+	t.Parallel()
+	start := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC).Unix()
+	const later = 3600
+	tests := []struct {
+		WantLine     string
+		Want         error
+		WithGit      bool
+		WantFinished int
+	}{{ // Test 0: The only scope stops, so nothing finished.
+		Want: engine.ErrCanceled, WantLine: "refreshing jira (project:KAFKA)...",
+	}, { // Test 1: Git sorts first and finishes, then jira stops.
+		WithGit: true, WantFinished: 1, WantLine: "refreshing jira (project:KAFKA)...",
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			site, stall, reached := stallingJira(t)
+			h, err := Open(t.TempDir(), "")
+			if err != nil {
+				t.Fatalf("Open: %v", err)
+			}
+			h.SetSecrets(mapSecrets{engine.JiraTokenEnv: "good"})
+			if test.WithGit {
+				if _, err := h.Index("git", "--repo-path="+newGitRepo(t), start); err != nil {
+					t.Fatalf("Index git: %v", err)
+				}
+			}
+			flags := "--jira-server\n--jira-url=" + site + "\n--jira-project\nKAFKA"
+			if _, err := h.Index("jira", flags, start); err != nil {
+				t.Fatalf("Index jira: %v", err)
+			}
+			heard := &heardLines{}
+			h.SetProgress(heard)
+			stall.Store(true)
+			var raw string
+			run := make(chan error, 1)
+			go func() {
+				var err error
+				raw, err = h.Refresh("", start+later)
+				run <- err
+			}()
+			<-reached
+			if !slices.Contains(heard.got(), test.WantLine) {
+				t.Errorf("no live line %q before the cancel: %q", test.WantLine, heard.got())
+			}
+			h.Cancel()
+			err = finishes(t, run)
+			if !errors.Is(err, test.Want) {
+				t.Fatalf("Refresh error = %v, want %v", err, test.Want)
+			}
+			if test.Want == nil {
+				var rv refreshView
+				if err := json.Unmarshal([]byte(raw), &rv); err != nil {
+					t.Fatalf("unmarshal %s: %v", raw, err)
+				}
+				if !rv.Canceled || rv.OK || len(rv.Results) != test.WantFinished {
+					t.Errorf("refresh = %s, want canceled and %d finished", raw, test.WantFinished)
+				}
+			}
+			inv, err := h.store.LoadInvocations()
+			if err != nil {
+				t.Fatalf("LoadInvocations: %v", err)
+			}
+			got := inv["jira"]["project:KAFKA"]
+			if got.Error != "" || got.AttemptedAt.Unix() != start || got.RanAt.Unix() != start {
+				t.Errorf("stopped scope wrote an attempt: %+v", got)
+			}
+			if test.WithGit {
+				for _, g := range inv["git"] {
+					if g.RanAt.Unix() != start+later {
+						t.Errorf("finished scope RanAt = %v, want the refresh time", g.RanAt)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestCancelWithNoRun verifies Cancel with nothing running does nothing and does not reach
+// the next run.
+func TestCancelWithNoRun(t *testing.T) {
+	t.Parallel()
+	people, err := filepath.Abs("../examples/people.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var none *Handle
+	none.Cancel()
+	none.SetProgress(nil)
+	h, err := Open(t.TempDir(), "")
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	h.Cancel()
+	if _, err := h.Index("org-csv", "--file="+people, 0); err != nil {
+		t.Errorf("Index after a stale cancel: %v", err)
+	}
+	h.Cancel()
+	raw, err := h.Refresh("", 60)
+	if err != nil {
+		t.Fatalf("Refresh after a stale cancel: %v", err)
+	}
+	if strings.Contains(raw, `"canceled"`) {
+		t.Errorf("a stale cancel reached the refresh: %s", raw)
 	}
 }

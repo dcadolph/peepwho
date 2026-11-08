@@ -14,6 +14,7 @@
 package core
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -58,6 +59,17 @@ type Handle struct {
 	store *engine.Store
 	// secrets supplies source tokens by name. Nil reads every name as empty.
 	secrets Secrets
+	// progress hears each line of an Index or Refresh as it happens. Nil hears nothing.
+	progress Progress
+	// cancel stops the Index or Refresh running now, nil when none is.
+	cancel context.CancelFunc
+}
+
+// Progress hears an Index or Refresh as it runs, one line at a time and in order.
+// The host implements it, such as a Swift type showing the newest line.
+type Progress interface {
+	// Line receives one line of progress with no line ending.
+	Line(text string)
 }
 
 // loaded is one load of the data directory, swapped whole so a question never
@@ -88,6 +100,55 @@ func (h *Handle) SetSecrets(s Secrets) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.secrets = s
+}
+
+// SetProgress sets who hears Index and Refresh as they run. A nil Progress hears
+// nothing.
+func (h *Handle) SetProgress(p Progress) {
+	if h == nil {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.progress = p
+}
+
+// Cancel stops the Index or Refresh running now, which then returns
+// engine.ErrCanceled or the scopes that finished. It does nothing when no run is
+// going, and never reaches a run that starts later.
+func (h *Handle) Cancel() {
+	if h == nil {
+		return
+	}
+	h.mu.RLock()
+	cancel := h.cancel
+	h.mu.RUnlock()
+	if cancel != nil {
+		cancel()
+	}
+}
+
+// begin starts a run the host can cancel and returns its context and what ends it.
+// The caller holds writeMu, so only one run is ever registered.
+func (h *Handle) begin() (context.Context, func()) {
+	ctx, cancel := context.WithCancel(context.Background())
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.cancel = cancel
+	return ctx, func() {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		h.cancel = nil
+		cancel()
+	}
+}
+
+// runLog returns the log for one run, which keeps its end and tells the handle's
+// Progress each line.
+func (h *Handle) runLog() *tailLog {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return &tailLog{max: maxLog, progress: h.progress}
 }
 
 // secret returns the credential stored under name, or empty when the handle
@@ -485,8 +546,8 @@ func (h *Handle) ChangesSince(sinceUnix int64) (out string, err error) {
 // so a long git run cannot grow the answer without bound.
 const maxLog = 64 << 10
 
-// tailLog keeps the last max bytes written to it. Sources may log from more
-// than one goroutine, so writes are serialized.
+// tailLog keeps the last max bytes written to it and tells progress each line. Sources
+// may log from more than one goroutine, so writes are serialized.
 type tailLog struct {
 	// mu serializes writes.
 	mu sync.Mutex
@@ -494,15 +555,37 @@ type tailLog struct {
 	buf []byte
 	// max is how many bytes to keep.
 	max int
+	// progress hears each complete line. Nil hears nothing.
+	progress Progress
+	// partial is the line still being written.
+	partial []byte
 }
 
-// Write appends p and drops the oldest bytes past the cap.
+// Write appends p, drops the oldest bytes past the cap, and tells progress each line p
+// completes. Holding the lock through the call keeps the lines in order.
 func (l *tailLog) Write(p []byte) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.buf = append(l.buf, p...)
 	if len(l.buf) > l.max {
 		l.buf = append([]byte(nil), l.buf[len(l.buf)-l.max:]...)
+	}
+	if l.progress == nil {
+		return len(p), nil
+	}
+	l.partial = append(l.partial, p...)
+	for {
+		end := bytes.IndexByte(l.partial, '\n')
+		if end < 0 {
+			break
+		}
+		if line := strings.TrimSpace(string(l.partial[:end])); line != "" {
+			l.progress.Line(line)
+		}
+		l.partial = l.partial[end+1:]
+	}
+	if len(l.partial) > maxLog {
+		l.partial = nil
 	}
 	return len(p), nil
 }
@@ -599,15 +682,20 @@ func (h *Handle) Index(source, flags string, nowUnix int64) (out string, err err
 	if err := h.refuseSample(); err != nil {
 		return "", err
 	}
-	log := &tailLog{max: maxLog}
+	log := h.runLog()
 	now := time.Unix(nowUnix, 0)
 	x := h.indexer(now, log)
+	ctx, done := h.begin()
+	defer done()
 	var scope string
 	x.Record = func(src, sc string) error {
 		scope = sc
 		return h.store.RecordInvocation(src, sc, run.Replay, now)
 	}
-	if err := x.Index(context.Background(), run.Request); err != nil {
+	if err := x.Index(ctx, run.Request); err != nil {
+		if ctx.Err() != nil {
+			return "", engine.ErrCanceled
+		}
 		return "", fmt.Errorf("core: index %s: %w", source, err)
 	}
 	if err := h.reload(); err != nil {
@@ -635,6 +723,8 @@ type refreshResult struct {
 type refreshView struct {
 	// OK is true when every replayed scope succeeded.
 	OK bool `json:"ok"`
+	// Canceled is true when the host stopped the run before every scope ran.
+	Canceled bool `json:"canceled,omitempty"`
 	// Results lists each replayed scope in source then scope order.
 	Results []refreshResult `json:"results"`
 	// Log is the end of the refresh's progress output.
@@ -645,7 +735,9 @@ type refreshView struct {
 // the host's clock in seconds since the Unix epoch. sources is a comma list,
 // or empty for every recorded source. One scope failing, such as on an expired
 // token, does not stop the others: the answer lists each scope with its error,
-// and ok is false. An error is returned only when nothing could run.
+// and ok is false. An error is returned only when nothing could run, or when
+// Cancel stopped the run before any scope finished, which is engine.ErrCanceled.
+// Canceled later, the answer lists what finished and canceled is true.
 func (h *Handle) Refresh(sources string, nowUnix int64) (out string, err error) {
 	defer rescue("refresh", &err)
 	if err := h.ready(); err != nil {
@@ -669,15 +761,21 @@ func (h *Handle) Refresh(sources string, nowUnix int64) (out string, err error) 
 		return "", err
 	}
 	now := time.Unix(nowUnix, 0)
-	log := &tailLog{max: maxLog}
-	results, err := h.indexer(now, log).Refresh(context.Background(), names, now)
+	log := h.runLog()
+	ctx, done := h.begin()
+	defer done()
+	results, err := h.indexer(now, log).Refresh(ctx, names, now)
 	if errors.Is(err, engine.ErrNothingRecorded) {
 		return "", engine.ErrNothingRecorded
+	}
+	canceled := errors.Is(err, context.Canceled)
+	if canceled && len(results) == 0 {
+		return "", engine.ErrCanceled
 	}
 	if err != nil && len(results) == 0 {
 		return "", fmt.Errorf("core: refresh: %w", err)
 	}
-	v := refreshView{OK: err == nil, Results: []refreshResult{}}
+	v := refreshView{OK: err == nil, Canceled: canceled, Results: []refreshResult{}}
 	ranOK := false
 	for _, r := range results {
 		rr := refreshResult{

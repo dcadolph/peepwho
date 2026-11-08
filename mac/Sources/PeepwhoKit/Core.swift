@@ -1,6 +1,22 @@
 import Foundation
 import PeepwhoCore
 
+// ProgressLines hands the core's progress lines to a closure.
+final class ProgressLines: NSObject, CoreProgressProtocol {
+    // lineHandler receives each line.
+    private let lineHandler: @Sendable (String) -> Void
+
+    // init wraps line.
+    init(line: @escaping @Sendable (String) -> Void) {
+        lineHandler = line
+    }
+
+    // line receives one line from the core.
+    func line(_ text: String?) {
+        lineHandler(text ?? "")
+    }
+}
+
 // Core is an opened data directory with typed, async calls off the main thread. Questions run on
 // a concurrent queue and Index and Refresh on a serial one, so a refresh never overlaps an index
 // and a question never waits behind either: the handle answers from the old index while a
@@ -34,6 +50,17 @@ public final class Core: @unchecked Sendable {
         let raw = CoreWipe(dir.path, &err)
         if let err { throw err }
         return try decode(raw)
+    }
+
+    // observeProgress hands line each line of an Index or Refresh as it runs, off the main thread.
+    public func observeProgress(_ line: @escaping @Sendable (String) -> Void) {
+        handle.setProgress(ProgressLines(line: line))
+    }
+
+    // cancel stops the Index or Refresh running now. It calls straight through, since the writes
+    // queue is busy with the very call it stops.
+    public func cancel() {
+        handle.cancel()
     }
 
     // ask answers who to talk to and where to ask about query.

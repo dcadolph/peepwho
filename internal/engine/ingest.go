@@ -162,6 +162,11 @@ func (x *Indexer) Index(ctx context.Context, req IndexRequest) error {
 	if err != nil {
 		return err
 	}
+	// A connector may hand back what it read before a cancel with no error. Folding
+	// that would store a partial read as complete.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := x.Fold(ctx, recs, FoldParams{
 		Merge: req.Merge, Incremental: incremental, AllowShrink: req.AllowShrink, HalfLifeDays: req.HalfLifeDays,
 		AliasesFile: req.AliasesFile, Embed: req.Embed, EmbedModel: req.EmbedModel, OllamaURL: req.OllamaURL,

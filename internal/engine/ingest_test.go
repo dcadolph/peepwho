@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -279,5 +281,48 @@ func TestFoldLogsChanges(t *testing.T) {
 				t.Errorf("change log mismatch (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+// cancelAtEOF reads like its reader and cancels when the reader runs out, which is a
+// connector seeing a cancel after its last read and returning what it has with no error.
+type cancelAtEOF struct {
+	// r is what gets read.
+	r *strings.Reader
+	// cancel runs at the end of r.
+	cancel context.CancelFunc
+}
+
+// Read reads from r and cancels once r has nothing left.
+func (c cancelAtEOF) Read(p []byte) (int, error) {
+	n, err := c.r.Read(p)
+	if err != nil {
+		c.cancel()
+	}
+	return n, err
+}
+
+// TestIndexCanceledSavesNothing verifies records a connector returned with no error
+// after a cancel are not folded, since that would store a partial read as complete.
+func TestIndexCanceledSavesNothing(t *testing.T) {
+	t.Parallel()
+	dir := Dir(t.TempDir())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	x := &Indexer{
+		Dir: dir, Log: io.Discard, Policy: policy.Default(),
+		Stdin: cancelAtEOF{r: strings.NewReader(`[{"kind":"person","name":"Ann Lee","email":"ann@x.com"}]`), cancel: cancel},
+		Record: func(string, string) error {
+			t.Error("a canceled index recorded a run")
+			return nil
+		},
+	}
+	if err := x.Index(ctx, IndexRequest{Source: "json"}); !errors.Is(err, context.Canceled) {
+		t.Errorf("Index error = %v, want %v", err, context.Canceled)
+	}
+	for _, file := range dir.Files() {
+		if _, err := os.Stat(file); !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("a canceled index left %s: %v", filepath.Base(file), err)
+		}
 	}
 }
