@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/cobra"
 
 	"github.com/dcadolph/peepwho/internal/engine"
@@ -59,9 +60,16 @@ func TestIndexRecordsEveryScope(t *testing.T) {
 		if err != nil || len(run.Replay) != 1 || run.Replay[0] != "--file="+f {
 			t.Fatalf("core records %q, %v; want only --file=%s", run.Replay, err, f)
 		}
-		want["org-csv"][engine.RefreshScope("org-csv", "", f, nil)] = run.Replay
+		want["org-csv"][engine.RefreshScope("org-csv", "", f, nil)] = engine.Run{Flags: run.Replay}
 	}
-	if diff := cmp.Diff(want, got); diff != "" {
+	for _, scopes := range got {
+		for scope, run := range scopes {
+			if run.RanAt.IsZero() || !run.RanAt.Equal(run.AttemptedAt) {
+				t.Errorf("%s recorded times %v and %v, want both set and equal", scope, run.RanAt, run.AttemptedAt)
+			}
+		}
+	}
+	if diff := cmp.Diff(want, got, cmpopts.IgnoreFields(engine.Run{}, "RanAt", "AttemptedAt")); diff != "" {
 		t.Errorf("recorded runs mismatch (-want +got):\n%s", diff)
 	}
 }

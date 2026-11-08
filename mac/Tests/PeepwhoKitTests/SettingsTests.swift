@@ -115,6 +115,74 @@ struct SettingsTests {
         #expect(Age.words(3 * 86400 + 5) == "3 days ago")
     }
 
+    // Test 7: Sources group in name order, a source is as old as its oldest scope, a failed last
+    // try shows beside the last success, and a run with no time says so.
+    @Test func sourceAges() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        let stamp = ISO8601DateFormatter()
+        func at(_ secondsAgo: TimeInterval) -> String { stamp.string(from: now.addingTimeInterval(-secondsAgo)) }
+        func scope(_ source: String, _ name: String, age: Int64?, tried: TimeInterval? = nil, error: String? = nil) -> IndexScope {
+            IndexScope(source: source, scope: name, ranAt: age.map { at(TimeInterval($0)) }, ageSeconds: age ?? 0,
+                       attemptedAt: tried.map(at), error: error)
+        }
+        let got = SourceAge.rows([
+            scope("slack", "", age: 120),
+            scope("git", "repo:/a", age: 3600),
+            scope("git", "repo:/b", age: 2 * 86400, tried: 6 * 3600, error: "repository not found"),
+            scope("jira", "project:A", age: nil),
+            scope("jira", "project:B", age: 60),
+            scope("github", "org:a", age: nil, tried: 300, error: "bad token"),
+            scope("pagerduty", "", age: 0, tried: nil, error: "boom"),
+            scope("codeowners", "file:/a", age: 60, tried: 7200, error: "older"),
+            scope("codeowners", "file:/b", age: 60, tried: 60, error: "newer"),
+        ], now: now)
+        #expect(got == [
+            SourceAge(source: "codeowners", detail: "Indexed 1 minute ago. Last try failed 1 minute ago: newer."),
+            SourceAge(source: "git", detail: "Indexed 2 days ago. Last try failed 6 hours ago: repository not found."),
+            SourceAge(source: "github", detail: "Indexed, time unknown. Last try failed 5 minutes ago: bad token."),
+            SourceAge(source: "jira", detail: "Indexed, time unknown."),
+            SourceAge(source: "pagerduty", detail: "Indexed just now. Last try failed: boom."),
+            SourceAge(source: "slack", detail: "Indexed 2 minutes ago."),
+        ])
+        #expect(SourceAge.rows([], now: now).isEmpty)
+    }
+
+    // Test 8: Through the real core, a repo that goes missing keeps its last success and shows the
+    // failed refresh beside it.
+    @Test func sourceAgesThroughCore() async throws {
+        let repo = try gitRepo()
+        let dir = tempDir("peepwho-data")
+        defer {
+            try? FileManager.default.removeItem(at: repo)
+            try? FileManager.default.removeItem(at: dir)
+        }
+        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+                                  secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
+        await model.pick(repo, as: .git)
+        #expect(model.sourceAges == [SourceAge(source: "git", detail: "Indexed just now.")])
+        try FileManager.default.removeItem(at: repo)
+        await model.refresh()
+        let row = try #require(model.sourceAges.first)
+        #expect(row.source == "git")
+        #expect(row.detail.hasPrefix("Indexed just now. Last try failed just now: "))
+    }
+
+    // Test 9: A status the core refuses says why, rather than leaving the window claiming the index
+    // is closed.
+    @Test func statusFailureShows() async throws {
+        let dir = tempDir("peepwho-data")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+                                  secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try "{".write(to: dir.appendingPathComponent("refresh.json"), atomically: true, encoding: .utf8)
+        await model.loadStatus()
+        #expect(model.status == nil)
+        #expect(model.lines.first?.contains("refresh") == true)
+    }
+
     // Test 2: A saved token is stored, an empty one deletes it, and scopes persist.
     @Test func secretsAndScopes() throws {
         let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))

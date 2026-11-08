@@ -18,6 +18,18 @@ struct SettingsView: View {
                 if let counts = sourceCounts {
                     Text(counts).font(.caption).foregroundStyle(.secondary)
                 }
+                ForEach(model.sourceAges) { row in
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(row.source)
+                        Spacer()
+                        Text(row.detail)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.trailing)
+                            .lineLimit(3)
+                            .textSelection(.enabled)
+                    }
+                    .font(.caption)
+                }
                 HStack {
                     Button("Index Now") { Task { await model.indexAll() } }
                     Button("Refresh Now") { Task { await model.refresh() } }

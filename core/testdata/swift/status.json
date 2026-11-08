@@ -1,10 +1,25 @@
 {
   "age_seconds": 3599,
-  "built_at": "2026-11-05T02:43:20Z",
+  "built_at": "2026-11-08T21:21:51Z",
   "channels": 4,
   "conversations": 6,
   "embeddings": false,
   "people": 12,
+  "scopes": [
+    {
+      "age_seconds": 3599,
+      "attempted_at": "2026-11-08T21:51:51Z",
+      "error": "repository not found",
+      "ran_at": "2026-11-08T21:21:51Z",
+      "scope": "repo:/src/app",
+      "source": "git"
+    },
+    {
+      "age_seconds": 0,
+      "scope": "",
+      "source": "slack"
+    }
+  ],
   "sealed": false,
   "sources": {
     "codeowners": 1,

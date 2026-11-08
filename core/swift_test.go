@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/dcadolph/peepwho/internal/engine"
 )
 
 // updateSwift rewrites the fixtures the Swift decode tests read when set.
@@ -65,6 +67,16 @@ func TestSwiftFixtures(t *testing.T) {
 		t.Fatalf("Open: %v", err)
 	}
 	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	built := h.current().eng.Index().BuiltAt()
+	if err := h.store.SaveInvocations(engine.Invocations{
+		"git": {"repo:/src/app": {
+			Flags: []string{"--repo-path", "/src/app"}, RanAt: built, AttemptedAt: built.Add(30 * time.Minute),
+			Error: "repository not found",
+		}},
+		"slack": {"": {}},
+	}); err != nil {
+		t.Fatalf("SaveInvocations: %v", err)
+	}
 	fresh := filepath.Join(t.TempDir(), "data")
 	w, err := Open(fresh, "")
 	if err != nil {
@@ -87,7 +99,7 @@ func TestSwiftFixtures(t *testing.T) {
 		{"search", func() (string, error) { return h.Search("angela", 3) }},
 		{"person", func() (string, error) { return h.Person("angela@corp.com") }},
 		{"recall", func() (string, error) { return h.Recall("angela@corp.com", "billing retries", 2) }},
-		{"status", func() (string, error) { return h.Status(h.current().eng.Index().BuiltAt().Unix() + 3600) }},
+		{"status", func() (string, error) { return h.Status(built.Unix() + 3600) }},
 		{"index", func() (string, error) { return w.Index("git", flags, now.Unix()) }},
 		{"refresh", func() (string, error) { return w.Refresh("", now.Add(time.Hour).Unix()) }},
 		{"changes", func() (string, error) { return f.ChangesSince(0) }},

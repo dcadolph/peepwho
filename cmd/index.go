@@ -87,7 +87,7 @@ func runIndex(cmd *cobra.Command, opts *options, req *engine.IndexRequest) error
 		if engine.ReadsStdin(source, req.File) {
 			return nil
 		}
-		return engine.NewStore(opts.dir(), nil).RecordInvocation(source, scope, engine.ReplayFlags(cmd.Flags()))
+		return engine.NewStore(opts.dir(), nil).RecordInvocation(source, scope, engine.ReplayFlags(cmd.Flags()), opts.now())
 	}
 	return x.Index(cmd.Context(), *req)
 }

@@ -50,6 +50,18 @@ struct DecodeTests {
         #expect(got.builtAt?.isEmpty == false)
         #expect((3599...3600).contains(got.ageSeconds))
         #expect(got.sources["git"] != nil)
+        let git = try #require(got.scopes.first)
+        #expect(git.source == "git")
+        #expect(git.scope == "repo:/src/app")
+        #expect(git.ranAt?.isEmpty == false)
+        #expect((3599...3600).contains(git.ageSeconds))
+        #expect(git.attemptedAt?.isEmpty == false)
+        #expect(git.error == "repository not found")
+        let slack = try #require(got.scopes.last)
+        #expect(slack.source == "slack")
+        #expect(slack.ranAt == nil)
+        #expect(slack.attemptedAt == nil)
+        #expect(slack.error == nil)
     }
 
     // changes decodes the merged changes and when they ran.

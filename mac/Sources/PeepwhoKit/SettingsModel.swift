@@ -120,12 +120,52 @@ public enum Age {
     }
 }
 
+// SourceAge says how fresh one source is, for the settings window.
+public struct SourceAge: Equatable, Sendable, Identifiable {
+    // source is the source name.
+    public let source: String
+    // detail is when the source last worked and, if its last try failed, why.
+    public let detail: String
+
+    // id is the source name, since rows hold one source each.
+    public var id: String { source }
+
+    // rows groups scopes by source in name order. A source is as old as its oldest scope, and is
+    // of unknown age when any scope is. now is the clock the ages were read at.
+    public static func rows(_ scopes: [IndexScope], now: Date) -> [SourceAge] {
+        Dictionary(grouping: scopes, by: \.source).sorted { $0.key < $1.key }.map { source, group in
+            let known = group.allSatisfy { $0.ranAt != nil }
+            let oldest = group.map(\.ageSeconds).max() ?? 0
+            var detail = known ? "Indexed \(Age.words(oldest))." : "Indexed, time unknown."
+            if let failure = lastFailure(group, now: now) {
+                detail += " \(failure)"
+            }
+            return SourceAge(source: source, detail: detail)
+        }
+    }
+
+    // lastFailure says how the newest failed try in group went, nil when none failed.
+    static func lastFailure(_ group: [IndexScope], now: Date) -> String? {
+        let parser = ISO8601DateFormatter()
+        let failed = group.compactMap { scope -> (error: String, at: Date?)? in
+            scope.error.map { ($0, scope.attemptedAt.flatMap(parser.date(from:))) }
+        }
+        guard let newest = failed.max(by: { ($0.at ?? .distantPast) < ($1.at ?? .distantPast) }) else {
+            return nil
+        }
+        guard let at = newest.at else { return "Last try failed: \(newest.error)." }
+        return "Last try failed \(Age.words(Int64(now.timeIntervalSince(at)))): \(newest.error)."
+    }
+}
+
 // SettingsModel drives the settings window: tokens, picked places, what the index holds, and
 // the Index, Refresh, and Wipe actions. It owns the open core and hands it to the search.
 @MainActor
 public final class SettingsModel: ObservableObject {
     // status is what the index held when last read, nil before the first read.
     @Published public private(set) var status: IndexStatus?
+    // statusAt is the clock status was read at.
+    @Published public private(set) var statusAt = Date()
     // busy names the action running, nil when idle.
     @Published public private(set) var busy: String?
     // lines are the outcomes of the last action, one sentence each.
@@ -315,7 +355,18 @@ public final class SettingsModel: ObservableObject {
             status = nil
             return
         }
-        status = try? await core.status(now: now)
+        statusAt = now
+        do {
+            status = try await core.status(now: now)
+        } catch {
+            status = nil
+            lines = [SearchModel.describe(error)]
+        }
+    }
+
+    // sourceAges says how fresh each recorded source is, as of the last status read.
+    public var sourceAges: [SourceAge] {
+        SourceAge.rows(status?.scopes ?? [], now: statusAt)
     }
 
     // has reports whether a secret is stored under name.

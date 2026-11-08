@@ -439,7 +439,7 @@ func TestUnbuiltHandle(t *testing.T) {
 		t.Fatalf("Status: %v", err)
 	}
 	if diff := cmp.Diff(`{"people":0,"channels":0,"teams":0,"subjects":0,"words":0,"sources":{},`+
-		`"embeddings":false,"conversations":0,"sealed":true,"age_seconds":0}`, raw); diff != "" {
+		`"embeddings":false,"conversations":0,"sealed":true,"age_seconds":0,"scopes":[]}`, raw); diff != "" {
 		t.Errorf("status mismatch (-want +got):\n%s", diff)
 	}
 	if raw, err := h.ChangesSince(0); err != nil || raw != `{"entries":0,"changes":{}}` {
@@ -519,6 +519,9 @@ func TestHandleIndexAndRefresh(t *testing.T) {
 	x := &engine.Indexer{
 		Dir: engine.Dir(ref), Codec: func() (vault.Codec, error) { return testKeyCipher(t), nil },
 		Policy: policy.Default(), Log: &strings.Builder{}, Now: func() time.Time { return now },
+		Record: func(source, scope string) error {
+			return engine.NewStore(engine.Dir(ref), nil).RecordInvocation(source, scope, nil, now)
+		},
 	}
 	req := engine.IndexRequest{Source: "git", IndexArgs: engine.IndexArgs{RepoPaths: []string{repo}, GitSinceDays: 10000}}
 	if err := x.Index(context.Background(), req); err != nil {
@@ -546,7 +549,9 @@ func TestHandleIndexAndRefresh(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantInv := engine.Invocations{"git": {"repo:" + repo: {"--git-since-days=10000", "--repo-path", repo}}}
+	wantInv := engine.Invocations{"git": {"repo:" + repo: {
+		Flags: []string{"--git-since-days=10000", "--repo-path", repo}, RanAt: now, AttemptedAt: now,
+	}}}
 	if diff := cmp.Diff(wantInv, inv); diff != "" {
 		t.Errorf("recorded run mismatch (-want +got):\n%s", diff)
 	}
@@ -575,6 +580,92 @@ func TestHandleIndexAndRefresh(t *testing.T) {
 	}
 	if !strings.Contains(st, `"built_at":"`+later.Format(time.RFC3339)+`"`) {
 		t.Errorf("status after refresh %s, want built_at %s from the reloaded index", st, later.Format(time.RFC3339))
+	}
+}
+
+// TestStatusScopes verifies Status says when each recorded scope last worked and
+// how its last try went, in source then scope order, and leaves out a time it
+// does not know.
+func TestStatusScopes(t *testing.T) {
+	t.Parallel()
+	repo := newGitRepo(t)
+	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	dir := t.TempDir()
+	h, err := Open(dir, testKeyB64)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	if _, err := h.Index("git", "--repo-path\n"+repo+"\n--git-since-days=10000\n", now.Unix()); err != nil {
+		t.Fatalf("Index: %v", err)
+	}
+	if err := os.RemoveAll(repo); err != nil {
+		t.Fatal(err)
+	}
+	failedAt := now.Add(time.Hour)
+	if _, err := h.Refresh("", failedAt.Unix()); err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+	store := engine.NewStore(engine.Dir(dir), nil)
+	inv, err := store.LoadInvocations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	inv["slack"] = map[string]engine.Run{"": {}}
+	if err := store.SaveInvocations(inv); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := h.Status(failedAt.Add(time.Hour).Unix())
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+	var got statusView
+	if err := json.Unmarshal([]byte(raw), &got); err != nil {
+		t.Fatalf("unmarshal %s: %v", raw, err)
+	}
+	failure := inv["git"]["repo:"+repo].Error
+	if failure == "" {
+		t.Error("the failed refresh recorded no error")
+	}
+	want := []scopeView{{
+		Source: "git", Scope: "repo:" + repo, RanAt: now.Format(time.RFC3339), AgeSeconds: 7200,
+		AttemptedAt: failedAt.Format(time.RFC3339), Error: failure,
+	}, {Source: "slack"}}
+	if diff := cmp.Diff(want, got.Scopes); diff != "" {
+		t.Errorf("scopes mismatch (-want +got):\n%s", diff)
+	}
+	if strings.Contains(raw[strings.Index(raw, `"source":"slack"`):], "ran_at") {
+		t.Errorf("a scope with no known time carries ran_at: %s", raw)
+	}
+	early, err := h.Status(now.Add(-time.Hour).Unix())
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+	if !strings.Contains(early, `"scope":"repo:`+repo+`","ran_at":"`+now.Format(time.RFC3339)+`","age_seconds":0`) {
+		t.Errorf("a clock set back gave a negative age: %s", early)
+	}
+}
+
+// TestStatusNoIndexScopes verifies a directory with no index still answers with an
+// empty scope list, and a damaged refresh config is an error rather than no scopes.
+func TestStatusNoIndexScopes(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	h, err := Open(dir, "")
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	raw, err := h.Status(0)
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+	if !strings.Contains(raw, `"scopes":[]`) {
+		t.Errorf("status %s, want an empty scope list", raw)
+	}
+	if err := os.WriteFile(engine.Dir(dir).Refresh(), []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.Status(0); err == nil {
+		t.Error("Status over a damaged refresh config returned nil")
 	}
 }
 

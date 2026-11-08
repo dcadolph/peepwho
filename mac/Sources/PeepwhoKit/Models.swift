@@ -204,12 +204,38 @@ public struct IndexStatus: Codable, Sendable {
     public let builtAt: String?
     // ageSeconds is how long before the supplied clock the index was written.
     public let ageSeconds: Int64
+    // scopes are the recorded index runs in source then scope order.
+    public let scopes: [IndexScope]
 
     // CodingKeys maps the core's snake case names.
     enum CodingKeys: String, CodingKey {
-        case people, teams, subjects, channels, words, conversations, sources, embeddings, sealed
+        case people, teams, subjects, channels, words, conversations, sources, embeddings, sealed, scopes
         case builtAt = "built_at"
         case ageSeconds = "age_seconds"
+    }
+}
+
+// IndexScope is one recorded index run: when it last worked and how its last try went.
+public struct IndexScope: Codable, Sendable {
+    // source is the source the run reads.
+    public let source: String
+    // scope is what the run reads, such as repo:/path.
+    public let scope: String
+    // ranAt is when it last worked, RFC 3339, absent when not known.
+    public let ranAt: String?
+    // ageSeconds is how long before the supplied clock ranAt was, zero when ranAt is absent.
+    public let ageSeconds: Int64
+    // attemptedAt is when it was last tried, RFC 3339, absent when not known.
+    public let attemptedAt: String?
+    // error says why the last try failed, absent when it worked.
+    public let error: String?
+
+    // CodingKeys maps the core's snake case names.
+    enum CodingKeys: String, CodingKey {
+        case source, scope, error
+        case ranAt = "ran_at"
+        case ageSeconds = "age_seconds"
+        case attemptedAt = "attempted_at"
     }
 }
 

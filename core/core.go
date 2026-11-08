@@ -20,6 +20,8 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -325,6 +327,49 @@ type statusView struct {
 	BuiltAt string `json:"built_at,omitempty"`
 	// AgeSeconds is how long before now the index was written.
 	AgeSeconds int64 `json:"age_seconds"`
+	// Scopes lists each recorded index run in source then scope order.
+	Scopes []scopeView `json:"scopes"`
+}
+
+// scopeView is one recorded index run in the JSON Status returns.
+type scopeView struct {
+	// Source is the source the run reads.
+	Source string `json:"source"`
+	// Scope is the refresh key the run was recorded under.
+	Scope string `json:"scope"`
+	// RanAt is when the scope last indexed successfully, RFC 3339, empty when
+	// not known.
+	RanAt string `json:"ran_at,omitempty"`
+	// AgeSeconds is how long before now RanAt was, zero when RanAt is empty.
+	AgeSeconds int64 `json:"age_seconds"`
+	// AttemptedAt is when the scope was last tried, RFC 3339, empty when not known.
+	AttemptedAt string `json:"attempted_at,omitempty"`
+	// Error is why the last try failed, empty when it succeeded.
+	Error string `json:"error,omitempty"`
+}
+
+// scopeViews reads the recorded index runs and says how old each is at now.
+func (h *Handle) scopeViews(now time.Time) ([]scopeView, error) {
+	inv, err := h.store.LoadInvocations()
+	if err != nil {
+		return nil, fmt.Errorf("core: status: %w", err)
+	}
+	views := []scopeView{}
+	for _, source := range slices.Sorted(maps.Keys(inv)) {
+		for _, scope := range slices.Sorted(maps.Keys(inv[source])) {
+			run := inv[source][scope]
+			v := scopeView{Source: source, Scope: scope, Error: run.Error}
+			if !run.RanAt.IsZero() {
+				v.RanAt = run.RanAt.UTC().Format(time.RFC3339)
+				v.AgeSeconds = max(0, int64(now.Sub(run.RanAt)/time.Second))
+			}
+			if !run.AttemptedAt.IsZero() {
+				v.AttemptedAt = run.AttemptedAt.UTC().Format(time.RFC3339)
+			}
+			views = append(views, v)
+		}
+	}
+	return views, nil
 }
 
 // Status reports what the index holds and how old it is at nowUnix, the host's
@@ -334,15 +379,20 @@ func (h *Handle) Status(nowUnix int64) (string, error) {
 	if err := h.ready(); err != nil {
 		return "", err
 	}
+	now := time.Unix(nowUnix, 0)
+	scopes, err := h.scopeViews(now)
+	if err != nil {
+		return "", err
+	}
 	l := h.current()
 	if l == nil {
-		return toJSON(statusView{Sources: map[string]int{}, Sealed: h.sealed})
+		return toJSON(statusView{Sources: map[string]int{}, Sealed: h.sealed, Scopes: scopes})
 	}
-	st := l.eng.Status(time.Unix(nowUnix, 0))
+	st := l.eng.Status(now)
 	v := statusView{
 		People: st.People, Channels: st.Channels, Teams: st.Teams,
 		Subjects: st.Subjects, Words: st.Words, Sources: st.Sources,
-		Embeddings: st.Embeddings, Conversations: l.episodes.Len(), Sealed: h.sealed,
+		Embeddings: st.Embeddings, Conversations: l.episodes.Len(), Sealed: h.sealed, Scopes: scopes,
 	}
 	if !st.BuiltAt.IsZero() {
 		v.BuiltAt = st.BuiltAt.UTC().Format(time.RFC3339)
@@ -499,11 +549,12 @@ func (h *Handle) Index(source, flags string, nowUnix int64) (string, error) {
 	h.writeMu.Lock()
 	defer h.writeMu.Unlock()
 	log := &tailLog{max: maxLog}
-	x := h.indexer(time.Unix(nowUnix, 0), log)
+	now := time.Unix(nowUnix, 0)
+	x := h.indexer(now, log)
 	var scope string
 	x.Record = func(src, sc string) error {
 		scope = sc
-		return h.store.RecordInvocation(src, sc, run.Replay)
+		return h.store.RecordInvocation(src, sc, run.Replay, now)
 	}
 	if err := x.Index(context.Background(), run.Request); err != nil {
 		return "", fmt.Errorf("core: index %s: %w", source, err)

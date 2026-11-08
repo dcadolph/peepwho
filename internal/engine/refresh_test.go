@@ -20,6 +20,7 @@ import (
 
 	"github.com/dcadolph/peepwho/internal/fakeapi"
 	"github.com/dcadolph/peepwho/internal/policy"
+	"github.com/dcadolph/peepwho/internal/util"
 )
 
 // TestInvocationsRoundTrip verifies the refresh config saves and loads, and a
@@ -27,9 +28,10 @@ import (
 func TestInvocationsRoundTrip(t *testing.T) {
 	t.Parallel()
 	store := NewStore(Dir(t.TempDir()), nil)
+	at := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
 	in := Invocations{
-		"github": {"org:acme": {"--github-org", "acme"}},
-		"slack":  {"all": {"--include-private=true"}},
+		"github": {"org:acme": {Flags: []string{"--github-org", "acme"}, RanAt: at, AttemptedAt: at.Add(time.Hour), Error: "boom"}},
+		"slack":  {"all": {Flags: []string{"--include-private=true"}}},
 	}
 	if err := store.SaveInvocations(in); err != nil {
 		t.Fatalf("save: %v", err)
@@ -38,8 +40,15 @@ func TestInvocationsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if len(out) != 2 || strings.Join(out["github"]["org:acme"], " ") != "--github-org acme" {
-		t.Errorf("round trip mismatch: %+v", out)
+	if diff := cmp.Diff(in, out); diff != "" {
+		t.Errorf("round trip mismatch (-want +got):\n%s", diff)
+	}
+	raw, err := os.ReadFile(store.Dir().Refresh())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "0001-01-01") {
+		t.Errorf("a time not known was written as a zero time: %s", raw)
 	}
 	empty, err := NewStore(Dir(t.TempDir()), nil).LoadInvocations()
 	if err != nil || len(empty) != 0 {
@@ -47,25 +56,91 @@ func TestInvocationsRoundTrip(t *testing.T) {
 	}
 }
 
-// TestInvocationsLegacyFormat verifies a refresh.json written before scope
-// keys existed still loads, folded under an empty scope, so nothing already
-// recorded is dropped by the upgrade.
-func TestInvocationsLegacyFormat(t *testing.T) {
+// TestInvocationsOlderShapes verifies a refresh.json from before runs carried
+// times still loads as runs with no times, so nothing recorded is dropped.
+func TestInvocationsOlderShapes(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		WantRuns Invocations
+		File     string
+	}{{ // Test 0: One flag list per source folds under an empty scope.
+		File: `{"git":["--repo-path","/src/b"],"slack":["--include-private=true"]}`,
+		WantRuns: Invocations{
+			"git":   {"": {Flags: []string{"--repo-path", "/src/b"}}},
+			"slack": {"": {Flags: []string{"--include-private=true"}}},
+		},
+	}, { // Test 1: One flag list per scope keeps its scopes.
+		File: `{"git":{"repo:/a":["--repo-path","/a"],"repo:/b":["--repo-path","/b"]},"slack":{"":null}}`,
+		WantRuns: Invocations{
+			"git": {
+				"repo:/a": {Flags: []string{"--repo-path", "/a"}},
+				"repo:/b": {Flags: []string{"--repo-path", "/b"}},
+			},
+			"slack": {"": {}},
+		},
+	}, { // Test 2: The current shape reads as it is written.
+		File: `{"git":{"repo:/a":{"flags":["--repo-path","/a"],"ran_at":"2026-11-01T12:00:00Z","error":"boom"}}}`,
+		WantRuns: Invocations{"git": {"repo:/a": {
+			Flags: []string{"--repo-path", "/a"}, RanAt: time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC), Error: "boom",
+		}}},
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			store := NewStore(Dir(t.TempDir()), nil)
+			if err := os.WriteFile(store.Dir().Refresh(), []byte(test.File), 0o600); err != nil {
+				t.Fatalf("write: %v", err)
+			}
+			out, err := store.LoadInvocations()
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			if diff := cmp.Diff(test.WantRuns, out); diff != "" {
+				t.Errorf("load mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestRecordInvocationStampsAndClears verifies a successful index run stamps both
+// times and clears the failure an earlier refresh left.
+func TestRecordInvocationStampsAndClears(t *testing.T) {
 	t.Parallel()
 	store := NewStore(Dir(t.TempDir()), nil)
-	legacy := []byte(`{"git":["--repo-path","/src/b"],"slack":["--include-private=true"]}`)
-	if err := os.WriteFile(store.Dir().Refresh(), legacy, 0o600); err != nil {
-		t.Fatalf("write: %v", err)
+	then := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	if err := store.SaveInvocations(Invocations{"git": {"repo:/a": {
+		Flags: []string{"--old"}, RanAt: then, AttemptedAt: then, Error: "boom",
+	}}}); err != nil {
+		t.Fatal(err)
 	}
-	out, err := store.LoadInvocations()
+	now := then.Add(time.Hour)
+	if err := store.RecordInvocation("git", "repo:/a", []string{"--new"}, now); err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.LoadInvocations()
 	if err != nil {
-		t.Fatalf("load: %v", err)
+		t.Fatal(err)
 	}
-	if diff := cmp.Diff(Invocations{
-		"git":   {"": {"--repo-path", "/src/b"}},
-		"slack": {"": {"--include-private=true"}},
-	}, out); diff != "" {
-		t.Errorf("legacy load mismatch (-want +got):\n%s", diff)
+	want := Invocations{"git": {"repo:/a": {Flags: []string{"--new"}, RanAt: now, AttemptedAt: now}}}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// TestRecordAttemptMissingScope verifies a try on a scope forgotten meanwhile does
+// not bring it back.
+func TestRecordAttemptMissingScope(t *testing.T) {
+	t.Parallel()
+	store := NewStore(Dir(t.TempDir()), nil)
+	if err := store.RecordAttempt("git", "repo:/a", time.Now(), nil); err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.LoadInvocations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(Invocations{}, got); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
 	}
 }
 
@@ -163,10 +238,10 @@ func TestRefresh(t *testing.T) {
 			jira := authJira(t)
 			dir := Dir(t.TempDir())
 			if err := NewStore(dir, nil).SaveInvocations(Invocations{
-				"jira": {"project:KAFKA": {
+				"jira": {"project:KAFKA": {Flags: []string{
 					"--jira-server=true", "--jira-url=" + jira, "--jira-project", "KAFKA", "--policy=open",
-				}},
-				"org-csv": {"file:" + people: {"--file=" + people}},
+				}}},
+				"org-csv": {"file:" + people: {Flags: []string{"--file=" + people}}},
 			}); err != nil {
 				t.Fatal(err)
 			}
@@ -227,6 +302,94 @@ func TestRefresh(t *testing.T) {
 	}
 }
 
+// TestRefreshRecordsAttempts verifies each replay writes how it went: a failure
+// keeps the last success and says why, and the next success clears the failure.
+func TestRefreshRecordsAttempts(t *testing.T) {
+	t.Parallel()
+	people, err := filepath.Abs("../../examples/people.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	jira := authJira(t)
+	dir := Dir(t.TempDir())
+	store := NewStore(dir, nil)
+	then := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	jiraFlags := []string{"--jira-server=true", "--jira-url=" + jira, "--jira-project", "KAFKA"}
+	csvFlags := []string{"--file=" + people}
+	if err := store.SaveInvocations(Invocations{
+		"jira":    {"project:KAFKA": {Flags: jiraFlags, RanAt: then, AttemptedAt: then}},
+		"org-csv": {"file:" + people: {Flags: csvFlags, RanAt: then, AttemptedAt: then}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	token := "wrong"
+	var clock time.Time
+	x := &Indexer{
+		Dir: dir, Log: &bytes.Buffer{}, Policy: policy.Default(),
+		Now:   func() time.Time { return clock },
+		Creds: func(string) string { return token },
+	}
+	clock = then.Add(time.Hour)
+	if _, err := x.Refresh(context.Background(), nil, clock); err == nil {
+		t.Fatal("Refresh with a wrong token returned nil")
+	}
+	got, err := store.LoadInvocations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	failure := got["jira"]["project:KAFKA"].Error
+	if failure == "" {
+		t.Error("the failed scope recorded no error")
+	}
+	want := Invocations{
+		"jira":    {"project:KAFKA": {Flags: jiraFlags, RanAt: then, AttemptedAt: clock, Error: failure}},
+		"org-csv": {"file:" + people: {Flags: csvFlags, RanAt: clock, AttemptedAt: clock}},
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("after a failure (-want +got):\n%s", diff)
+	}
+	token = "good"
+	clock = clock.Add(time.Hour)
+	if _, err := x.Refresh(context.Background(), []string{"jira"}, clock); err != nil {
+		t.Fatalf("Refresh with the right token: %v", err)
+	}
+	got, err = store.LoadInvocations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(Run{Flags: jiraFlags, RanAt: clock, AttemptedAt: clock}, got["jira"]["project:KAFKA"]); diff != "" {
+		t.Errorf("after a success (-want +got):\n%s", diff)
+	}
+}
+
+// TestRefreshAttemptWriteWarns verifies a try that cannot be written warns and
+// leaves the refresh's own outcome alone.
+func TestRefreshAttemptWriteWarns(t *testing.T) {
+	t.Parallel()
+	people, err := filepath.Abs("../../examples/people.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := Dir(t.TempDir())
+	if err := NewStore(dir, nil).SaveInvocations(Invocations{
+		"org-csv": {"file:" + people: {Flags: []string{"--file=" + people}}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(dir.Refresh()+util.LockSuffix, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	var log bytes.Buffer
+	x := &Indexer{Dir: dir, Log: &log, Policy: policy.Default(), Now: time.Now}
+	results, err := x.Refresh(context.Background(), nil, time.Now())
+	if err != nil || len(results) != 1 || !results[0].OK {
+		t.Errorf("Refresh = %+v, %v; want one ok result and no error", results, err)
+	}
+	if !strings.Contains(log.String(), "warning: could not save how refresh org-csv") {
+		t.Errorf("log does not warn:\n%s", log.String())
+	}
+}
+
 // TestRefreshNothingRecorded verifies a refresh with no recorded scope is a
 // bad-arguments error that says how to record one.
 func TestRefreshNothingRecorded(t *testing.T) {
@@ -243,7 +406,7 @@ func TestRefreshNothingRecorded(t *testing.T) {
 func TestRefreshBadRecordedFlag(t *testing.T) {
 	t.Parallel()
 	dir := Dir(t.TempDir())
-	if err := NewStore(dir, nil).SaveInvocations(Invocations{"org-csv": {"file:x": {"--no-such-flag"}}}); err != nil {
+	if err := NewStore(dir, nil).SaveInvocations(Invocations{"org-csv": {"file:x": {Flags: []string{"--no-such-flag"}}}}); err != nil {
 		t.Fatal(err)
 	}
 	x := &Indexer{Dir: dir, Log: &bytes.Buffer{}}
