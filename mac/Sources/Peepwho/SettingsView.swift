@@ -2,39 +2,162 @@ import AppKit
 import PeepwhoKit
 import SwiftUI
 
-// SettingsView is the settings window: what the index holds, the places and tokens it reads,
-// and the actions that build, refresh, and wipe it.
+// SettingsView is the settings window: one tab each for general choices, the sources peepwho
+// reads, the index, and privacy, above a strip showing the action running and its outcome.
 struct SettingsView: View {
     // model holds the settings and runs the actions.
     @ObservedObject var model: SettingsModel
     // confirmingWipe shows the wipe confirmation.
     @State private var confirmingWipe = false
+    // confirmingForget shows the forget everything confirmation.
+    @State private var confirmingForget = false
 
-    // body lays out the index summary above the sources.
+    // body lays the tabs out above the activity strip every tab shares.
     var body: some View {
-        Form {
-            Section("General") {
-                if let login = model.login {
-                    Toggle("Open at login", isOn: Binding(
-                        get: { login != .off },
-                        set: { model.setOpensAtLogin($0) }
-                    ))
+        VStack(spacing: 0) {
+            TabView {
+                ForEach(SettingsTab.allCases) { tab in
+                    content(tab).tabItem { Label(tab.title, systemImage: tab.symbol) }
                 }
-                if let note = model.loginNote {
-                    HStack {
-                        Text(note).font(.caption).foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Spacer()
-                        Button("Open System Settings") { SystemLoginItem.openSettings() }.controlSize(.small)
+            }
+            .padding([.top, .horizontal])
+            activity
+        }
+        .frame(width: 640, height: 600)
+        .task { await model.loadStatus() }
+        .confirmationDialog("Wipe the index?", isPresented: $confirmingWipe) {
+            Button("Wipe", role: .destructive) { Task { await model.wipe() } }
+        } message: {
+            Text("This deletes everything peepwho has indexed on this Mac. Tokens and picked folders stay.")
+        }
+        .confirmationDialog("Forget every token and folder?", isPresented: $confirmingForget) {
+            Button("Forget Everything", role: .destructive) { Task { await model.forgetEverything() } }
+        } message: {
+            Text("This deletes every token, site address, and picked folder and file from the Keychain. "
+                + "The index keeps what it holds until a wipe.")
+        }
+    }
+
+    // content is the body of tab.
+    @ViewBuilder
+    private func content(_ tab: SettingsTab) -> some View {
+        switch tab {
+        case .general: general
+        case .sources: sources
+        case .index: index
+        case .privacy: privacy
+        }
+    }
+
+    // general holds opening at login, the version, and About.
+    private var general: some View {
+        Form {
+            if model.login != nil || model.loginNote != nil {
+                Section {
+                    if let login = model.login {
+                        Toggle("Open at login", isOn: Binding(
+                            get: { login != .off },
+                            set: { model.setOpensAtLogin($0) }
+                        ))
+                    }
+                    if let note = model.loginNote {
+                        HStack {
+                            Text(note).font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer()
+                            Button("Open System Settings") { SystemLoginItem.openSettings() }.controlSize(.small)
+                        }
                     }
                 }
+            }
+            Section {
                 HStack {
                     Text(version).foregroundStyle(.secondary)
                     Spacer()
                     Button("About peepwho") { showAbout() }
                 }
             }
-            Section("Index") {
+        }
+        .formStyle(.grouped)
+    }
+
+    // sources shows one card per source with its fields and whether it is set up.
+    private var sources: some View {
+        Form {
+            ForEach(SourceCard.all) { card in
+                Section {
+                    fields(card)
+                } header: {
+                    HStack {
+                        Label(card.title, systemImage: card.symbol)
+                        Spacer()
+                        badge(card.connected(saved: model.saved, placed: Set(model.placeNames.keys)))
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    // fields are the rows of card: its places, its secrets, then what its source reads.
+    @ViewBuilder
+    private func fields(_ card: SourceCard) -> some View {
+        ForEach(card.slots, id: \.self) { slot in
+            PlaceRow(label: placeLabel(slot), slot: slot, model: model)
+        }
+        ForEach(card.secrets, id: \.self) { name in
+            let (label, secure) = secretLabel(name)
+            SecretRow(label: label, name: name, model: model, secure: secure)
+        }
+        switch card.source {
+        case "github":
+            TextField("Repositories", text: $model.scopes.githubRepos, prompt: Text("owner/name, owner/name"))
+            TextField("Or every repository in org", text: $model.scopes.githubOrg)
+        case "jira":
+            TextField("Projects", text: $model.scopes.jiraProjects, prompt: Text("KEY, KEY"))
+            Toggle("Server or Data Center", isOn: $model.scopes.jiraServer)
+        case "confluence":
+            TextField("Spaces", text: $model.scopes.confluenceSpaces, prompt: Text("KEY, KEY"))
+            Toggle("Server or Data Center", isOn: $model.scopes.confluenceServer)
+        default:
+            EmptyView()
+        }
+    }
+
+    // badge says whether a card holds what its source needs.
+    private func badge(_ connected: Bool) -> some View {
+        Group {
+            if connected {
+                Label("Set up", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+            } else {
+                Text("Not set up").foregroundStyle(.secondary)
+            }
+        }
+        .font(.caption)
+    }
+
+    // placeLabel names slot.
+    private func placeLabel(_ slot: BookmarkSlot) -> String {
+        switch slot {
+        case .git: "Git repository"
+        case .csv: "Org chart CSV"
+        case .codeowners: "CODEOWNERS"
+        }
+    }
+
+    // secretLabel names the field for secret name and reports whether what is typed stays hidden.
+    private func secretLabel(_ name: String) -> (String, Bool) {
+        switch name {
+        case SecretName.jiraURL, SecretName.confluenceURL: ("Site URL", false)
+        case SecretName.jiraEmail, SecretName.confluenceEmail: ("Email", false)
+        default: ("Token", true)
+        }
+    }
+
+    // index shows what the index holds, how fresh each source is, and the actions that build it.
+    private var index: some View {
+        Form {
+            Section {
                 Text(model.summary).fixedSize(horizontal: false, vertical: true)
                 if let counts = sourceCounts {
                     Text(counts).font(.caption).foregroundStyle(.secondary)
@@ -51,19 +174,57 @@ struct SettingsView: View {
                     }
                     .font(.caption)
                 }
+            }
+            Section {
                 HStack {
                     Group {
                         Button("Index Now") { Task { await model.indexAll() } }
                         Button("Refresh Now") { Task { await model.refresh() } }
                     }
                     .disabled(model.status?.sample == true)
+                    Spacer()
                     if model.canLoadSample {
                         Button("Load Sample Company") { Task { await model.loadSample() } }
                     }
+                }
+                .disabled(model.busy != nil)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    // privacy says how the index is kept and holds the actions that remove what peepwho keeps.
+    private var privacy: some View {
+        Form {
+            Section {
+                Label(model.privacy, systemImage: model.status?.sealed == true ? "lock.fill" : "lock.open")
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Section {
+                HStack {
+                    Text("Wipe deletes everything peepwho has indexed on this Mac. Tokens and picked folders stay.")
+                        .fixedSize(horizontal: false, vertical: true)
                     Spacer()
                     Button("Wipe…", role: .destructive) { confirmingWipe = true }
                 }
-                .disabled(model.busy != nil)
+                HStack {
+                    Text("Forget deletes every token, site address, and picked folder and file. "
+                        + "The index keeps what it holds until a wipe.")
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer()
+                    Button("Forget Everything…", role: .destructive) { confirmingForget = true }
+                }
+            }
+            .disabled(model.busy != nil)
+        }
+        .formStyle(.grouped)
+    }
+
+    // activity shows the action running with its progress and Cancel, then the last outcome.
+    @ViewBuilder
+    private var activity: some View {
+        if model.busy != nil || !model.lines.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
                 if let busy = model.busy {
                     HStack {
                         ProgressView().controlSize(.small)
@@ -82,44 +243,8 @@ struct SettingsView: View {
                     Text(line).font(.caption).textSelection(.enabled)
                 }
             }
-            Section("Folders and files") {
-                PlaceRow(label: "Git repository", slot: .git, model: model)
-                PlaceRow(label: "Org chart CSV", slot: .csv, model: model)
-                PlaceRow(label: "CODEOWNERS", slot: .codeowners, model: model)
-            }
-            Section("Slack") {
-                SecretRow(label: "Token", name: SecretName.slackToken, model: model)
-            }
-            Section("GitHub") {
-                SecretRow(label: "Token", name: SecretName.githubToken, model: model)
-                TextField("Repositories", text: $model.scopes.githubRepos, prompt: Text("owner/name, owner/name"))
-                TextField("Or every repository in org", text: $model.scopes.githubOrg)
-            }
-            Section("Jira") {
-                SecretRow(label: "Site URL", name: SecretName.jiraURL, model: model, secure: false)
-                SecretRow(label: "Email", name: SecretName.jiraEmail, model: model, secure: false)
-                SecretRow(label: "Token", name: SecretName.jiraToken, model: model)
-                TextField("Projects", text: $model.scopes.jiraProjects, prompt: Text("KEY, KEY"))
-                Toggle("Server or Data Center", isOn: $model.scopes.jiraServer)
-            }
-            Section("Confluence") {
-                SecretRow(label: "Site URL", name: SecretName.confluenceURL, model: model, secure: false)
-                SecretRow(label: "Email", name: SecretName.confluenceEmail, model: model, secure: false)
-                SecretRow(label: "Token", name: SecretName.confluenceToken, model: model)
-                TextField("Spaces", text: $model.scopes.confluenceSpaces, prompt: Text("KEY, KEY"))
-                Toggle("Server or Data Center", isOn: $model.scopes.confluenceServer)
-            }
-            Section("PagerDuty") {
-                SecretRow(label: "Token", name: SecretName.pagerdutyToken, model: model)
-            }
-        }
-        .formStyle(.grouped)
-        .frame(width: 520, height: 640)
-        .task { await model.loadStatus() }
-        .confirmationDialog("Wipe the index?", isPresented: $confirmingWipe) {
-            Button("Wipe", role: .destructive) { Task { await model.wipe() } }
-        } message: {
-            Text("This deletes everything peepwho has indexed on this Mac. Tokens and picked folders stay.")
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
         }
     }
 

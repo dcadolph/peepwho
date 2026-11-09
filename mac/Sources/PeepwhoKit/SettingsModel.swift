@@ -306,6 +306,28 @@ public final class SettingsModel: ObservableObject {
         }
     }
 
+    // forgetEverything deletes every token, site address, and scope and drops every picked place,
+    // and stops refreshing every source, since each could only fail from then on. What the index
+    // already holds stays until a wipe. Nothing is forgotten when the index is not open, so the
+    // refresh record never names a source the person thinks is gone.
+    public func forgetEverything() async {
+        await run("Forgetting", cancelable: false) { core in
+            for card in SourceCard.all where !card.source.isEmpty {
+                try await core.forgetScopes(card.source)
+            }
+            for slot in BookmarkSlot.allCases {
+                try await core.forgetScopes(slot.source)
+                self.places.forget(slot)
+            }
+            for name in SourceCard.entered {
+                self.secrets.delete(name)
+            }
+            self.scopes = Scopes()
+            self.readSaved()
+            return ["Forgot every token, folder, and file. The index keeps what it holds until a wipe."]
+        }
+    }
+
     // indexAll indexes every picked place and every token source with a scope.
     public func indexAll() async {
         await run("Indexing") { core in
@@ -482,6 +504,15 @@ public final class SettingsModel: ObservableObject {
         return "\(counts) Indexed \(Age.words(s.ageSeconds)).\(sealed)"
     }
 
+    // privacy says how the index is kept on this Mac.
+    public var privacy: String {
+        guard let s = status else { return "The index is not open." }
+        guard s.sealed else {
+            return "The index is not encrypted on disk. Tokens and picked folders stay in your Keychain."
+        }
+        return "The index is encrypted on disk. Its key, your tokens, and your picked folders stay in your Keychain."
+    }
+
     // sourceAges says how fresh each recorded source is, as of the last status read.
     public var sourceAges: [SourceAge] {
         SourceAge.rows(status?.scopes ?? [], sample: status?.sample == true, now: statusAt)
@@ -597,12 +628,7 @@ public final class SettingsModel: ObservableObject {
 
     // readSaved reads which secrets and places the stores hold.
     private func readSaved() {
-        let names = [
-            SecretName.slackToken, SecretName.githubToken, SecretName.jiraURL, SecretName.jiraEmail,
-            SecretName.jiraToken, SecretName.confluenceURL, SecretName.confluenceEmail,
-            SecretName.confluenceToken, SecretName.pagerdutyToken,
-        ]
-        saved = Set(names.filter { secrets.get($0) != nil })
+        saved = Set(SourceCard.entered.filter { secrets.get($0) != nil })
         var named: [BookmarkSlot: String] = [:]
         for slot in BookmarkSlot.allCases where places.has(slot) {
             if let url = try? places.resolve(slot) {
