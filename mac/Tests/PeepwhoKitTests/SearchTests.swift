@@ -183,16 +183,19 @@ struct SearchStateTests {
         await model.ask("terraform")
         let id = try #require(model.people.first?.id)
 
-        async let shown: Void = model.select(id)
+        // A task on the main actor runs to its lookup before the yield returns, so the lookup is
+        // running when the window moves on, however busy the machine is. The answer cannot land
+        // before then, since it needs the main actor too.
+        let shown = Task { await model.select(id) }
         await Task.yield()
         model.back()
-        await shown
+        await shown.value
         #expect(model.detail == nil)
 
-        async let opening: Void = model.open(id)
+        let opening = Task { await model.open(id) }
         await Task.yield()
         model.use(core)
-        await opening
+        await opening.value
         #expect(opened.urls.isEmpty)
 
         await model.select(id)
