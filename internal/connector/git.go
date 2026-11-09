@@ -216,6 +216,7 @@ func (g *GitHistory) Fetch(ctx context.Context) ([]Record, error) {
 	if len(g.opts.Paths) == 0 {
 		return nil, ErrNoRepoPaths
 	}
+	g.opts.Paths = expandRepoPaths(g.opts.Paths, g.opts.Log)
 	g.resolveRepoIDs()
 	g.assignPlaceLabels()
 
@@ -284,8 +285,8 @@ func (g *GitHistory) Fetch(ctx context.Context) ([]Record, error) {
 	// an empty success would let a moved folder or a lost permission pass as a
 	// clean refresh, so it fails and leaves the existing index alone.
 	if unreadable == len(g.opts.Paths) {
-		return nil, fmt.Errorf("%w: see the skip lines above "+
-			"(a moved folder or a lost permission looks like this)", ErrNoReadableRepo)
+		return nil, fmt.Errorf("%w: see the skip lines above (a moved folder, a lost "+
+			"permission, or a folder with no repository in it looks like this)", ErrNoReadableRepo)
 	}
 
 	names := pickNames(nameCounts)
