@@ -10,12 +10,14 @@ struct PeepwhoApp: App {
 
     // body declares the menu bar item and the settings window.
     var body: some Scene {
-        MenuBarExtra("peepwho", systemImage: "person.2") {
+        MenuBarExtra {
             SearchView(model: app.search) {
                 app.settings.reopenIfClosed()
                 await app.settings.loadStatus()
                 await app.settings.refreshIfStale()
             }
+        } label: {
+            Image(nsImage: MenuBarOwl.image)
         }
         .menuBarExtraStyle(.window)
         Settings {

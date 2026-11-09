@@ -25,8 +25,9 @@ id and its index in its own container, and neither can read the command line's
 
 ## The menu bar app
 
-`mac/Sources/Peepwho` is the Mac app, a menu bar item with no Dock icon. Typing in its search
-field asks who to talk to, and Enter opens a Slack DM with the first person, or shows them
+`mac/Sources/Peepwho` is the Mac app, an owl in the menu bar with no Dock icon. The owl is a
+template image drawn from the site's mark, so macOS paints it to suit the menu bar. Typing in its
+search field asks who to talk to, and Enter opens a Slack DM with the first person, or shows them
 when the index has no Slack link for them. Clicking a person shows what the index knows
 about them. Above the results it lists who and what
 joined or left since the menu last closed.
