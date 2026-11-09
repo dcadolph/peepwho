@@ -371,14 +371,16 @@ struct SettingsTests {
         let places = MemoryPlaces()
         let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
                                   secrets: MemorySecrets(), places: places, defaults: defaults)
-        async let picked: Void = model.pick(repo, as: .git)
+        // A task on the main actor runs to its first wait before the yield returns, so the pick is
+        // busy here however busy the machine is.
+        let picked = Task { await model.pick(repo, as: .git) }
         await Task.yield()
         #expect(model.busy != nil)
         await model.wipe()
         #expect(model.lines.first?.hasSuffix("is still running. Try again when it finishes.") == true)
         await model.indexAll()
         #expect(model.lines.first?.hasSuffix("is still running. Try again when it finishes.") == true)
-        await picked
+        await picked.value
         #expect(model.busy == nil)
         #expect(model.status?.sources["git"] != nil)
         #expect(FileManager.default.fileExists(atPath: dir.path))
