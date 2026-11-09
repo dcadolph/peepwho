@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -65,11 +66,24 @@ func NewKeyword(ix *index.Index) *Keyword {
 
 // Resolve ranks people and channels for query using the index.
 func (k *Keyword) Resolve(_ context.Context, query string, limit int) (Answer, error) {
+	people := withNamed(nameMatch(k.ix, query, limit), k.ix.Search(query, limit), limit)
 	return Answer{
-		People:   withNamed(nameMatch(k.ix, query, limit), k.ix.Search(query, limit), limit),
-		Channels: k.ix.SearchChannels(query, limit),
+		People:   withoutChatter(people, func(m model.Match) bool { return m.Declared }),
+		Channels: withoutChatter(k.ix.SearchChannels(query, limit), func(m model.ChannelMatch) bool { return m.Declared }),
 		ix:       k.ix,
 	}, nil
+}
+
+// withoutChatter drops the undeclared matches when the top match is declared,
+// rests on a stated topic, title, or name, so a clear answer is not padded out
+// to the limit with people and channels that only said the word. Only the top
+// match decides: a declared match further down while the leader rests on what
+// was said would otherwise discard the right person.
+func withoutChatter[T any](items []T, declared func(T) bool) []T {
+	if len(items) == 0 || !declared(items[0]) {
+		return items
+	}
+	return slices.DeleteFunc(items, func(m T) bool { return !declared(m) })
 }
 
 // Chatter sends a system and user prompt to a model and returns its reply. The

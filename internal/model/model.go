@@ -219,6 +219,10 @@ type Match struct {
 	// Strength estimates how trustworthy the match is, from zero to one:
 	// query-term coverage scaled by the strength of the matched fields.
 	Strength float64
+	// Declared reports that the match rests on a stated topic, title, or name.
+	// Team names are made of everyday words such as "people" and mentions are
+	// passing talk, so neither counts.
+	Declared bool
 	// Reasons explains why the person matched, for transparency.
 	Reasons []string
 }
@@ -233,6 +237,9 @@ type ChannelMatch struct {
 	// Strength estimates how trustworthy the match is, from zero to one:
 	// query-term coverage scaled by the strength of the matched fields.
 	Strength float64
+	// Declared reports that the match rests on the channel's name, topic, or
+	// purpose rather than on passing mentions in its messages alone.
+	Declared bool
 	// Reasons explains why the channel matched.
 	Reasons []string
 	// TopMembers are the most relevant active members, most relevant first.

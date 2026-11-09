@@ -114,7 +114,7 @@ func nameMatch(ix *index.Index, query string, limit int) []model.Match {
 		}
 		out = append(out, model.Match{
 			Person: h.person, Team: team,
-			Score: h.score, Strength: h.score, Reasons: reasons,
+			Score: h.score, Strength: h.score, Declared: true, Reasons: reasons,
 		})
 	}
 	return out

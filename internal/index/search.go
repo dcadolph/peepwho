@@ -265,6 +265,7 @@ func (ix *Index) Search(query string, limit int) []model.Match {
 		}
 		matches[i].Reasons = reasons
 		matches[i].Strength = evidence * coveredShare(matched[pid], covers, originals)
+		matches[i].Declared = evidence > evidenceTeam
 	}
 	return matches
 }
@@ -311,6 +312,7 @@ func (ix *Index) SearchChannels(query string, limit int) []model.ChannelMatch {
 			Channel:  ch,
 			Score:    sc,
 			Strength: evidence * coverage,
+			Declared: evidence > evidenceTeam,
 			Reasons:  reasons,
 		})
 	}
