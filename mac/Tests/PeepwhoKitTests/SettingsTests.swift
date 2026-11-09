@@ -410,6 +410,27 @@ struct SettingsTests {
         #expect(model.progress == nil)
     }
 
+    // Test 18: A pick whose first index fails is forgotten, so no row claims a place that never
+    // indexed.
+    @Test func failedPickIsForgotten() async throws {
+        let place = tempDir("peepwho-place")
+        let dir = tempDir("peepwho-data")
+        try FileManager.default.createDirectory(at: place, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: place)
+            try? FileManager.default.removeItem(at: dir)
+        }
+        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let places = MemoryPlaces()
+        let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+                                  secrets: MemorySecrets(), places: places, defaults: defaults)
+        await model.pick(place, as: .git)
+        #expect(model.lines.first?.contains("folder with no repository in it") == true)
+        #expect(places.urls[.git] == nil)
+        #expect(model.placeNames[.git] == nil)
+        #expect(places.open == 0)
+    }
+
     // Test 8: A cancel between jobs leaves the next job unrun and clears the run's state, and
     // every place is released.
     @Test func cancelStopsTheJobLoop() async throws {

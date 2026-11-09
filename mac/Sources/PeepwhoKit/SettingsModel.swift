@@ -276,7 +276,9 @@ public final class SettingsModel: ObservableObject {
         readSaved()
     }
 
-    // pick remembers url for slot, stops refreshing the place it replaces, and indexes it.
+    // pick remembers url for slot, stops refreshing the place it replaces, and indexes it. A pick
+    // whose first index fails or is canceled is forgotten, so a picked place is always one that
+    // indexed.
     public func pick(_ url: URL, as slot: BookmarkSlot) async {
         guard refuseWhileBusy() else { return }
         do {
@@ -287,10 +289,16 @@ public final class SettingsModel: ObservableObject {
         }
         readSaved()
         await run("Indexing \(url.lastPathComponent)") { core in
-            guard let url = try self.places.resolve(slot) else { return [] }
-            defer { self.places.release(url) }
-            try await core.forgetScopes(slot.source)
-            return [try await self.index(core, IndexJob.forPlace(slot, url))]
+            do {
+                guard let url = try self.places.resolve(slot) else { return [] }
+                defer { self.places.release(url) }
+                try await core.forgetScopes(slot.source)
+                return [try await self.index(core, IndexJob.forPlace(slot, url))]
+            } catch {
+                self.places.forget(slot)
+                self.readSaved()
+                throw error
+            }
         }
     }
 
