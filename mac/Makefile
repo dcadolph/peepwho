@@ -13,12 +13,21 @@ SAMPLE := .build/SampleCompany
 .PHONY: build test host app verify dmg run-host run clean
 
 # fat joins one product's per-architecture builds into one binary at the given path.
-fat = lipo -create -output $(2) $(foreach arch,$(ARCHS),.build/$(arch)-apple-macosx/release/$(1))
+fat = lipo -create -output $(2) $(foreach arch,$(ARCHS),.build/arch/$(arch)/$(1))
 
 # build compiles every target in release mode once per architecture. Passing both to one
-# swift build moves it to a build system that cannot link the core's Objective-C classes.
+# swift build cannot link the core's Objective-C classes. The build engine writes every
+# architecture to the one folder --show-bin-path names, so each architecture's products are
+# copied aside into a fresh folder before the next build overwrites them. Reading fixed paths
+# instead once lipoed a morning's leftover binaries into a new app.
 build: $(FRAMEWORK)
-	for arch in $(ARCHS); do swift build -c release --arch $$arch || exit 1; done
+	for arch in $(ARCHS); do \
+		swift build -c release --arch $$arch || exit 1; \
+		bin=$$(swift build -c release --arch $$arch --show-bin-path) || exit 1; \
+		rm -rf .build/arch/$$arch && mkdir -p .build/arch/$$arch || exit 1; \
+		cp "$$bin/Peepwho" "$$bin/Host" .build/arch/$$arch/ || exit 1; \
+		lipo "$$bin/Peepwho" -verify_arch $$arch || exit 1; \
+	done
 
 # test runs the PeepwhoKit tests, which decode the core's fixtures.
 test: $(FRAMEWORK)
