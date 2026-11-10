@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/slack"
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/slack"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // Archive bounds. A retained conversation is meant to be read by a person, so

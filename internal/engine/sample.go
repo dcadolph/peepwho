@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // sampleMarker is the JSON the sample marker holds.

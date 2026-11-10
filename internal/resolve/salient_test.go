@@ -4,8 +4,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/index"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/index"
 )
 
 // salientIndex builds a person who owns a declared subject and has picked up

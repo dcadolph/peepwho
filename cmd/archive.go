@@ -6,21 +6,21 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/episode"
+	"github.com/dcadolph/whotoask/internal/episode"
 )
 
 // newArchiveCmd builds the archive command group, which reports and prunes the
-// conversation content peepwho keeps.
+// conversation content whotoask keeps.
 func newArchiveCmd(opts *options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "archive",
-		Short: "Report and prune the conversations peepwho keeps",
-		Long: `Report and prune the conversations peepwho keeps.
+		Short: "Report and prune the conversations whotoask keeps",
+		Long: `Report and prune the conversations whotoask keeps.
 
 Recall points back at past conversations on every install. With --archive at
 index time the words of those conversations are kept too, on this machine,
 beside the index, so an answer can show how something was worked out after the
-source has aged the messages out. Set a key with peepwho vault and that file is
+source has aged the messages out. Set a key with whotoask vault and that file is
 encrypted alongside the index; without one it is plain JSON readable only by you.
 
 Retention is yours to set. Nothing here contacts a server, and nothing is
@@ -75,8 +75,8 @@ func newArchivePruneCmd(opts *options) *cobra.Command {
 		Short: "Delete remembered conversations, or just their content",
 		Long: `Delete remembered conversations, or just their content.
 
-  peepwho archive prune --older-than-days 365   forget conversations over a year old
-  peepwho archive prune --content-only          keep the links, drop the content
+  whotoask archive prune --older-than-days 365   forget conversations over a year old
+  whotoask archive prune --content-only          keep the links, drop the content
 
 This is the only command that deletes remembered conversations, and it deletes
 exactly what you name.`,

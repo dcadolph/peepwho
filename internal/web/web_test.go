@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/dcadolph/peepwho/internal/report"
+	"github.com/dcadolph/whotoask/internal/report"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/feedback"
-	"github.com/dcadolph/peepwho/internal/llm"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/recall"
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/feedback"
+	"github.com/dcadolph/whotoask/internal/llm"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/recall"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // testHandler builds a handler whose Ask returns one canned person.
@@ -49,8 +49,8 @@ func TestIndexPage(t *testing.T) {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "peepwho") || !strings.Contains(body, "test") {
-		t.Errorf("index page missing peepwho or version:\n%s", body)
+	if !strings.Contains(body, "whotoask") || !strings.Contains(body, "test") {
+		t.Errorf("index page missing whotoask or version:\n%s", body)
 	}
 }
 
@@ -279,7 +279,7 @@ func TestLocalOnlyHostGuard(t *testing.T) {
 		Host: "localhost", LocalOnly: true, WantCode: http.StatusOK,
 	}, { // Test 6: Without LocalOnly, a proxied Host passes: the documented
 		// TLS proxy forwards its public name.
-		Host: "peepwho.corp.example", LocalOnly: false, WantCode: http.StatusOK,
+		Host: "whotoask.corp.example", LocalOnly: false, WantCode: http.StatusOK,
 	}}
 	for testNum, test := range tests {
 		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
@@ -309,11 +309,11 @@ func TestSameOrigin(t *testing.T) {
 		Host       string
 		WantResult bool
 	}{
-		{Origin: "http://peepwho.local", Host: "peepwho.local", WantResult: true},
-		{Origin: "https://peepwho.local:8765", Host: "peepwho.local:8765", WantResult: true},
-		{Origin: "http://evil.example", Host: "peepwho.local", WantResult: false},
-		{Origin: "null", Host: "peepwho.local", WantResult: false},
-		{Origin: "file://peepwho.local", Host: "peepwho.local", WantResult: false},
+		{Origin: "http://whotoask.local", Host: "whotoask.local", WantResult: true},
+		{Origin: "https://whotoask.local:8765", Host: "whotoask.local:8765", WantResult: true},
+		{Origin: "http://evil.example", Host: "whotoask.local", WantResult: false},
+		{Origin: "null", Host: "whotoask.local", WantResult: false},
+		{Origin: "file://whotoask.local", Host: "whotoask.local", WantResult: false},
 	}
 	for testNum, test := range tests {
 		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
@@ -922,7 +922,7 @@ func readTemplate(t *testing.T, name string) string {
 	return string(b)
 }
 
-// Everything peepwho shows is on its way somewhere else: into a ticket, a channel,
+// Everything whotoask shows is on its way somewhere else: into a ticket, a channel,
 // a review document. A view that can only be looked at is half an answer, and the
 // failure is silent, since a missing entry here just means the button quietly
 // does not appear. This reads the shipped script rather than trusting a comment.
@@ -1076,7 +1076,7 @@ func TestEveryInsightCardCanBeCopied(t *testing.T) {
 }
 
 // TestTheNavSaysWhichQuestionEachGroupAnswers covers the sidebar's grouping.
-// peepwho answers three different questions for three different people, and a
+// whotoask answers three different questions for three different people, and a
 // flat list of views hides that: who holds what, how something was done last
 // time, and where the organization is thin.
 //
@@ -1175,7 +1175,7 @@ func TestRecallCanBeTakenWithYou(t *testing.T) {
 	if !strings.Contains(src, `exportButton("Export"`) {
 		t.Error("a recall session cannot be exported")
 	}
-	if !strings.Contains(src, "peepwho-recall.csv") {
+	if !strings.Contains(src, "whotoask-recall.csv") {
 		t.Error("the recall export writes no file")
 	}
 	// The export has to match the filters on screen. Dumping everything fetched
@@ -1192,10 +1192,10 @@ func TestEmptyViewsSayWhatWouldFillThem(t *testing.T) {
 	t.Parallel()
 	src := readStatic(t, "app.js")
 	for _, want := range []string{
-		"peepwho index --source git",   // people
-		"peepwho index --source slack", // channels
-		"a source of record",           // teams
-		"index a CODEOWNERS file",      // ownership drift
+		"whotoask index --source git",   // people
+		"whotoask index --source slack", // channels
+		"a source of record",            // teams
+		"index a CODEOWNERS file",       // ownership drift
 	} {
 		if !strings.Contains(src, want) {
 			t.Errorf("no empty state mentions %q, so a blank view says nothing about how to fill it", want)

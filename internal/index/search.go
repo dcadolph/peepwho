@@ -13,7 +13,7 @@ import (
 
 	"github.com/agnivade/levenshtein"
 
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // evidenceBoost turns the kind of evidence behind a match into a score
@@ -473,7 +473,7 @@ func resolveTerms(
 // Equally close corrections break to the one the organization actually uses,
 // measured by how many people hold it. A real code base contains its own
 // misspellings, and they sit exactly as close to a typo as the correct word
-// does: asked about "blutooth", peepwho answered with a directory misspelled
+// does: asked about "blutooth", whotoask answered with a directory misspelled
 // "blueooth" rather than bluetooth, purely because it sorted first.
 func resolveTerm(
 	postings map[string]map[model.ID]float64, vocab vocabIndex, term string,
@@ -696,7 +696,7 @@ func (ix *Index) reasons(
 			field += ", not lately"
 		}
 		// A correction has to name what it corrected to. Told only that
-		// "zigby" was fuzzy, a reader cannot tell whether peepwho read it as
+		// "zigby" was fuzzy, a reader cannot tell whether whotoask read it as
 		// zigbee or as zigzag, which is the difference between a lucky save
 		// and a wrong guess presented with strength.
 		if hit.fuzzy() && found != "" && found != term {
@@ -759,7 +759,7 @@ func (ix *Index) channelReasons(
 			continue
 		}
 		// A correction has to name what it corrected to. Told only that
-		// "zigby" was fuzzy, a reader cannot tell whether peepwho read it as
+		// "zigby" was fuzzy, a reader cannot tell whether whotoask read it as
 		// zigbee or as zigzag, which is the difference between a lucky save
 		// and a wrong guess presented with strength.
 		if hit.fuzzy() && found != "" && found != term {

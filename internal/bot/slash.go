@@ -13,8 +13,8 @@ import (
 // cannot pin a handler goroutine forever.
 const handleTimeout = 60 * time.Second
 
-// slashUsage answers an empty /peepwho.
-const slashUsage = "Ask like: /peepwho who owns billing retries"
+// slashUsage answers an empty /whotoask.
+const slashUsage = "Ask like: /whotoask who owns billing retries"
 
 // Responder posts a slash-command answer to its response URL.
 type Responder interface {
@@ -37,7 +37,7 @@ func (f ResponderFunc) Respond(ctx context.Context, responseURL, text string) er
 	return f(ctx, responseURL, text)
 }
 
-// slashCommand is one /peepwho invocation, from either transport.
+// slashCommand is one /whotoask invocation, from either transport.
 type slashCommand struct {
 	// Text is the question after the command word.
 	Text string
@@ -52,7 +52,7 @@ type slashCommand struct {
 func routeSlash(ctx context.Context, e *Engine, respond Responder, cmd slashCommand, log io.Writer) {
 	defer func() {
 		if rec := recover(); rec != nil {
-			fmt.Fprintf(log, "peepwho bot: slash panic: %v\n", rec)
+			fmt.Fprintf(log, "whotoask bot: slash panic: %v\n", rec)
 		}
 	}()
 	if cmd.ResponseURL == "" {
@@ -68,13 +68,13 @@ func routeSlash(ctx context.Context, e *Engine, respond Responder, cmd slashComm
 
 	text, err := e.Answer(ctx, cmd.UserID, cmd.Text)
 	if err != nil {
-		fmt.Fprintf(log, "peepwho bot: slash: %v\n", err)
+		fmt.Fprintf(log, "whotoask bot: slash: %v\n", err)
 	}
 	if text == "" {
 		text = slashUsage
 	}
 	if err := respond.Respond(ctx, cmd.ResponseURL, text); err != nil {
-		fmt.Fprintf(log, "peepwho bot: slash respond: %v\n", err)
+		fmt.Fprintf(log, "whotoask bot: slash respond: %v\n", err)
 	}
 }
 
@@ -87,36 +87,36 @@ func routeSlashRecall(
 	private, ok := respond.(PrivateResponder)
 	if !ok {
 		if err := respond.Respond(ctx, cmd.ResponseURL, noPrivateReply); err != nil {
-			fmt.Fprintf(log, "peepwho bot: slash respond: %v\n", err)
+			fmt.Fprintf(log, "whotoask bot: slash respond: %v\n", err)
 		}
 		return
 	}
 	allowed, warn := e.allow(cmd.UserID)
 	if warn {
 		if err := private.RespondPrivately(ctx, cmd.ResponseURL, rateWarning); err != nil {
-			fmt.Fprintf(log, "peepwho bot: slash respond: %v\n", err)
+			fmt.Fprintf(log, "whotoask bot: slash respond: %v\n", err)
 		}
 		return
 	}
 	if !allowed {
 		return
 	}
-	text := "Tell me what to look for, like `/peepwho recall certificate renewal`."
+	text := "Tell me what to look for, like `/whotoask recall certificate renewal`."
 	if query != "" {
 		answer, err := e.Recall(ctx, cmd.UserID, query, recallLimit)
 		if err != nil {
-			fmt.Fprintf(log, "peepwho bot: slash recall: %v\n", err)
+			fmt.Fprintf(log, "whotoask bot: slash recall: %v\n", err)
 		}
 		if answer != "" {
 			text = answer
 		}
 	}
 	if err := private.RespondPrivately(ctx, cmd.ResponseURL, text); err != nil {
-		fmt.Fprintf(log, "peepwho bot: slash respond: %v\n", err)
+		fmt.Fprintf(log, "whotoask bot: slash respond: %v\n", err)
 	}
 }
 
-// SlashHandler serves /peepwho over HTTP for the Events API transport. It
+// SlashHandler serves /whotoask over HTTP for the Events API transport. It
 // verifies the Slack signature, acknowledges immediately, and answers through
 // the command's response URL.
 type SlashHandler struct {
@@ -211,8 +211,8 @@ func (h *SlashHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	select {
 	case h.slots <- struct{}{}:
 	default:
-		fmt.Fprintln(h.log, "peepwho bot: busy, declined a slash command")
-		_, _ = w.Write([]byte("peepwho is busy answering other questions. Try again in a moment."))
+		fmt.Fprintln(h.log, "whotoask bot: busy, declined a slash command")
+		_, _ = w.Write([]byte("whotoask is busy answering other questions. Try again in a moment."))
 		return
 	}
 	go func() { //nolint:contextcheck // Reply outlives the request.

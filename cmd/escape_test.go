@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/feedback"
-	"github.com/dcadolph/peepwho/internal/render"
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/feedback"
+	"github.com/dcadolph/whotoask/internal/render"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // TestRenderEscapesIndexedText drives renderers with hostile indexed and

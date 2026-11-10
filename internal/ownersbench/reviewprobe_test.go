@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/github"
-	"github.com/dcadolph/peepwho/internal/index"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/github"
+	"github.com/dcadolph/whotoask/internal/index"
 )
 
 // TestReviewSignalProbe is a one-off experiment runner, gated behind env
@@ -21,10 +21,10 @@ import (
 // is a scoring question, and answering it here would mean one forge read per
 // arm, on a forge whose pull requests move between reads.
 func TestReviewSignalProbe(t *testing.T) {
-	repoPath := os.Getenv("PEEPWHO_PROBE_REPO")
-	repoFull := os.Getenv("PEEPWHO_PROBE_GITHUB")
-	outDir := os.Getenv("PEEPWHO_PROBE_OUT")
-	token := os.Getenv("PEEPWHO_GITHUB_TOKEN")
+	repoPath := os.Getenv("WHOTOASK_PROBE_REPO")
+	repoFull := os.Getenv("WHOTOASK_PROBE_GITHUB")
+	outDir := os.Getenv("WHOTOASK_PROBE_OUT")
+	token := os.Getenv("WHOTOASK_GITHUB_TOKEN")
 	if repoPath == "" || repoFull == "" || outDir == "" || token == "" {
 		t.Skip("probe env not set")
 	}
@@ -36,7 +36,7 @@ func TestReviewSignalProbe(t *testing.T) {
 	}
 
 	pages := 10
-	if v := os.Getenv("PEEPWHO_PROBE_PAGES"); v != "" {
+	if v := os.Getenv("WHOTOASK_PROBE_PAGES"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			pages = n
 		}

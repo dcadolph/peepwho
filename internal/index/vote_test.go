@@ -3,8 +3,8 @@ package index
 import (
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/feedback"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/feedback"
 )
 
 // voteIndex builds two equally weighted kafka owners and one kafka channel.

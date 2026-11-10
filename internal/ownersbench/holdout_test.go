@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/index"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/index"
 )
 
 // newHoldoutRepo builds a repository with a clear before and after: one
@@ -121,7 +121,7 @@ func TestRunHoldoutHidesTheFuture(t *testing.T) {
 	}
 	// Both predictors saw only the early era, so neither can have named the
 	// late person: the holdout is measuring prediction, not recall.
-	for _, n := range append(area.Peepwho, area.Baseline...) {
+	for _, n := range append(area.WhoToAsk, area.Baseline...) {
 		if n == "Late Person" {
 			t.Errorf("a predictor named somebody who only appears after the cutoff: %+v", area)
 		}

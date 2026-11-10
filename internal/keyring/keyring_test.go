@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/vault"
+	"github.com/dcadolph/whotoask/internal/vault"
 )
 
 // TestFromEnvKey verifies a base64 key produces a working codec and is reported

@@ -7,9 +7,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // SplitName is one display name the index holds under more than one person,

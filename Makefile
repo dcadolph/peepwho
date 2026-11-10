@@ -1,6 +1,6 @@
-BINARY  := peepwho
+BINARY  := whotoask
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-LDFLAGS := -s -w -X github.com/dcadolph/peepwho/cmd.version=$(VERSION)
+LDFLAGS := -s -w -X github.com/dcadolph/whotoask/cmd.version=$(VERSION)
 
 .PHONY: build install test test-short e2e vet fmt lint core-deps mac host release clean
 
@@ -43,7 +43,7 @@ core-deps:
 # -macosversion sets the floor on every cgo object. gomobile overrides CGO_CFLAGS, so the
 # flag is the only way in, and the build cache ignores it: after changing it, build once
 # with GOFLAGS=-a or the cached runtime objects keep the old floor.
-MAC_FRAMEWORK := mac/Frameworks/PeepwhoCore.xcframework
+MAC_FRAMEWORK := mac/Frameworks/WhoToAskCore.xcframework
 MACOS_MIN := 14.0
 
 mac:

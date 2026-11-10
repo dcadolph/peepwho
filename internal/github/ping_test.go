@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/httputil"
+	"github.com/dcadolph/whotoask/internal/httputil"
 )
 
 // TestPing verifies the auth check hits the authenticated-user endpoint, returns

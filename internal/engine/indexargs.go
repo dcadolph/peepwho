@@ -90,7 +90,7 @@ func RegisterIndexFlags(fs *pflag.FlagSet, a *IndexArgs) {
 	fs.IntVar(&a.SinceDays, "since-days", 180, "Slack history window in days.")
 	fs.IntVar(&a.MaxMessages, "max-messages", 5000, "Slack message cap per channel.")
 	fs.BoolVar(&a.Episodes, "episodes", false,
-		"Record past conversations so peepwho recall can point back at them.")
+		"Record past conversations so whotoask recall can point back at them.")
 	fs.IntVar(&a.MaxEpisodes, "max-episodes-per-channel", 200, "Episode cap per channel.")
 	fs.BoolVar(&a.Archive, "archive", false,
 		"Slack only: keep the words of each conversation, not just a link. Needs an index key, implies --episodes.")
@@ -119,14 +119,14 @@ func RegisterIndexFlags(fs *pflag.FlagSet, a *IndexArgs) {
 	fs.StringVar(&a.GitHubOrg, "github-org", "", "GitHub org to index all repositories of.")
 	fs.IntVar(&a.MaxRepos, "max-repos", 0, "Cap repositories taken from --github-org (0 = all).")
 	fs.BoolVar(&a.GitHubEmails, "github-emails", false, "Resolve GitHub user emails to join other sources.")
-	fs.StringVar(&a.JiraURL, "jira-url", "", "Jira site URL (or PEEPWHO_JIRA_URL).")
+	fs.StringVar(&a.JiraURL, "jira-url", "", "Jira site URL (or WHOTOASK_JIRA_URL).")
 	fs.StringArrayVar(&a.JiraProjects, "jira-project", nil, "Jira project key (repeatable).")
 	fs.StringVar(&a.JiraJQL, "jira-jql", "", "Jira JQL query (overrides --jira-project).")
 	fs.IntVar(&a.MaxIssues, "max-issues", 1000, "Cap Jira issues read.")
 	fs.BoolVar(&a.JiraServer, "jira-server", false,
 		"Jira is self-hosted Server or Data Center (v2 API, bearer or anonymous auth), not Cloud.")
 	fs.StringArrayVar(&a.ConfluenceSpaces, "confluence-space", nil, "Confluence space key (repeatable).")
-	fs.StringVar(&a.ConfluenceURL, "confluence-url", "", "Confluence site URL; or PEEPWHO_CONFLUENCE_URL (falls back to the Jira URL).")
+	fs.StringVar(&a.ConfluenceURL, "confluence-url", "", "Confluence site URL; or WHOTOASK_CONFLUENCE_URL (falls back to the Jira URL).")
 	fs.StringVar(&a.ConfluenceCQL, "confluence-cql", "", "Confluence CQL query (overrides --confluence-space).")
 	fs.BoolVar(&a.ConfluenceServer, "confluence-server", false,
 		"Confluence is self-hosted Server or Data Center (REST at site root, bearer/anonymous auth), not Cloud.")

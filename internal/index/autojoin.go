@@ -6,10 +6,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/identity"
+	"github.com/dcadolph/whotoask/internal/identity"
 
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // minHandleLen keeps trivially short handles from joining anyone.

@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // Changes describes which people, teams, and channels entered or left the graph

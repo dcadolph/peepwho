@@ -149,7 +149,7 @@ func TestNewEmptyPanics(t *testing.T) {
 	New("", "e", "t")
 }
 
-// TestSearchRequestsEveryFieldItDecodes guards the bug class that made peepwho
+// TestSearchRequestsEveryFieldItDecodes guards the bug class that made whotoask
 // produce no Jira episodes at all: Jira returns only the fields the query
 // names, so a field the Issue struct decodes but the query omits is silently
 // always empty, and nothing in a mock-backed test reveals it. Reflection keeps

@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // Tie expansion bounds. Expansion trades precision for reach, so every bound
@@ -31,7 +31,7 @@ const tieAskedPrefix = "~"
 // tieExpand grows a resolved query with the subjects that travel with the ones
 // it named, learned from the co-occurrence graph rather than from any list.
 //
-// This is the search path finally reading peepwho's most distinctive structure.
+// This is the search path finally reading whotoask's most distinctive structure.
 // A question about billing retries reaches the person who owns kafka-lag when
 // the two move together in this organization's work, and the reason line says
 // exactly that, because "they travel together here" is evidence a synonym

@@ -12,14 +12,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/llm"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/policy"
-	"github.com/dcadolph/peepwho/internal/util"
-	"github.com/dcadolph/peepwho/internal/vault"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/llm"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/policy"
+	"github.com/dcadolph/whotoask/internal/util"
+	"github.com/dcadolph/whotoask/internal/vault"
 )
 
 // Passphrase labels name the sealed file an Unlock is asked to open, so a
@@ -253,7 +253,7 @@ func (x *Indexer) Index(ctx context.Context, req IndexRequest) error {
 }
 
 // saveProgress runs after a successful index. It records the flags this
-// source was indexed with, so `peepwho refresh` and a scheduled refresh can
+// source was indexed with, so `whotoask refresh` and a scheduled refresh can
 // replay them, then saves the position the next incremental run resumes from.
 // The refresh record is keyed by scope, so indexing repo A and then repo B in
 // separate runs keeps both; keyed by source alone, the second run silently
@@ -528,7 +528,7 @@ func (x *Indexer) reportFold(ix *index.Index, changes index.Changes) {
 	if c, _ := x.codec(); c == nil && len(ix.Graph.People) > 0 {
 		fmt.Fprintln(out,
 			"note: this index holds names, emails, and titles in plaintext, protected only by file "+
-				"permissions. Set PEEPWHO_INDEX_KEY or PEEPWHO_INDEX_PASSPHRASE to encrypt it at rest.")
+				"permissions. Set WHOTOASK_INDEX_KEY or WHOTOASK_INDEX_PASSPHRASE to encrypt it at rest.")
 	}
 	reportChanges(out, changes)
 }
@@ -551,7 +551,7 @@ func (x *Indexer) guardArchive() error {
 	if codec == nil {
 		return fmt.Errorf(
 			"%w: an archive retains the full text of conversations, so it must be encrypted at rest. "+
-				"Set PEEPWHO_INDEX_KEY (base64 of 32 random bytes) or PEEPWHO_INDEX_PASSPHRASE and retry, "+
+				"Set WHOTOASK_INDEX_KEY (base64 of 32 random bytes) or WHOTOASK_INDEX_PASSPHRASE and retry, "+
 				"or drop --archive to keep only links", ErrBadArgs)
 	}
 	fmt.Fprintln(x.log(), "archive: keeping the words of each conversation, encrypted at rest")
@@ -561,7 +561,7 @@ func (x *Indexer) guardArchive() error {
 // saveEpisodes merges newly observed conversations into the episode store.
 // Episodes always merge, even when the index itself is rebuilt: a source stops
 // serving old messages long before they stop being worth remembering, so
-// dropping them would throw away history peepwho may be the last to hold.
+// dropping them would throw away history whotoask may be the last to hold.
 func (x *Indexer) saveEpisodes(ctx context.Context, ix *index.Index, p FoldParams) error {
 	eps := p.Episodes
 	if len(eps) == 0 {

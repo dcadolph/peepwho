@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/llm"
+	"github.com/dcadolph/whotoask/internal/llm"
 )
 
 // ollamaURL is where a local model serves, when one is running.

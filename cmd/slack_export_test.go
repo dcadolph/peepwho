@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // exportZip is the real-format Slack export fixture shared with the connector

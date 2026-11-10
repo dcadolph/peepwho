@@ -1,4 +1,4 @@
-// Package vault encrypts peepwho's on-disk index at rest. A Codec transforms file
+// Package vault encrypts whotoask's on-disk index at rest. A Codec transforms file
 // bytes on their way to and from disk: Plain passes them through, and Cipher
 // seals them with authenticated encryption under a 32-byte key or a passphrase.
 // Keys are held only in memory, never serialized, and never logged.
@@ -27,10 +27,10 @@ import (
 const (
 	// magicV1 is the original format. Its passphrase keys were derived with
 	// weaker Argon2id parameters, so it is still read but never written.
-	magicV1 = "PEEPWHOv1"
+	magicV1 = "WHOTOASKv1"
 	// magicV2 derives passphrase keys with the parameters argonTime names. It
 	// is what every write produces.
-	magicV2 = "PEEPWHOv2"
+	magicV2 = "WHOTOASKv2"
 	// magic is the version new files are written in.
 	magic = magicV2
 )

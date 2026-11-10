@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/util"
-	"github.com/dcadolph/peepwho/internal/vault"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/util"
+	"github.com/dcadolph/whotoask/internal/vault"
 )
 
 // MaxChangeEntries caps the change log. A save keeps the newest entries.

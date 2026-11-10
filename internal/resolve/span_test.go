@@ -8,12 +8,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
-// TestSoleSpansFindOnePersonConnections checks peepwho reports a connection
+// TestSoleSpansFindOnePersonConnections checks whotoask reports a connection
 // between two subjects that only one person has ever made. Counting experts per
 // subject cannot find these: both areas are well covered, and what rests on one
 // person is not either subject but the knowledge that they belong together.
@@ -195,7 +195,7 @@ func TestSoleSpansJoinCrossingsThatShareAPerson(t *testing.T) {
 // Somebody who touches nine hundred areas in one commit has run a codemod, not
 // learned how those areas relate. If that counted, every sole connection would
 // dissolve the moment a repository had a formatting pass, and anyone verifying a
-// finding against the history would find the refactor author and conclude peepwho
+// finding against the history would find the refactor author and conclude whotoask
 // was wrong. Measured on home-assistant/core: of four findings checked by hand,
 // every rival author was a 900-to-1271-component refactor and the named person
 // was the only one who had done focused work across the areas.

@@ -77,7 +77,7 @@ jobs:
           cosign verify-blob checksums.txt \
             --signature checksums.txt.sig \
             --certificate checksums.txt.pem \
-            --certificate-identity-regexp '^https://github.com/dcadolph/peepwho/\.github/workflows/release\.yml@refs/tags/v' \
+            --certificate-identity-regexp '^https://github.com/dcadolph/whotoask/\.github/workflows/release\.yml@refs/tags/v' \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com
           sha256sum -c checksums.txt
 

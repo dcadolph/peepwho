@@ -12,10 +12,10 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/dcadolph/peepwho/internal/engine"
-	"github.com/dcadolph/peepwho/internal/httputil"
-	"github.com/dcadolph/peepwho/internal/prompt"
-	"github.com/dcadolph/peepwho/internal/slack"
+	"github.com/dcadolph/whotoask/internal/engine"
+	"github.com/dcadolph/whotoask/internal/httputil"
+	"github.com/dcadolph/whotoask/internal/prompt"
+	"github.com/dcadolph/whotoask/internal/slack"
 )
 
 // TestConnectHelpMatchesKeychainBehavior pins the help text to what the
@@ -198,33 +198,33 @@ func TestExplainAuthError(t *testing.T) {
 // echoing the secret, and reuses a value already set in the environment.
 func TestCollect(t *testing.T) {
 	spec := sourceSpec{creds: []credField{
-		{env: "PEEPWHO_TEST_URL", label: "URL"},
-		{env: "PEEPWHO_TEST_TOKEN", label: "Token", secret: true},
+		{env: "WHOTOASK_TEST_URL", label: "URL"},
+		{env: "WHOTOASK_TEST_TOKEN", label: "Token", secret: true},
 	}}
 
-	t.Setenv("PEEPWHO_TEST_URL", "")
-	t.Setenv("PEEPWHO_TEST_TOKEN", "")
+	t.Setenv("WHOTOASK_TEST_URL", "")
+	t.Setenv("WHOTOASK_TEST_TOKEN", "")
 	var out bytes.Buffer
 	ui := prompt.New(strings.NewReader("https://x\ns3cr3t\n"), &out, &out)
 	creds, err := collect(ui, spec)
 	if err != nil {
 		t.Fatalf("collect: %v", err)
 	}
-	if creds["PEEPWHO_TEST_URL"] != "https://x" || creds["PEEPWHO_TEST_TOKEN"] != "s3cr3t" {
+	if creds["WHOTOASK_TEST_URL"] != "https://x" || creds["WHOTOASK_TEST_TOKEN"] != "s3cr3t" {
 		t.Errorf("creds = %v", creds)
 	}
 	if strings.Contains(out.String(), "s3cr3t") {
 		t.Errorf("secret echoed into output: %q", out.String())
 	}
 
-	t.Setenv("PEEPWHO_TEST_URL", "https://preset")
+	t.Setenv("WHOTOASK_TEST_URL", "https://preset")
 	var out2 bytes.Buffer
 	ui2 := prompt.New(strings.NewReader("y\nsecret2\n"), &out2, &out2)
 	creds2, err := collect(ui2, spec)
 	if err != nil {
 		t.Fatalf("collect reuse: %v", err)
 	}
-	if creds2["PEEPWHO_TEST_URL"] != "https://preset" || creds2["PEEPWHO_TEST_TOKEN"] != "secret2" {
+	if creds2["WHOTOASK_TEST_URL"] != "https://preset" || creds2["WHOTOASK_TEST_TOKEN"] != "secret2" {
 		t.Errorf("creds2 = %v", creds2)
 	}
 }

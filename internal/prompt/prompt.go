@@ -1,4 +1,4 @@
-// Package prompt renders peepwho's interactive setup wizard: brew-style step
+// Package prompt renders whotoask's interactive setup wizard: brew-style step
 // headers plus the line, secret, confirm, and menu reads the connect command
 // drives. Secrets are read without echo and never stored here; this package only
 // moves a value from the terminal into memory for the caller to use and discard.

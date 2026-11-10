@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// TestRedeliveredEventIsAnsweredOnce checks a repeat of an event peepwho has
+// TestRedeliveredEventIsAnsweredOnce checks a repeat of an event whotoask has
 // already answered is dropped. Slack redelivers when an acknowledgment is slow
 // or lost, and without this the bot answers the same question twice in the
 // channel it was asked in.

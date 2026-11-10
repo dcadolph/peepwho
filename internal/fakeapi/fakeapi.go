@@ -1,4 +1,4 @@
-// Package fakeapi serves the source APIs peepwho reads, enforcing the parts of
+// Package fakeapi serves the source APIs whotoask reads, enforcing the parts of
 // each contract that a hand-written stub quietly ignores.
 //
 // A stub written inside a test answers with whatever its author typed,
@@ -6,7 +6,7 @@
 // fields named in the query, GitHub's list endpoint carries a narrower object
 // than the single-item one, and both paginate on the caller's terms. A client
 // that reads a field it never requested works perfectly against a stub and
-// returns nothing in production, which is exactly what once made peepwho
+// returns nothing in production, which is exactly what once made whotoask
 // produce no Jira episodes at all while every test passed.
 //
 // These servers close that gap. They are deliberately strict: asking for

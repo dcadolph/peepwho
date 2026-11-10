@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/httputil"
+	"github.com/dcadolph/whotoask/internal/httputil"
 )
 
 // Anthropic API defaults.
@@ -110,7 +110,7 @@ type anthropicMessage struct {
 	Content string `json:"content"`
 }
 
-// anthropicResponse is the subset of the Messages API response peepwho reads.
+// anthropicResponse is the subset of the Messages API response whotoask reads.
 type anthropicResponse struct {
 	// Content holds the reply blocks.
 	Content []struct {

@@ -5,9 +5,9 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // Span is a connection between two subjects that only one person has ever made.

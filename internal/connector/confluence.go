@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/confluence"
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/confluence"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // ConfluenceOptions configures the Confluence connector.

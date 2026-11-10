@@ -13,7 +13,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-// TestResolveClock checks that PEEPWHO_NOW pins the clock in UTC and that a
+// TestResolveClock checks that WHOTOASK_NOW pins the clock in UTC and that a
 // value it cannot parse is an error, never a silent fallback.
 func TestResolveClock(t *testing.T) {
 	t.Parallel()
@@ -68,7 +68,7 @@ func TestResolveClock(t *testing.T) {
 	}
 }
 
-// TestNowEnvPinsIndexAndStatus runs index and status with PEEPWHO_NOW set and
+// TestNowEnvPinsIndexAndStatus runs index and status with WHOTOASK_NOW set and
 // checks that the saved build time and the reported age come from the pinned
 // clock, and that a bad value fails before any command runs. It sets the
 // environment, so it cannot run in parallel.

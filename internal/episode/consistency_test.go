@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // TestStoreConsistencyUnderRandomOperations drives a store through thousands

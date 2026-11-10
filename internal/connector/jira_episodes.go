@@ -3,10 +3,10 @@ package connector
 import (
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/jira"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/jira"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // Episodes returns the resolved issues seen by the most recent Fetch. It is

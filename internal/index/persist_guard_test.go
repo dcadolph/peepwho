@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
+	"github.com/dcadolph/whotoask/internal/connector"
 )
 
 // TestLoadSourcesRefusesStaleSidecar covers the crash window between the two

@@ -10,20 +10,20 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/bot"
-	"github.com/dcadolph/peepwho/internal/engine"
-	"github.com/dcadolph/peepwho/internal/recall"
-	"github.com/dcadolph/peepwho/internal/resolve"
-	"github.com/dcadolph/peepwho/internal/secret"
-	"github.com/dcadolph/peepwho/internal/slack"
+	"github.com/dcadolph/whotoask/internal/bot"
+	"github.com/dcadolph/whotoask/internal/engine"
+	"github.com/dcadolph/whotoask/internal/recall"
+	"github.com/dcadolph/whotoask/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/secret"
+	"github.com/dcadolph/whotoask/internal/slack"
 )
 
 // Bot environment variables. The bot token is shared with the index command.
 const (
 	// slackAppTokenEnv holds the app-level token (xapp-) for socket mode.
-	slackAppTokenEnv = "PEEPWHO_SLACK_APP_TOKEN"
+	slackAppTokenEnv = "WHOTOASK_SLACK_APP_TOKEN"
 	// slackSigningSecretEnv holds the signing secret for the events transport.
-	slackSigningSecretEnv = "PEEPWHO_SLACK_SIGNING_SECRET"
+	slackSigningSecretEnv = "WHOTOASK_SLACK_SIGNING_SECRET"
 )
 
 // slackReplier posts bot answers through the Slack Web API.
@@ -79,8 +79,8 @@ func newBotCmd(opts *options) *cobra.Command {
 trailing --llm or --keyword in a message overrides the mode for that answer.
 
 Transports and their credentials:
-  socket  no public URL needed     PEEPWHO_SLACK_TOKEN + PEEPWHO_SLACK_APP_TOKEN
-  events  serves HTTP for Slack    PEEPWHO_SLACK_TOKEN + PEEPWHO_SLACK_SIGNING_SECRET`,
+  socket  no public URL needed     WHOTOASK_SLACK_TOKEN + WHOTOASK_SLACK_APP_TOKEN
+  events  serves HTTP for Slack    WHOTOASK_SLACK_TOKEN + WHOTOASK_SLACK_SIGNING_SECRET`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			botToken := secret.Resolve(slackTokenEnv)
 			if botToken == "" {
@@ -165,7 +165,7 @@ func runSocketBot(cmd *cobra.Command, engine *bot.Engine, replier bot.Replier, b
 	}
 	runner := bot.NewSocketRunner(slack.New(appToken), engine, replier, botUserID,
 		bot.WithLog(cmd.ErrOrStderr()), bot.WithResponder(slackResponder{}))
-	fmt.Fprintln(cmd.ErrOrStderr(), "peepwho bot: connected over socket mode (Ctrl-C to stop)")
+	fmt.Fprintln(cmd.ErrOrStderr(), "whotoask bot: connected over socket mode (Ctrl-C to stop)")
 	return runner.Run(cmd.Context())
 }
 
@@ -199,7 +199,7 @@ func runEventsBot(cmd *cobra.Command, engine *bot.Engine, replier bot.Replier, b
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()
 	fmt.Fprintf(cmd.ErrOrStderr(),
-		"peepwho bot: events endpoint on http://%s/slack/events (Ctrl-C to stop)\n", addr)
+		"whotoask bot: events endpoint on http://%s/slack/events (Ctrl-C to stop)\n", addr)
 
 	select {
 	case err := <-errCh:
@@ -208,7 +208,7 @@ func runEventsBot(cmd *cobra.Command, engine *bot.Engine, replier bot.Replier, b
 		}
 		return err
 	case <-ctx.Done():
-		fmt.Fprintln(cmd.ErrOrStderr(), "peepwho bot: shutting down")
+		fmt.Fprintln(cmd.ErrOrStderr(), "whotoask bot: shutting down")
 		shutCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
 		return srv.Shutdown(shutCtx)

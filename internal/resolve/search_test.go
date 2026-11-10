@@ -5,8 +5,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/index"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/index"
 )
 
 // searchFixture builds a small index across people and a channel for the search

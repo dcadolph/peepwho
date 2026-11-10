@@ -8,12 +8,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/engine"
-	"github.com/dcadolph/peepwho/internal/fact"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/render"
-	"github.com/dcadolph/peepwho/internal/resolve"
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/engine"
+	"github.com/dcadolph/whotoask/internal/fact"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/render"
+	"github.com/dcadolph/whotoask/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // newAskCmd builds the ask command, which answers a question from the index.
@@ -40,8 +40,8 @@ Modes:
   llm       a local Ollama model re-ranks and writes a recommendation
 
 Examples:
-  peepwho ask "who do I talk to about billing retries"
-  peepwho ask --mode llm "where do I ask about kafka"`,
+  whotoask ask "who do I talk to about billing retries"
+  whotoask ask --mode llm "where do I ask about kafka"`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ix, err := opts.loadIndex(cmd)
@@ -98,7 +98,7 @@ func warnEmptyAsk(cmd *cobra.Command, ix *index.Index, query string, ans resolve
 	}
 	w := cmd.ErrOrStderr()
 	if ix.Graph == nil || len(ix.Graph.People) == 0 {
-		fmt.Fprintln(w, "No one is indexed yet: run `peepwho index` against a source first.")
+		fmt.Fprintln(w, "No one is indexed yet: run `whotoask index` against a source first.")
 		return
 	}
 	// Ask ranks by who knows a subject. A question naming a person is answered
@@ -118,12 +118,12 @@ func warnEmptyAsk(cmd *cobra.Command, ix *index.Index, query string, ans resolve
 			}
 			fmt.Fprintln(w, "  "+label)
 		}
-		fmt.Fprintln(w, "Use `peepwho search` to explore, or ask with the terms your team would use.")
+		fmt.Fprintln(w, "Use `whotoask search` to explore, or ask with the terms your team would use.")
 		return
 	}
 	fmt.Fprintln(w,
 		"No match for that question. Matching is on the words people and channels are described by, "+
-			"so try the terms your team would use, or `peepwho directory` to see what is indexed.")
+			"so try the terms your team would use, or `whotoask directory` to see what is indexed.")
 }
 
 // firstNonEmpty returns the first non-empty string, or empty when all are empty.

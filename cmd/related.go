@@ -5,8 +5,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/render"
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/render"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // newRelatedCmd builds the related command, which reports the topics held by
@@ -25,8 +25,8 @@ held by fewer of them is a specialty within it.
 Deterministic over the graph, no model needed.
 
 Examples:
-  peepwho related billing
-  peepwho related kubernetes --limit 5`,
+  whotoask related billing
+  whotoask related kubernetes --limit 5`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ix, err := opts.loadIndex(cmd)

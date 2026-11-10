@@ -1,4 +1,4 @@
-// Package github is a minimal GitHub REST client scoped to what peepwho ingests:
+// Package github is a minimal GitHub REST client scoped to what whotoask ingests:
 // repositories, contributors, pull requests, CODEOWNERS, and users. The token
 // is held only in memory, never serialized, and never logged.
 package github
@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/httputil"
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/httputil"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // defaultBaseURL is the GitHub REST API root.
@@ -119,7 +119,7 @@ type account struct {
 	Login string `json:"login"`
 }
 
-// PullRequest is the subset of a pull request peepwho reads.
+// PullRequest is the subset of a pull request whotoask reads.
 type PullRequest struct {
 	// Number is the pull request number.
 	Number int `json:"number"`

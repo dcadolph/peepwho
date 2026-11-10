@@ -11,12 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/engine"
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/keyring"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/state"
-	"github.com/dcadolph/peepwho/internal/vault"
+	"github.com/dcadolph/whotoask/internal/engine"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/keyring"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/state"
+	"github.com/dcadolph/whotoask/internal/vault"
 )
 
 // writeOrgCSV writes a small org chart and returns its path.
@@ -408,13 +408,13 @@ func TestDoctorReportsFileEncryptionState(t *testing.T) {
 	if !strings.Contains(string(out), "still plaintext") {
 		t.Errorf("doctor does not flag the key-set-but-file-plain gap:\n%s", out)
 	}
-	if !strings.Contains(string(out), "peepwho vault encrypt") {
+	if !strings.Contains(string(out), "whotoask vault encrypt") {
 		t.Errorf("doctor gives no fix for the plaintext file:\n%s", out)
 	}
 }
 
 // TestKeyModeFileRefusesPassphrasePrompt verifies a key-sealed index read with
-// no key configured points straight at PEEPWHO_INDEX_KEY instead of prompting
+// no key configured points straight at WHOTOASK_INDEX_KEY instead of prompting
 // for a passphrase that cannot work and then blaming the passphrase.
 func TestKeyModeFileRefusesPassphrasePrompt(t *testing.T) {
 	dir := t.TempDir()

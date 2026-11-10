@@ -46,7 +46,7 @@ func (c *company) crossCuts() []crossing {
 	// The subjects one person holds are also joined to each other, so they form
 	// a body of work and not two unconnected pairs. Without this the company
 	// has nothing for the joined-work finding to report, and the demo shows an
-	// empty panel where the heaviest thing peepwho says belongs.
+	// empty panel where the heaviest thing whotoask says belongs.
 	for s, held := range heldTogether {
 		if s > 0 && held < len(c.owners) && s < len(c.owners) {
 			out = append(out, crossing{A: s - 1, B: s, Who: c.owners[held].who})

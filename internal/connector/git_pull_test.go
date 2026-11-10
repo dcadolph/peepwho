@@ -14,7 +14,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/dcadolph/peepwho/internal/github"
+	"github.com/dcadolph/whotoask/internal/github"
 )
 
 // newPullRepo builds a repository whose changes land through merge commits

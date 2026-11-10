@@ -4,9 +4,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/feedback"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/feedback"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // buildFullIndex ingests every source against the simulated org and returns

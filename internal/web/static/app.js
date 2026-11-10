@@ -1,4 +1,4 @@
-// peepwho web UI: an ask view over /api/ask and directory views over
+// whotoask web UI: an ask view over /api/ask and directory views over
 // /api/directory, routed by location.hash. Result text is set with
 // textContent so indexed data cannot inject markup.
 
@@ -45,12 +45,12 @@ const cliStatus = document.getElementById("cli-status");
 const cliNote = document.getElementById("cli-note");
 // The commands the demo can print, in the order somebody would run them.
 const CLI_COMMANDS = [
-  { cmd: "ask", label: "peepwho ask" },
-  { cmd: "ask-llm", label: "peepwho ask --mode llm", recorded: true },
-  { cmd: "risk", label: "peepwho risk" },
-  { cmd: "ownership", label: "peepwho ownership" },
-  { cmd: "related", label: "peepwho related" },
-  { cmd: "attest", label: "peepwho attest" },
+  { cmd: "ask", label: "whotoask ask" },
+  { cmd: "ask-llm", label: "whotoask ask --mode llm", recorded: true },
+  { cmd: "risk", label: "whotoask risk" },
+  { cmd: "ownership", label: "whotoask ownership" },
+  { cmd: "related", label: "whotoask related" },
+  { cmd: "attest", label: "whotoask attest" },
 ];
 let cliCurrent = "";
 let recallData = null;
@@ -349,7 +349,7 @@ function personCard(p, query, i) {
   const name = el("div", "name");
   const toggle = el("button", "name-toggle", p.name || p.email || "unknown");
   toggle.type = "button";
-  toggle.title = "Show everything peepwho knows";
+  toggle.title = "Show everything whotoask knows";
   toggle.addEventListener("click", () => openProfile(p.id || p.email));
   name.appendChild(toggle);
   const badge = strengthBadge(p.strength);
@@ -448,7 +448,7 @@ function personLink(name, id) {
   if (!id) return document.createTextNode(label);
   const button = el("button", "person-link", label);
   button.type = "button";
-  button.title = "Show everything peepwho knows about " + label;
+  button.title = "Show everything whotoask knows about " + label;
   button.addEventListener("click", (ev) => {
     ev.stopPropagation();
     openProfile(id);
@@ -572,8 +572,8 @@ function showFeedbackHow() {
   const p1 = el("p", "fb-how-p",
     "Your votes on answers stay on this machine and tune your own ranking. " +
     "If you want to send us what they amount to, one command writes a file:");
-  const pre = el("pre", "story-install", "peepwho feedback bundle");
-  pre.appendChild(copyButton("peepwho feedback bundle"));
+  const pre = el("pre", "story-install", "whotoask feedback bundle");
+  pre.appendChild(copyButton("whotoask feedback bundle"));
   const p2 = el("p", "fb-how-p",
     "It holds vote counts, the word counts of the questions, and the comments " +
     "you typed. Queries, names, and messages never appear in it. Read the " +
@@ -701,11 +701,11 @@ function channelCard(c, query, i) {
 const DIR_VIEWS = {
   people: {
     title: "People",
-    empty: "No people indexed yet. Any source with authors fills this: try peepwho index --source git --repo-path <a repository>.",
+    empty: "No people indexed yet. Any source with authors fills this: try whotoask index --source git --repo-path <a repository>.",
   },
   channels: {
     title: "Channels",
-    empty: "No channels indexed yet. Channels come from Slack, so this stays empty until peepwho index --source slack has run.",
+    empty: "No channels indexed yet. Channels come from Slack, so this stays empty until whotoask index --source slack has run.",
   },
   teams: {
     title: "Teams",
@@ -948,7 +948,7 @@ function fillExport(view, rows) {
   const button = exportButton("Export CSV", () => {
     const shown = rows();
     downloadCSV(
-      "peepwho-" + view + ".csv",
+      "whotoask-" + view + ".csv",
       cols.map(([h]) => h),
       shown.map((r) => cols.map(([, get]) => get(r))),
     );
@@ -991,7 +991,7 @@ function dirPersonRow(p) {
   const name = el("div", "name");
   const toggle = el("button", "name-toggle", p.name || p.id);
   toggle.type = "button";
-  toggle.title = "Show everything peepwho knows";
+  toggle.title = "Show everything whotoask knows";
   toggle.addEventListener("click", () => openProfile(p.id));
   name.appendChild(toggle);
   who.appendChild(name);
@@ -1001,7 +1001,7 @@ function dirPersonRow(p) {
 
   const contact = el("div", "person-contact");
   if (p.email) contact.appendChild(el("span", "person-mail", p.email));
-  // Everything peepwho knows about them, in one paste: for a ticket, a handover
+  // Everything whotoask knows about them, in one paste: for a ticket, a handover
   // note, or the message you are about to write asking for help.
   contact.appendChild(copyButton(() => [
     p.name || p.id,
@@ -1218,7 +1218,7 @@ function applyRecallFilters() {
         (e.participants || []).map((p) => p.name || p.email || p).join("; "),
         e.summary || "", e.permalink || "",
       ]);
-      downloadCSV("peepwho-recall.csv",
+      downloadCSV("whotoask-recall.csv",
         ["When", "Source", "Title", "Who", "Summary", "Link"], rows);
     }));
   }
@@ -1473,7 +1473,7 @@ async function renderExposure() {
         out.push(["Ownership drift", d.topic, d.why || "", "", "declared " +
           (d.declared || []).join("; ") + "; actually " + (d.actual || "")]);
       }
-      downloadCSV("peepwho-findings.csv",
+      downloadCSV("whotoask-findings.csv",
         ["Finding", "Subject", "Detail", "Count", "People"], out);
     });
     b.classList.add("exp-export");
@@ -1813,7 +1813,7 @@ async function sealFinding() {
 
   const card = el("div", "exp-card exp-ok");
   const head = el("div", "exp-card-head");
-  head.appendChild(el("span", "exp-topic", claim.type || "peepwho.knowledge-risk/1"));
+  head.appendChild(el("span", "exp-topic", claim.type || "whotoask.knowledge-risk/1"));
   head.appendChild(el("span", "exp-level", "signed"));
   head.appendChild(el("span", "exp-bus", manifest.format || ""));
   card.appendChild(head);
@@ -1835,10 +1835,10 @@ async function sealFinding() {
 
   const dl = el("a", "exp-dl", "Download the sealed finding");
   dl.href = "/api/attest?download=1";
-  dl.setAttribute("download", "peepwho-finding.zip");
+  dl.setAttribute("download", "whotoask-finding.zip");
   expProofOut.appendChild(dl);
   const how = el("p", "exp-also",
-    "Verify it anywhere, offline: unzip peepwho-finding.zip, then peepwho verify finding");
+    "Verify it anywhere, offline: unzip whotoask-finding.zip, then whotoask verify finding");
   expProofOut.appendChild(how);
 }
 

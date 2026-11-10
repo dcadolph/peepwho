@@ -3,7 +3,7 @@ package index
 import (
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
+	"github.com/dcadolph/whotoask/internal/connector"
 )
 
 // boostFixture builds an index where the question's own subject has a strong

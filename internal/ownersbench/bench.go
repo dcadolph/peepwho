@@ -9,10 +9,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // Config bounds one benchmark run.
@@ -26,7 +26,7 @@ type Config struct {
 	// TopK is how many names each side may offer.
 	TopK int
 	// MaxLeafShare is the most directories a leaf name may be shared by
-	// before the directory is excluded as unjudgeable: peepwho's subjects are
+	// before the directory is excluded as unjudgeable: whotoask's subjects are
 	// names, and a name sixty directories share identifies none of them.
 	MaxLeafShare int
 	// Log receives progress lines; nil discards them.
@@ -68,12 +68,12 @@ type DirResult struct {
 	Approvers []string `json:"approvers"`
 	// GitTop are the top committers by files touched, the naive baseline.
 	GitTop []string `json:"gitTop"`
-	// PeepwhoTop are the people peepwho says the subject rests on.
-	PeepwhoTop []string `json:"peepwhoTop"`
+	// WhoToAskTop are the people whotoask says the subject rests on.
+	WhoToAskTop []string `json:"whotoaskTop"`
 	// GitHit reports whether an approver is among the top committers.
 	GitHit bool `json:"gitHit"`
-	// PeepwhoHit reports whether peepwho named an approver.
-	PeepwhoHit bool `json:"peepwhoHit"`
+	// WhoToAskHit reports whether whotoask named an approver.
+	WhoToAskHit bool `json:"whotoaskHit"`
 }
 
 // Result is a full benchmark run.
@@ -174,11 +174,11 @@ func Run(ix *index.Index, cfg Config) (*Result, error) {
 		for _, l := range leaders[topic] {
 			subjectTop = append(subjectTop, l.Name)
 		}
-		peepwhoTop := resolve.FuseRanks(cfg.TopK, dirRanked(ix, cfg, t.Dir), subjectTop)
+		whotoaskTop := resolve.FuseRanks(cfg.TopK, dirRanked(ix, cfg, t.Dir), subjectTop)
 		res.Dirs = append(res.Dirs, DirResult{
-			Dir: t.Dir, Approvers: approvers, GitTop: gitTop, PeepwhoTop: peepwhoTop,
-			GitHit:     anyKeyed(gitTop, approverKeys),
-			PeepwhoHit: anyKeyed(peepwhoTop, approverKeys),
+			Dir: t.Dir, Approvers: approvers, GitTop: gitTop, WhoToAskTop: whotoaskTop,
+			GitHit:      anyKeyed(gitTop, approverKeys),
+			WhoToAskHit: anyKeyed(whotoaskTop, approverKeys),
 		})
 	}
 	if len(res.Dirs) == 0 {

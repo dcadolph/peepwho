@@ -132,7 +132,7 @@ func TestEncryptionFinding(t *testing.T) {
 		// because the operator believes the disk is protected and it is not.
 		KeyConfigured: true, OnDisk: false,
 		WantDetail: "an encryption key is configured but the index file on disk is still plaintext",
-		WantLevel:  levelWarn, WantFix: "peepwho vault encrypt",
+		WantLevel:  levelWarn, WantFix: "whotoask vault encrypt",
 	}}
 	for testNum, test := range tests {
 		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // TestAnswerDropsChatter asks the demo company about every subject by name and

@@ -40,7 +40,7 @@ var secretPatterns = []secretPattern{
 	// Stripe secret and restricted keys.
 	{re: regexp.MustCompile(`\b[sr]k_(?:live|test)_[A-Za-z0-9]{16,255}\b`)},
 	// OpenAI and Anthropic API keys, prefixed or bare. These are the providers
-	// peepwho itself supports, so they are certain to be pasted near it. The
+	// whotoask itself supports, so they are certain to be pasted near it. The
 	// dashed tails demand length a hyphenated prose slug never reaches, since
 	// "sk-proj-management-plan" is a phrase someone could actually write.
 	// The dashed tail is tried first: alternation is leftmost-first, so the
@@ -74,7 +74,7 @@ var secretPatterns = []secretPattern{
 }
 
 // Scrub replaces credential-shaped substrings with a redaction mark and
-// reports how many were found. It runs over every piece of prose peepwho
+// reports how many were found. It runs over every piece of prose whotoask
 // ingests, because people paste keys into Slack and tickets, and a
 // who-knows-what index must never become a where-the-secrets-are index.
 func Scrub(s string) (string, int) {

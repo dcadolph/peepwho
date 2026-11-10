@@ -13,7 +13,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/dcadolph/peepwho/internal/connector"
+	"github.com/dcadolph/whotoask/internal/connector"
 )
 
 // sampleRecords returns a small set of people for ranking tests.
@@ -334,7 +334,7 @@ func TestProfile(t *testing.T) {
 }
 
 // TestMergeIsIdempotent verifies re-reading a source replaces its earlier
-// contribution instead of stacking a second copy on top. The command peepwho's
+// contribution instead of stacking a second copy on top. The command whotoask's
 // own help recommends for a schedule is `index --source X --merge`, so a run
 // that inflated its own weights would drift the ranking a little further every
 // night until an explicit topic owner lost to a passing mention.

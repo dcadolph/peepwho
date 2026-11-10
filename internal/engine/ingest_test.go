@@ -17,10 +17,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/policy"
-	"github.com/dcadolph/peepwho/internal/vault"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/policy"
+	"github.com/dcadolph/whotoask/internal/vault"
 )
 
 // TestGuardArchive covers the gate on keeping the words of a conversation. It

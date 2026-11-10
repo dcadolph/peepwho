@@ -9,21 +9,21 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/engine"
-	"github.com/dcadolph/peepwho/internal/policy"
-	"github.com/dcadolph/peepwho/internal/secret"
-	"github.com/dcadolph/peepwho/internal/vault"
+	"github.com/dcadolph/whotoask/internal/engine"
+	"github.com/dcadolph/whotoask/internal/policy"
+	"github.com/dcadolph/whotoask/internal/secret"
+	"github.com/dcadolph/whotoask/internal/vault"
 )
 
 // policyEnvVar names the environment variable pointing to an org policy file.
-const policyEnvVar = "PEEPWHO_POLICY_FILE"
+const policyEnvVar = "WHOTOASK_POLICY_FILE"
 
 // defaultPolicyFile is the path an organization can pin a policy at.
-const defaultPolicyFile = "/etc/peepwho/policy.json"
+const defaultPolicyFile = "/etc/whotoask/policy.json"
 
 // nowEnvVar names the environment variable that pins the clock to one RFC 3339
 // instant, so tests and benchmarks get reproducible output.
-const nowEnvVar = "PEEPWHO_NOW"
+const nowEnvVar = "WHOTOASK_NOW"
 
 // options holds the shared flags resolved on the root command.
 type options struct {
@@ -41,7 +41,7 @@ type options struct {
 	pol policy.Policy
 	// systemPolicyFile is the org-pinned policy path, defaultPolicyFile in production.
 	systemPolicyFile string
-	// envPolicyFile is the PEEPWHO_POLICY_FILE override, read once at startup.
+	// envPolicyFile is the WHOTOASK_POLICY_FILE override, read once at startup.
 	envPolicyFile string
 	// codecCache is the resolved at-rest codec, nil for plain JSON. It is set
 	// once, lazily, so a passphrase entered during a load is reused for the save.
@@ -52,7 +52,7 @@ type options struct {
 	// fake so nothing touches the real one.
 	keychain *secret.Store
 	// clock is the time source every command reads, nil for the system clock.
-	// PEEPWHO_NOW pins it at startup.
+	// WHOTOASK_NOW pins it at startup.
 	clock func() time.Time
 }
 
@@ -114,7 +114,7 @@ func newRootCmd() *cobra.Command {
 	}
 
 	root := &cobra.Command{
-		Use:           "peepwho",
+		Use:           "whotoask",
 		Short:         "Know who knows",
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -148,7 +148,7 @@ func newRootCmd() *cobra.Command {
 }
 
 // resolvePolicy sets o.pol from the org policy files and the user's flag. A
-// locked system policy always wins, even when PEEPWHO_POLICY_FILE names another
+// locked system policy always wins, even when WHOTOASK_POLICY_FILE names another
 // file, so the env var cannot unlock a pinned machine. Otherwise the env file
 // replaces the system file entirely and must exist, a locked file pins its
 // mode over the flag, and an unlocked file supplies the default the flag may
@@ -160,7 +160,7 @@ func (o *options) resolvePolicy(policyChanged bool, errOut io.Writer) error {
 	}
 	systemLocked := found && cfg.Locked
 	if systemLocked && o.envPolicyFile != "" {
-		fmt.Fprintln(errOut, "peepwho: "+policyEnvVar+" ignored; system policy is locked")
+		fmt.Fprintln(errOut, "whotoask: "+policyEnvVar+" ignored; system policy is locked")
 	}
 	if !systemLocked && o.envPolicyFile != "" {
 		envCfg, envFound, envErr := policy.Load(o.envPolicyFile)
@@ -183,7 +183,7 @@ func (o *options) resolvePolicy(policyChanged bool, errOut io.Writer) error {
 		}
 		o.pol = pol
 		if policyChanged {
-			fmt.Fprintln(errOut, "peepwho: --policy ignored; pinned by org policy")
+			fmt.Fprintln(errOut, "whotoask: --policy ignored; pinned by org policy")
 		}
 		return nil
 	}
@@ -212,7 +212,7 @@ func (o *options) resolvePolicy(policyChanged bool, errOut io.Writer) error {
 // defaultDataDir returns the default data directory under the user's home.
 func defaultDataDir() string {
 	if home, err := os.UserHomeDir(); err == nil {
-		return filepath.Join(home, ".peepwho")
+		return filepath.Join(home, ".whotoask")
 	}
-	return ".peepwho"
+	return ".whotoask"
 }

@@ -8,9 +8,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/pagerduty"
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/pagerduty"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // PagerDutyOptions configures the PagerDuty connector.

@@ -1,4 +1,4 @@
-// Package bot answers peepwho questions from Slack. It is transport-agnostic: a
+// Package bot answers whotoask questions from Slack. It is transport-agnostic: a
 // socket-mode or events-api adapter normalizes Slack events into Events and
 // feeds them to the Engine, which resolves and replies through a Replier.
 package bot
@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // Per-user rate limiting: rateMax questions per rateWindow. The bot answers

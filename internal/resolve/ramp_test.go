@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/connector"
+	"github.com/dcadolph/whotoask/internal/connector"
 )
 
 // arrival builds one observed arrival, established after days when reached.

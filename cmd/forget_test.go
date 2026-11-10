@@ -7,12 +7,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/engine"
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/engine"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // TestForgetPurgesPerson indexes the Slack export fixture, purges one person,
-// and then proves they are gone from every file peepwho keeps and every answer
+// and then proves they are gone from every file whotoask keeps and every answer
 // it gives, while everyone else survives.
 func TestForgetPurgesPerson(t *testing.T) {
 	t.Parallel()

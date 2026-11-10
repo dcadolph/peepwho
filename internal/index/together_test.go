@@ -3,13 +3,13 @@ package index
 import (
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // TestTopicLinksAreCarriedIntoTheGraph checks a source's observation that two
 // subjects are worked on together survives into the graph, where relatedness
-// can use it. It is the only thing peepwho knows about a subject that does not
+// can use it. It is the only thing whotoask knows about a subject that does not
 // come through the people holding it.
 func TestTopicLinksAreCarriedIntoTheGraph(t *testing.T) {
 	t.Parallel()

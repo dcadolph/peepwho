@@ -1,4 +1,4 @@
-// Package util holds small helpers shared across peepwho's packages.
+// Package util holds small helpers shared across whotoask's packages.
 package util
 
 import (

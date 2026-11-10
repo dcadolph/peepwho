@@ -1,4 +1,4 @@
-// Package confluence is a minimal Confluence Cloud client scoped to what peepwho
+// Package confluence is a minimal Confluence Cloud client scoped to what whotoask
 // ingests: pages and the people who wrote them. Credentials are held only in
 // memory, never serialized, and never logged.
 package confluence
@@ -16,8 +16,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/httputil"
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/httputil"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // API bases for the two Confluence deployments. Cloud serves the REST API under
@@ -128,7 +128,7 @@ func NewServer(siteURL, token string, opts ...Option) *Client {
 	return c
 }
 
-// User is the subset of a Confluence user peepwho reads.
+// User is the subset of a Confluence user whotoask reads.
 type User struct {
 	// AccountID is the stable account identifier on Confluence Cloud.
 	AccountID string `json:"accountId"`
@@ -165,7 +165,7 @@ type label struct {
 	Name string `json:"name"`
 }
 
-// Page is the subset of a content page peepwho reads.
+// Page is the subset of a content page whotoask reads.
 type Page struct {
 	// Title is the page title.
 	Title string `json:"title"`

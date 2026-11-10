@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
+	"github.com/dcadolph/whotoask/internal/connector"
 )
 
 // fakeEmbedder maps text to a small vector over a fixed vocabulary, so cosine

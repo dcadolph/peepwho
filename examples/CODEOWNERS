@@ -1,5 +1,5 @@
-# Example CODEOWNERS for peepwho. Index it with:
-#   peepwho index --source codeowners --file examples/CODEOWNERS
+# Example CODEOWNERS for whotoask. Index it with:
+#   whotoask index --source codeowners --file examples/CODEOWNERS
 /internal/billing/      @angela-malone   billing-team@example.com
 /internal/invoicing/    @pam-vance
 /internal/infra/        @carol-lee

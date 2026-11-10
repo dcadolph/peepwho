@@ -12,8 +12,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/util"
-	"github.com/dcadolph/peepwho/internal/vault"
+	"github.com/dcadolph/whotoask/internal/util"
+	"github.com/dcadolph/whotoask/internal/vault"
 )
 
 // Version is the current state-file schema version.

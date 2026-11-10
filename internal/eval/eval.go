@@ -1,4 +1,4 @@
-// Package eval measures how well peepwho answers, against the only ground truth
+// Package eval measures how well whotoask answers, against the only ground truth
 // a real organization hands over for free: the ownership it wrote down.
 //
 // The point is not the score. The point is that a score exists at all, and that
@@ -14,20 +14,20 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // Result is everything measurable about one index, in one place.
 //
 // It deliberately mixes the score with the reasons a score could be wrong.
-// Agreement alone is not interpretable: a low number means peepwho is wrong, or
+// Agreement alone is not interpretable: a low number means whotoask is wrong, or
 // the declared owner is stale, or the owner's work was never linked to their
 // handle, and those call for three different fixes.
 type Result struct {
 	// Agreement is how often the declared owner of an area is also the person
-	// peepwho says leads it, zero to one. Read it with Unlinked in hand: an owner
+	// whotoask says leads it, zero to one. Read it with Unlinked in hand: an owner
 	// whose commits were never tied to their handle cannot agree with anything.
 	Agreement float64 `json:"agreement"`
 	// Declared is how many areas have an owner of record at all, which is the
@@ -39,7 +39,7 @@ type Result struct {
 	// anywhere. Usually an identity that was never joined, not a departure.
 	Silent int `json:"silent"`
 	// Unworked counts disagreements where the owner works elsewhere but never in
-	// the area they own. Paper ownership, and peepwho is probably right.
+	// the area they own. Paper ownership, and whotoask is probably right.
 	Unworked int `json:"unworked"`
 	// Trailing counts disagreements where the owner does work in the area, just
 	// less than whoever leads it. The genuinely arguable bucket.
@@ -158,11 +158,11 @@ func handleOnly(id model.ID) bool {
 	return i > 0 && !strings.Contains(s[i+1:], "@")
 }
 
-// Area is one declared area and whether peepwho named its owner of record.
+// Area is one declared area and whether whotoask named its owner of record.
 type Area struct {
 	// Topic is the area.
 	Topic string `json:"topic"`
-	// Held is whether the declared owner is also the person peepwho names.
+	// Held is whether the declared owner is also the person whotoask names.
 	Held bool `json:"held"`
 	// Answerable is whether the declared owner has recorded work in this area
 	// at all. When they do not, no ranking could have named them.

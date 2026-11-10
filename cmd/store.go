@@ -7,14 +7,14 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/engine"
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/fact"
-	"github.com/dcadolph/peepwho/internal/feedback"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/keyring"
-	"github.com/dcadolph/peepwho/internal/prompt"
-	"github.com/dcadolph/peepwho/internal/vault"
+	"github.com/dcadolph/whotoask/internal/engine"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/fact"
+	"github.com/dcadolph/whotoask/internal/feedback"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/keyring"
+	"github.com/dcadolph/whotoask/internal/prompt"
+	"github.com/dcadolph/whotoask/internal/vault"
 )
 
 // store returns the engine store over the data directory, sealed with the
@@ -96,7 +96,7 @@ func unlockAndLoad[T any](
 	ui := prompt.New(cmd.InOrStdin(), cmd.ErrOrStderr(), cmd.ErrOrStderr())
 	if !ui.Interactive() {
 		return zero, fmt.Errorf(
-			"%w: set %s or %s (see `peepwho vault keygen`)",
+			"%w: set %s or %s (see `whotoask vault keygen`)",
 			vault.ErrEncrypted, keyring.EnvKey, keyring.EnvPassphrase)
 	}
 	const attempts = 3
@@ -185,9 +185,9 @@ func noIndexError(err error) error {
 		// because it is the step that needs credentials to already exist.
 		return fmt.Errorf(
 			"%w. Nothing is indexed yet.\n"+
-				"  Try it on sample data with no setup:   peepwho demo\n"+
-				"  Point it at your own tools:            peepwho connect\n"+
-				"  Then build the index:                  peepwho index",
+				"  Try it on sample data with no setup:   whotoask demo\n"+
+				"  Point it at your own tools:            whotoask connect\n"+
+				"  Then build the index:                  whotoask index",
 			ErrNoIndex)
 	}
 	if errors.Is(err, index.ErrDamaged) {
@@ -198,9 +198,9 @@ func noIndexError(err error) error {
 		return fmt.Errorf(
 			"%w.\n"+
 				"  The index is rebuilt from the sources, so nothing is lost by making it again:\n"+
-				"    peepwho index --source SOURCE\n"+
+				"    whotoask index --source SOURCE\n"+
 				"  If the file was meant to be encrypted, the key is missing rather than the data:\n"+
-				"    set PEEPWHO_INDEX_KEY or PEEPWHO_INDEX_PASSPHRASE and try again",
+				"    set WHOTOASK_INDEX_KEY or WHOTOASK_INDEX_PASSPHRASE and try again",
 			err)
 	}
 	return err

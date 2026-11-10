@@ -27,19 +27,19 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/engine"
-	"github.com/dcadolph/peepwho/internal/fakeapi"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/policy"
-	"github.com/dcadolph/peepwho/internal/simorg"
-	"github.com/dcadolph/peepwho/internal/vault"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/engine"
+	"github.com/dcadolph/whotoask/internal/fakeapi"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/policy"
+	"github.com/dcadolph/whotoask/internal/simorg"
+	"github.com/dcadolph/whotoask/internal/vault"
 )
 
 // testKey is a fixed 32-byte raw key for sealing test data directories.
 var testKey = []byte("0123456789abcdef0123456789abcdef") //nolint:gochecknoglobals // Not modified, simplifies testing.
 
-// testKeyB64 is testKey in the form peepwho vault keygen prints.
+// testKeyB64 is testKey in the form whotoask vault keygen prints.
 var testKeyB64 = base64.StdEncoding.EncodeToString(testKey) //nolint:gochecknoglobals // Not modified, simplifies testing.
 
 // newTestDataDir writes the simulated company and its conversations to a temp
@@ -320,7 +320,7 @@ func TestHandleSecrets(t *testing.T) {
 		Handle: &Handle{}, Secrets: mapSecrets{engine.JiraTokenEnv: "tok-1"},
 		Name: engine.JiraTokenEnv, WantValue: "tok-1",
 	}, { // Test 1: Name the host does not hold.
-		Handle: &Handle{}, Secrets: mapSecrets{engine.JiraTokenEnv: "tok-1"}, Name: "PEEPWHO_SLACK_TOKEN",
+		Handle: &Handle{}, Secrets: mapSecrets{engine.JiraTokenEnv: "tok-1"}, Name: "WHOTOASK_SLACK_TOKEN",
 	}, { // Test 2: No Secrets set.
 		Handle: &Handle{}, Name: engine.JiraTokenEnv,
 	}, { // Test 3: Secrets cleared with nil.

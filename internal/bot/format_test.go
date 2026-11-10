@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // TestFormatEscapesMrkdwn verifies user-derived text cannot inject Slack

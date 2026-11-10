@@ -84,7 +84,7 @@ func TestEvalOwnersScores(t *testing.T) {
 	if err != nil {
 		t.Fatalf("eval owners: %v\n%s", err, stderr)
 	}
-	for _, want := range []string{"judged 1 directories", "peepwho names an approver in its top 3:  1/1",
+	for _, want := range []string{"judged 1 directories", "whotoask names an approver in its top 3:  1/1",
 		"Y", "billing"} {
 		if !strings.Contains(string(out), want) {
 			t.Errorf("eval owners output lacks %q:\n%s", want, out)

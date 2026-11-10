@@ -1,4 +1,4 @@
-// Package mcp serves peepwho over the Model Context Protocol, so agent
+// Package mcp serves whotoask over the Model Context Protocol, so agent
 // clients such as Claude Code and Claude Desktop can ask who knows what
 // mid-conversation. The transport is stdio: one JSON-RPC 2.0 message per
 // line on stdin and stdout, with stderr free for logs.
@@ -207,7 +207,7 @@ func (s *Server) callTool(ctx context.Context, w io.Writer, req request) {
 	isError := err != nil
 	if isError {
 		text = err.Error()
-		fmt.Fprintf(s.log, "peepwho mcp: %s: %v\n", p.Name, err)
+		fmt.Fprintf(s.log, "whotoask mcp: %s: %v\n", p.Name, err)
 	}
 	s.writeResult(w, req.ID, map[string]any{
 		"content": []map[string]any{{"type": "text", "text": text}},
@@ -235,11 +235,11 @@ func (s *Server) writeError(w io.Writer, id json.RawMessage, code int, message s
 func (s *Server) write(w io.Writer, v any) {
 	raw, err := json.Marshal(v)
 	if err != nil {
-		fmt.Fprintf(s.log, "peepwho mcp: encode: %v\n", err)
+		fmt.Fprintf(s.log, "whotoask mcp: encode: %v\n", err)
 		return
 	}
 	raw = append(raw, '\n')
 	if _, err := w.Write(raw); err != nil {
-		fmt.Fprintf(s.log, "peepwho mcp: write: %v\n", err)
+		fmt.Fprintf(s.log, "whotoask mcp: write: %v\n", err)
 	}
 }

@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
+	"github.com/dcadolph/whotoask/internal/connector"
 )
 
-// TestAnswerSaysWhenAnExpertHasMovedOn checks peepwho admits that the person it
+// TestAnswerSaysWhenAnExpertHasMovedOn checks whotoask admits that the person it
 // names has stopped working on the subject. Knowing something best is not the
 // same as still being in it: on a real repository the leading expert of two
 // subjects in five had already stopped touching them, and was less than half as

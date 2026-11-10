@@ -9,7 +9,7 @@ Every command accepts these.
 
 | Flag         | Default     | What it does                                        |
 | ------------ | ----------- | --------------------------------------------------- |
-| `--data-dir` | `~/.peepwho` | Directory holding the index and feedback files.&nbsp;&nbsp;&nbsp; |
+| `--data-dir` | `~/.whotoask` | Directory holding the index and feedback files.&nbsp;&nbsp;&nbsp; |
 | `--policy`   | `strict`    | Egress policy: `strict`, `redacted`, or `open`.     |
 | `--pretty`   | off         | Indent JSON output.                                 |
 | `--human`    | off         | Force human-readable output, even when piped.       |
@@ -31,13 +31,13 @@ into one index with `--merge`. People join across sources by email, or by an
 | `matters`    | Time-entry or matter CSV from a billing or practice system | none                         | no     |
 | `codeowners` | CODEOWNERS paths per owner                   | none                         | no     |
 | `git`        | Commit authors per changed path              | none                         | yes    |
-| `slack`      | Users, channels, message history             | `PEEPWHO_SLACK_TOKEN`         | yes    |
-| `github`     | Repos, contributors, PRs, issues, CODEOWNERS | `PEEPWHO_GITHUB_TOKEN`        | yes    |
-| `jira`       | Issue assignees and reporters                | `PEEPWHO_JIRA_*`              | yes    |
-| `confluence` | Page creators and editors                    | `PEEPWHO_CONFLUENCE_*`        | yes    |
-| `pagerduty`  | Services and current on-calls                | `PEEPWHO_PAGERDUTY_TOKEN`     | no     |
+| `slack`      | Users, channels, message history             | `WHOTOASK_SLACK_TOKEN`         | yes    |
+| `github`     | Repos, contributors, PRs, issues, CODEOWNERS | `WHOTOASK_GITHUB_TOKEN`        | yes    |
+| `jira`       | Issue assignees and reporters                | `WHOTOASK_JIRA_*`              | yes    |
+| `confluence` | Page creators and editors                    | `WHOTOASK_CONFLUENCE_*`        | yes    |
+| `pagerduty`  | Services and current on-calls                | `WHOTOASK_PAGERDUTY_TOKEN`     | no     |
 | `json`       | JSON array of records from a file or stdin   | none                         | no     |
-| `graph`      | Microsoft Graph users and reporting lines    | `PEEPWHO_GRAPH_TOKEN`         | no     |
+| `graph`      | Microsoft Graph users and reporting lines    | `WHOTOASK_GRAPH_TOKEN`         | no     |
 
 Dated sources decay: see [recency](#recency). Undated sources describe the
 present and keep full weight. Bot accounts (dependabot and friends) are
@@ -48,15 +48,15 @@ skipped the git source fails, even under `--merge`, and the existing index is
 left as it was.
 
 With `--episodes`, four of them also record the past work behind the graph, which
-is what [`peepwho recall`](#peepwho-recall) points back at: Slack threads and runs
+is what [`whotoask recall`](#whotoask-recall) points back at: Slack threads and runs
 of channel conversation, merged GitHub pull requests, resolved Jira issues, and
 resolved PagerDuty incidents.
 
-## peepwho index
+## whotoask index
 
 Builds or extends the index from one source per run.
 
-    peepwho index --source SOURCE [scope flags] [--merge]
+    whotoask index --source SOURCE [scope flags] [--merge]
 
 The index keeps one record set per source, so a full read of a second scope of the same source replaces what the first scope contributed; only an incremental merge folds into it.
 
@@ -87,11 +87,11 @@ The index keeps one record set per source, so a full read of a second scope of t
 | `--github-emails`   | off       | github     | Resolve user emails to join other sources.       |
 | `--jira-project`    |           | jira       | Project key, repeatable.                         |
 | `--jira-jql`        |           | jira       | JQL query; overrides `--jira-project`.           |
-| `--jira-url`        |           | jira       | Site URL; or `PEEPWHO_JIRA_URL`.                  |
+| `--jira-url`        |           | jira       | Site URL; or `WHOTOASK_JIRA_URL`.                  |
 | `--max-issues`      | `1000`    | jira       | Cap issues read.                                 |
 | `--jira-server`     | `false`   | jira       | Self-hosted Server/DC (v2 API, bearer/anonymous).|
 | `--confluence-space`|           | confluence | Space key, repeatable.                           |
-| `--confluence-url`  |           | confluence | Site URL; or `PEEPWHO_CONFLUENCE_URL` (falls back to the Jira URL). |
+| `--confluence-url`  |           | confluence | Site URL; or `WHOTOASK_CONFLUENCE_URL` (falls back to the Jira URL). |
 | `--confluence-cql`  |           | confluence | CQL query; overrides `--confluence-space`.       |
 | `--max-pages`       | `2000`    | confluence | Cap pages read.                                  |
 | `--confluence-server`| `false`  | confluence | Self-hosted Server/DC (REST at root, bearer/anonymous).|
@@ -129,31 +129,31 @@ an incremental run skipped. A source driven by an explicit `--jira-jql` or
 `--confluence-cql` always reads in full, since that query is authoritative and
 cannot be narrowed to a delta.
 
-## peepwho refresh
+## whotoask refresh
 
-    peepwho refresh
+    whotoask refresh
 
 Re-index every source that has been indexed at least once, reusing the flags it
 was last indexed with and merging the result. Each `index` run records its flags
 in refresh.json; a source read from stdin is not recorded, since a scheduled run
 could not supply the input.
 
-## peepwho schedule
+## whotoask schedule
 
-    peepwho schedule --install | --remove | --status
+    whotoask schedule --install | --remove | --status
 
-Install a launchd agent that runs `peepwho refresh` every Sunday at 3am, so the
+Install a launchd agent that runs `whotoask refresh` every Sunday at 3am, so the
 graph stays current without remembering to. macOS only; on other systems run
-`peepwho refresh` from cron. Logs go to ~/Library/Logs/peepwho-refresh.log.
+`whotoask refresh` from cron. Logs go to ~/Library/Logs/whotoask-refresh.log.
 
-## peepwho connect
+## whotoask connect
 
 Sets up a source interactively: it explains the source, shows how to create the
 credential, reads and validates it, runs the first index, and prints the `export`
 line to save. Credentials are validated in memory and never written to disk.
-connect needs a terminal; scripts use `peepwho index`.
+connect needs a terminal; scripts use `whotoask index`.
 
-    peepwho connect [source]
+    whotoask connect [source]
 
 | Flag       | Default | What it does                                            |
 | ---------- | ------- | ------------------------------------------------------- |
@@ -164,28 +164,28 @@ With no argument it shows a menu of every source, marked configured or not. With
 source (`org-csv`, `codeowners`, `git`, `slack`, `github`, `jira`, `confluence`,
 `pagerduty`, or `graph`) it sets up just that one.
 
-## peepwho vault
+## whotoask vault
 
 Encrypts the on-disk index at rest so a stolen disk or a stray backup cannot read
 your people graph. Encryption turns on whenever a key is configured, through
-`PEEPWHO_INDEX_KEY` (a base64 32-byte key) or `PEEPWHO_INDEX_PASSPHRASE`.
+`WHOTOASK_INDEX_KEY` (a base64 32-byte key) or `WHOTOASK_INDEX_PASSPHRASE`.
 
-    peepwho vault keygen     # print a fresh key as an export line
-    peepwho vault status     # report the key and whether the index is encrypted
-    peepwho vault encrypt    # encrypt an existing plain index in place
-    peepwho vault decrypt    # rewrite the index back to plain JSON
+    whotoask vault keygen     # print a fresh key as an export line
+    whotoask vault status     # report the key and whether the index is encrypted
+    whotoask vault encrypt    # encrypt an existing plain index in place
+    whotoask vault decrypt    # rewrite the index back to plain JSON
 
-With a key set, every `peepwho index` write is encrypted and every read decrypts.
+With a key set, every `whotoask index` write is encrypted and every read decrypts.
 `encrypt` and `decrypt` rewrite every store beside the index too: the
 conversations, facts, feedback, and the change log, and `status` reports each.
 Reading an encrypted index without the key fails rather than exposing anything. See
 [PRIVACY.md](PRIVACY.md) for the full model.
 
-## peepwho ask
+## whotoask ask
 
 Answers a question from the index.
 
-    peepwho ask [flags] QUESTION
+    whotoask ask [flags] QUESTION
 
 | Flag            | Default   | What it does                                        |
 | --------------- | --------- | --------------------------------------------------- |
@@ -215,24 +215,24 @@ Each result carries a `strength`
 from zero to one: query coverage scaled by the weight of the evidence, where an
 explicit topic is proof, a title slightly less, a passing mention half.
 
-## peepwho recall
+## whotoask recall
 
 Finds the past conversation where something was worked out, and who was in it.
 An answer is a pointer, not a transcript: the people, the place, the date, and a
 link back to the conversation in the tool it happened in. Opening the link uses
 your own access to that tool.
 
-    peepwho recall [flags] QUESTION
+    whotoask recall [flags] QUESTION
 
-Results cover only conversations you took part in, so peepwho has to know who you
-are. It takes `--me`, then `PEEPWHO_ME`, then your git email.
+Results cover only conversations you took part in, so whotoask has to know who you
+are. It takes `--me`, then `WHOTOASK_ME`, then your git email.
 
 | Flag                  | Default   | What it does                                     |
 | --------------------- | --------- | ------------------------------------------------ |
 | `--me`                |           | Who is asking: an email or a source identifier such as `slack:U123`. |
 | `--limit`             | `5`       | Maximum conversations to return.                 |
 | `--meaning`           | off       | Match by meaning instead of exact words. Needs an index built with `--episodes --embed`. |
-| `--how`               | off       | Show how it was worked out, for conversations peepwho keeps. Needs `--archive` at index time. |
+| `--how`               | off       | Show how it was worked out, for conversations whotoask keeps. Needs `--archive` at index time. |
 | `--provider`          | `ollama`  | Model provider for `--how`. Cloud providers need `--policy open`, because the conversation is sent whole. |
 | `--model`             |           | Chat model that writes the account for `--how`.  |
 | `--openai-url`        |           | OpenAI-compatible base URL.                      |
@@ -240,14 +240,14 @@ are. It takes `--me`, then `PEEPWHO_ME`, then your git email.
 | `--ollama-url`        | localhost | Ollama base URL.                                 |
 | `--link-horizon-days` | `0`       | Warn that links older than this many days may have expired. Zero makes no claim. |
 
-Recall is also a Slack command (`/peepwho recall ...` or `recall ...` in a
+Recall is also a Slack command (`/whotoask recall ...` or `recall ...` in a
 mention), where it answers only to the person who asked, and an MCP tool
-(`peepwho_recall`). The web app serves it on localhost only: the serve token
+(`whotoask_recall`). The web app serves it on localhost only: the serve token
 gates the server, not one person's history.
 
-## peepwho near
+## whotoask near
 
-    peepwho near PERSON [--limit N]
+    whotoask near PERSON [--limit N]
 
 Rank the people who work nearest PERSON by shared team and channel membership and
 shared topics. Co-membership is normalized by group size, so a small tight team
@@ -255,18 +255,18 @@ counts for far more than a broad channel; groups that span most of the org are
 ignored as administrative; and permission tiers of one group (store-admin,
 store-write) fold together. PERSON is an email, an id, or an exact name.
 
-## peepwho search
+## whotoask search
 
-    peepwho search QUERY [--limit N]
+    whotoask search QUERY [--limit N]
 
 Find people and channels whose name, email, title, team, or topic contains
 QUERY, ranked by how directly they match. This is a direct lookup, so use it
 when you know what you are looking for; use `ask` when you want the people who
 know a subject ranked by expertise.
 
-## peepwho related
+## whotoask related
 
-    peepwho related TOPIC [--limit N]
+    whotoask related TOPIC [--limit N]
 
 Report the subjects related to TOPIC, on two kinds of evidence, and say which
 is speaking for each.
@@ -274,7 +274,7 @@ is speaking for each.
 The stronger is what is worked on together. Two areas altered in the same
 commit, fixed under one ticket, described on one page, or carried by a single
 pull request belong to one body of knowledge whoever did the work, which makes
-this the only thing peepwho knows about a subject that does not run through the
+this the only thing whotoask knows about a subject that does not run through the
 people holding it. Git, Jira, Confluence, and GitHub all contribute it the same
 way, so this works for a company whose work lives in tickets and pages rather
 than in one large repository. The other sources cannot: a chat message or an
@@ -333,16 +333,16 @@ person holds overlaps perfectly with everything else they hold.
 
 Neither needs a taxonomy anyone had to write, and neither needs a model.
 
-## peepwho risk
+## whotoask risk
 
-    peepwho risk [PERSON] [--limit N] [--html PATH]
+    whotoask risk [PERSON] [--limit N] [--html PATH]
 
 Score knowledge concentration across the graph: the subjects where one or two
 people hold most of the expertise, so a single departure is visible before it
 hurts. Name a person for the offboarding view instead: what the record shows only them in.
 
 `--html` writes a self-contained knowledge-risk brief to PATH rather than
-printing. The file needs no network, no server, and no peepwho to open, so it can
+printing. The file needs no network, no server, and no whotoask to open, so it can
 be forwarded to somebody who has neither. It leads with the headline counts,
 lists every scored subject in a sortable and filterable table with a CSV export,
 reads the same finding back per person as what would leave with them, and states
@@ -373,9 +373,9 @@ the work over has to learn the whole of it at once.
 
 Deterministic arithmetic over the graph, no model needed.
 
-## peepwho ownership
+## whotoask ownership
 
-    peepwho ownership
+    whotoask ownership
 
 Compare declared ownership, from a source of record such as CODEOWNERS, against
 who actually has the expertise. A mismatch is ownership drift: the file says one
@@ -409,13 +409,13 @@ team (`alerting-squad` and a team named Alerting): its members become the
 owners of record, and the area is judged by whether one of them leads it. Index
 an org-chart source alongside CODEOWNERS to get this.
 
-## peepwho assess
+## whotoask assess
 
 Produces a sealed knowledge-risk assessment from local exports, built with no
 tokens and no network.
 
-    peepwho assess --repo-path ./target-repo --out acme-assessment
-    peepwho assess --repo-path ./svc-a --repo-path ./svc-b --slack-export export.zip
+    whotoask assess --repo-path ./target-repo --out acme-assessment
+    whotoask assess --repo-path ./svc-a --repo-path ./svc-b --slack-export export.zip
 
 | Flag               | Default                | What it does                                    |
 | ------------------ | ---------------------- | ----------------------------------------------- |
@@ -426,7 +426,7 @@ tokens and no network.
 | `--slack-export`   |                        | Slack export zip or its unzipped folder.        |
 | `--org-csv`        |                        | Org chart CSV.                                  |
 | `--codeowners`     |                        | CODEOWNERS file or a repo root holding one.     |
-| `--out`            | `peepwho-assessment-<date>` | Output directory.                           |
+| `--out`            | `whotoask-assessment-<date>` | Output directory.                           |
 | `--top`            | `10`                   | People covered in the departure file.           |
 | `--git-since-days` | `730`                  | How far back to read git history.               |
 
@@ -435,7 +435,7 @@ each change, and credits them with the directories that pull request touched
 rather than the words of its title. That is what surfaces the people who
 approve work without writing it, and on public repositories it is the
 difference between trailing a plain commit count and beating it. It needs
-`PEEPWHO_GITHUB_TOKEN`, and it is the only part of an assessment that touches
+`WHOTOASK_GITHUB_TOKEN`, and it is the only part of an assessment that touches
 the network.
 
 The index is built fresh in memory and never saved, so an assessment never
@@ -448,7 +448,7 @@ who stands nearest to what rests on them, with the evidence; nearest by the
 record, not a judgment of ability), `systems.json` and `checks.json` when a
 repository was read (each significant directory, and one paste-ready git
 command per directory counting the same history, so any row can be checked
-without peepwho), `ramp.json` (what this history shows about moving into an
+without whotoask), `ramp.json` (what this history shows about moving into an
 unfamiliar area: how long the people who did it took, and how many started and
 did not carry on), `aliases.json` when identities were left split,
 `manifest.json` and `manifest.sig` (the seal), and a `README.txt` explaining
@@ -478,29 +478,29 @@ The seal covers every one of those files by the bytes that were written, read
 back from disk, so a verifier pointed at the directory checks the reader's own
 copy:
 
-    peepwho verify acme-assessment
+    whotoask verify acme-assessment
 
 It names any file whose bytes no longer match what was sealed, and any file
 that is missing, and exits non-zero when there is either.
 
-## peepwho attest
+## whotoask attest
 
-    peepwho attest [--out DIR]
-    peepwho attest key
+    whotoask attest [--out DIR]
+    whotoask attest key
 
 Write the current knowledge-risk finding to `risk.json` in DIR (default
 `./finding`) and seal it. `manifest.json` lists every file by size and sha256,
 and `manifest.sig` is an ed25519 signature over the exact bytes of
-`manifest.json`. Anyone can check it offline with `peepwho verify`, with no
+`manifest.json`. Anyone can check it offline with `whotoask verify`, with no
 account and nothing sent anywhere. The signing key is created once under the
 data directory and reused.
 
-`peepwho attest key` prints the install's public key and key id. Publish it
-somewhere a reader already trusts, so they can pin it with `peepwho verify --key`.
+`whotoask attest key` prints the install's public key and key id. Publish it
+somewhere a reader already trusts, so they can pin it with `whotoask verify --key`.
 
-## peepwho verify
+## whotoask verify
 
-    peepwho verify DIR [--key B64]
+    whotoask verify DIR [--key B64]
 
 Check the seal in DIR. The signature in `manifest.sig` must verify over the
 exact bytes of `manifest.json`, the key id must match the public key, and every
@@ -517,9 +517,9 @@ non-zero, so it can be chained in a script.
 |---------|---------|-------------------------------------------------------------|
 | `--key` | none    | Base64 public key the seal must be signed with.             |
 
-## peepwho identity
+## whotoask identity
 
-    peepwho identity [PERSON]
+    whotoask identity [PERSON]
 
 List the inferred identity merges: each handle folded into a person, how
 confident the merge is, and the evidence for it. Joins by shared email or
@@ -547,25 +547,25 @@ missing from every answer. The flag lists those owners, the ones owning most
 first, which is the worklist for an alias file. Groups named as owners are left
 out, since no alias can tie a group to an address.
 
-## peepwho archive
+## whotoask archive
 
-Reports and prunes the conversations peepwho keeps.
+Reports and prunes the conversations whotoask keeps.
 
-    peepwho archive status                          # what is kept and how far back
-    peepwho archive prune --older-than-days 365     # forget conversations over a year old
-    peepwho archive prune --content-only            # keep the links, drop the words
+    whotoask archive status                          # what is kept and how far back
+    whotoask archive prune --older-than-days 365     # forget conversations over a year old
+    whotoask archive prune --content-only            # keep the links, drop the words
 
 `prune` is the only command that deletes remembered conversations, and it deletes
 exactly what you name.
 
-## peepwho feedback
+## whotoask feedback
 
 Records, reviews, and clears votes on answers.
 
-    peepwho feedback record QUESTION (--person ID | --channel NAME) \
+    whotoask feedback record QUESTION (--person ID | --channel NAME) \
       (--helpful | --not-helpful) [--comment TEXT]
-    peepwho feedback list [--query Q | --person ID | --channel NAME]
-    peepwho feedback clear (--query Q | --person ID | --channel NAME | --all)
+    whotoask feedback list [--query Q | --person ID | --channel NAME]
+    whotoask feedback clear (--query Q | --person ID | --channel NAME | --all)
 
 | Flag            | Applies to    | What it does                              |
 | --------------- | ------------- | ----------------------------------------- |
@@ -584,40 +584,40 @@ gentle 1.1x capped at two votes, high is 1.5x capped at four, off ignores
 votes entirely. Votes live in `feedback.json` under the data directory and
 survive re-indexing.
 
-### peepwho feedback bundle
+### whotoask feedback bundle
 
-Writes the redacted feedback report a user can choose to hand to peepwho's
+Writes the redacted feedback report a user can choose to hand to whotoask's
 makers. Composing and sending are two different acts by design: this command
 only writes a file, so every byte can be read before it goes anywhere, and
 nothing in the binary can send it.
 
 The full schema, so what can appear in the file is known before it is asked
-for (`peepwho-feedback-bundle/1`):
+for (`whotoask-feedback-bundle/1`):
 
 | Field | What it holds |
 |-------------------|--------------------------------------------------------|
 | `schema`, `note`  | The format name, and the redaction statement itself    |
-| `version`         | The peepwho build that wrote the bundle                 |
+| `version`         | The whotoask build that wrote the bundle                 |
 | `votes`           | Counts only: total, helpful, not, on people, on channels |
 | `queryShapes`     | Per vote: the question's word count and the verdict    |
 | `comments`        | The notes typed with votes, verbatim, with times       |
 
 Queries, names, addresses, and message text never appear: a question asked of
-peepwho is itself a fact about your organization, so only its word count
+whotoask is itself a fact about your organization, so only its word count
 leaves. The one free text is what was typed as feedback, carried because it
 was written to be read by someone fixing the product.
 
 An organization can pin even this manual path off with
 `"feedback_bundle": "deny"` in its policy file; the lock enforces what a
-promise only asserts. `peepwho feedback summary` shows the same arithmetic in
+promise only asserts. `whotoask feedback summary` shows the same arithmetic in
 place without writing anything.
 
-## peepwho forget
+## whotoask forget
 
-Purges one person from everything peepwho stores on this machine.
+Purges one person from everything whotoask stores on this machine.
 
-    peepwho forget jane@example.com
-    peepwho forget "Jane Roe" --yes
+    whotoask forget jane@example.com
+    whotoask forget "Jane Roe" --yes
 
 | Flag    | What it does           |
 | ------- | ---------------------- |
@@ -631,19 +631,19 @@ forgotten, and the change log stops naming them. A conversation with other parti
 its searchable words. `feedback.json` is not touched, and re-indexing a source
 that still contains the person brings them back.
 
-## peepwho wipe
+## whotoask wipe
 
-    peepwho wipe [--yes]
+    whotoask wipe [--yes]
 
-Delete everything peepwho stored on this machine: every file it writes under
+Delete everything whotoask stored on this machine: every file it writes under
 the data directory (the index and its sources sidecar, `index.state.json`,
 `episodes.json` with any archive, `feedback.json`, `facts.json`,
 `changes.json`, `refresh.json`, `attest.key`, and their lock and temporary files) and every
-credential `peepwho connect` saved in the OS keychain. It lists what it will
+credential `whotoask connect` saved in the OS keychain. It lists what it will
 remove and asks you to type `wipe`; `--yes` skips the question for scripts.
 Anything else declines and leaves every file in place.
 
-Files peepwho did not write stay, and the data directory is removed only when
+Files whotoask did not write stay, and the data directory is removed only when
 the wipe leaves it empty, so `--data-dir` pointed at a shared directory never
 loses anything else. Environment variables and a scheduled refresh are out of
 its reach, and it names any that remain.
@@ -652,12 +652,12 @@ its reach, and it names any that remain.
 | ------- | ------- | -------------------- |
 | `--yes` | off     | Wipe without asking. |
 
-## peepwho fact
+## whotoask fact
 
-    peepwho fact record SUBJECT RELATION OBJECT [--detail D] [--source S]
-    peepwho fact list [SUBJECT] [--relation R] [--source S] [--json]
-    peepwho fact forget [SUBJECT [RELATION [OBJECT]]] [--source S]
-    peepwho fact import [FILE|-] [--source S]
+    whotoask fact record SUBJECT RELATION OBJECT [--detail D] [--source S]
+    whotoask fact list [SUBJECT] [--relation R] [--source S] [--json]
+    whotoask fact forget [SUBJECT [RELATION [OBJECT]]] [--source S]
+    whotoask fact import [FILE|-] [--source S]
 
 Facts state what no crawl can find: which team owns a service, who to escalate
 to, and above all what a team does not own. Each is a subject, a relation, and an
@@ -666,41 +666,41 @@ the index so it survives re-indexing. Relations are `owned_by`, `not_owned_by`,
 `escalates_to`, `reports_to`, `runs_on`, and `answers_questions_about`; an unknown
 relation is refused. An `import` with `--source` replaces that source's facts, so
 it is the whole of what the source currently asserts, which makes a catalog easy
-to pipe in with `curl ... | jq ... | peepwho fact import --source catalog -`.
-Recorded facts also appear alongside `peepwho ask` answers when they mention a
+to pipe in with `curl ... | jq ... | whotoask fact import --source catalog -`.
+Recorded facts also appear alongside `whotoask ask` answers when they mention a
 term from the question.
 
-## peepwho directory
+## whotoask directory
 
-    peepwho directory
+    whotoask directory
 
 List everyone in the index with their team and topics, a read-only inventory of
 what has been indexed. It answers "who is in here?" without running a query.
 
-## peepwho status
+## whotoask status
 
-    peepwho status
+    whotoask status
 
 Report the index: when it was last built; how many people, channels, teams, and
 topics it holds; how many records each source contributed; whether it carries
 embeddings; and whether a key encrypts it at rest.
 
-## peepwho doctor
+## whotoask doctor
 
-    peepwho doctor
+    whotoask doctor
 
 Diagnose configuration and index problems and print the fix for each. It checks
 that the index loads, is non-empty, and is fresh, whether it carries vectors and
 is encrypted at rest, which connector credentials are set, and how many declared
 owners have no work recorded against them. Every problem
 prints the exact command that resolves it, and `doctor` exits nonzero when
-something stops peepwho from answering, so it works as a gate in a script.
+something stops whotoask from answering, so it works as a gate in a script.
 
-## peepwho serve
+## whotoask serve
 
 Runs the local web UI over the same engine.
 
-    peepwho serve [--addr HOST:PORT] [--mode keyword|semantic|llm]
+    whotoask serve [--addr HOST:PORT] [--mode keyword|semantic|llm]
 
 | Flag            | Default          | What it does                                                 |
 | --------------- | ---------------- | ------------------------------------------------------------ |
@@ -720,12 +720,12 @@ no votes and shows no buttons. Connections are bounded (30s read, 90s
 write, 2min idle) so slow or stalled clients cannot pile up on a shared
 box.
 
-## peepwho demo
+## whotoask demo
 
 Serves the web UI over an index built in process, with no credentials and
 nothing fetched from the network.
 
-    peepwho demo [--repo DIR] [--big] [--save-index DIR]
+    whotoask demo [--repo DIR] [--big] [--save-index DIR]
 
 With `--repo` it reads that repository's git history and opens on the exposure
 view, so the first screen names the directories the work rests on and the ones
@@ -742,30 +742,30 @@ Takes the same flags as `serve`, plus four of its own.
 | --------------- | ------------------------------------------------------------------ |
 | `--repo`        | Read a real repository instead of the simulation. Repeatable. Reads git only, so the recall view stays off: git records what changed, not what was said. |
 | `--max-commits` | Commits to read per repository with `--repo`, 4000 by default, which keeps a large repository starting in seconds. |
-| `--big`         | Simulate a company of 200 people rather than the small sample, which is what to look at to judge how peepwho reads at a real size. |
+| `--big`         | Simulate a company of 200 people rather than the small sample, which is what to look at to judge how whotoask reads at a real size. |
 | `--save-index`  | Write the simulated company to a directory as a real index and exit, so the other commands can be run against it. |
 
-## peepwho mcp
+## whotoask mcp
 
 Serves the index to MCP clients over stdio, so agents such as Claude Code
 and Claude Desktop can ask who knows what mid-conversation. Tools:
-`peepwho_ask`, `peepwho_recall`, `peepwho_person`, `peepwho_directory`.
+`whotoask_ask`, `whotoask_recall`, `whotoask_person`, `whotoask_directory`.
 
-    peepwho mcp [--embed-model name] [--ollama-url url]
+    whotoask mcp [--embed-model name] [--ollama-url url]
 
-Register with `claude mcp add peepwho -- peepwho mcp`, or a `mcpServers`
+Register with `claude mcp add whotoask -- whotoask mcp`, or a `mcpServers`
 entry in Claude Desktop's config. Semantic mode works when the index was
 built with `--embed` and local Ollama is running; keyword needs nothing.
 
-## peepwho bot
+## whotoask bot
 
 Runs the Slack bot. Mention it, send it a direct message, or use the
-`/peepwho` slash command; a trailing `--llm` or `--keyword` in the text
+`/whotoask` slash command; a trailing `--llm` or `--keyword` in the text
 overrides the mode for that answer. Each user gets ten questions a minute,
 Slack redeliveries are never answered twice, and a dropped connection
 reconnects with backoff.
 
-    peepwho bot [--transport socket|events]
+    whotoask bot [--transport socket|events]
 
 | Flag            | Default          | What it does                                                 |
 | --------------- | ---------------- | ------------------------------------------------------------ |
@@ -780,44 +780,44 @@ reconnects with backoff.
 | `--openai-url`  |                  | OpenAI-compatible base URL including the version path.       |
 | `--feedback`    | `normal`         | How hard votes move ranking: `off`, `low`, `normal`, `high`. |
 
-## peepwho version
+## whotoask version
 
-    peepwho version
+    whotoask version
 
 Prints the version stamped at build time. Release binaries carry the tag; a plain
 `go build` or `go install` prints `dev`.
 
 ## Environment variables
 
-Credentials are read from the OS keychain, when `peepwho connect` saved them
+Credentials are read from the OS keychain, when `whotoask connect` saved them
 there, or from the environment, never from flags, and are never logged. An
 environment variable always wins over the keychain, so a one-off run can
 override a stored value.
 
 | Variable                      | Used by            | What it is                                |
 | ----------------------------- | ------------------ | ----------------------------------------- |
-| `PEEPWHO_SLACK_TOKEN`          | slack source, bot  | Bot token (`xoxb-`).                      |
-| `PEEPWHO_SLACK_APP_TOKEN`      | bot (socket)       | App-level token (`xapp-`).                |
-| `PEEPWHO_SLACK_SIGNING_SECRET` | bot (events)       | Request signature secret.                 |
-| `PEEPWHO_GITHUB_TOKEN`         | github source      | Personal access token.                    |
-| `PEEPWHO_JIRA_URL`             | jira source        | Site URL, e.g. `https://x.atlassian.net`. |
-| `PEEPWHO_JIRA_EMAIL`           | jira source        | Account email for basic auth.             |
-| `PEEPWHO_JIRA_TOKEN`           | jira source        | API token.                                |
-| `PEEPWHO_CONFLUENCE_URL`       | confluence source  | Site URL; falls back to `PEEPWHO_JIRA_URL`. |
-| `PEEPWHO_CONFLUENCE_EMAIL`     | confluence source  | Account email; falls back to Jira's.      |
-| `PEEPWHO_CONFLUENCE_TOKEN`     | confluence source  | API token; falls back to Jira's.          |
-| `PEEPWHO_PAGERDUTY_TOKEN`      | pagerduty source   | Read-only API token.                      |
-| `PEEPWHO_GRAPH_TOKEN`          | graph source       | Microsoft Graph access token.             |
-| `PEEPWHO_GRAPH_URL`            | graph source       | Graph endpoint for a sovereign cloud.     |
-| `PEEPWHO_ANTHROPIC_KEY`        | llm anthropic provider | Claude API key.                       |
-| `PEEPWHO_OPENAI_KEY`           | llm openai provider    | OpenAI-compatible API key.            |
-| `PEEPWHO_GEMINI_KEY`           | llm gemini provider    | Gemini API key.                       |
-| `PEEPWHO_SERVE_TOKEN`          | serve, demo        | Bearer token; required to bind beyond localhost. |
-| `PEEPWHO_POLICY_FILE`          | all commands       | Extra policy file; a locked `/etc/peepwho/policy.json` overrides it. |
-| `PEEPWHO_ME`                   | recall, serve      | Who is asking, so recall covers your own conversations. |
-| `PEEPWHO_INDEX_KEY`            | index encryption   | Base64 32-byte key that enables at-rest encryption. |
-| `PEEPWHO_INDEX_PASSPHRASE`     | index encryption   | Passphrase for at-rest encryption; prompted if unset on a terminal. |
-| `PEEPWHO_NOW`                  | all commands       | Pins the clock to one RFC 3339 time, e.g. `2026-11-01T12:00:00Z`, for reproducible output in tests and benchmarks. An unparseable value is an error. |
+| `WHOTOASK_SLACK_TOKEN`          | slack source, bot  | Bot token (`xoxb-`).                      |
+| `WHOTOASK_SLACK_APP_TOKEN`      | bot (socket)       | App-level token (`xapp-`).                |
+| `WHOTOASK_SLACK_SIGNING_SECRET` | bot (events)       | Request signature secret.                 |
+| `WHOTOASK_GITHUB_TOKEN`         | github source      | Personal access token.                    |
+| `WHOTOASK_JIRA_URL`             | jira source        | Site URL, e.g. `https://x.atlassian.net`. |
+| `WHOTOASK_JIRA_EMAIL`           | jira source        | Account email for basic auth.             |
+| `WHOTOASK_JIRA_TOKEN`           | jira source        | API token.                                |
+| `WHOTOASK_CONFLUENCE_URL`       | confluence source  | Site URL; falls back to `WHOTOASK_JIRA_URL`. |
+| `WHOTOASK_CONFLUENCE_EMAIL`     | confluence source  | Account email; falls back to Jira's.      |
+| `WHOTOASK_CONFLUENCE_TOKEN`     | confluence source  | API token; falls back to Jira's.          |
+| `WHOTOASK_PAGERDUTY_TOKEN`      | pagerduty source   | Read-only API token.                      |
+| `WHOTOASK_GRAPH_TOKEN`          | graph source       | Microsoft Graph access token.             |
+| `WHOTOASK_GRAPH_URL`            | graph source       | Graph endpoint for a sovereign cloud.     |
+| `WHOTOASK_ANTHROPIC_KEY`        | llm anthropic provider | Claude API key.                       |
+| `WHOTOASK_OPENAI_KEY`           | llm openai provider    | OpenAI-compatible API key.            |
+| `WHOTOASK_GEMINI_KEY`           | llm gemini provider    | Gemini API key.                       |
+| `WHOTOASK_SERVE_TOKEN`          | serve, demo        | Bearer token; required to bind beyond localhost. |
+| `WHOTOASK_POLICY_FILE`          | all commands       | Extra policy file; a locked `/etc/whotoask/policy.json` overrides it. |
+| `WHOTOASK_ME`                   | recall, serve      | Who is asking, so recall covers your own conversations. |
+| `WHOTOASK_INDEX_KEY`            | index encryption   | Base64 32-byte key that enables at-rest encryption. |
+| `WHOTOASK_INDEX_PASSPHRASE`     | index encryption   | Passphrase for at-rest encryption; prompted if unset on a terminal. |
+| `WHOTOASK_NOW`                  | all commands       | Pins the clock to one RFC 3339 time, e.g. `2026-11-01T12:00:00Z`, for reproducible output in tests and benchmarks. An unparseable value is an error. |
 
 ## Identity aliases
 
@@ -858,7 +858,7 @@ which is what separates state-store from "should have" and "during rebalance",
 and no part may start with a digit, which is what a ticket reference looks like.
 
 What a source states is taken as stated. If a tracker labels its tickets
-`kip-1076`, that is a subject the project has, and peepwho reports it rather than
+`kip-1076`, that is a subject the project has, and whotoask reports it rather than
 deciding which of your labels are real ones.
 
 ## Ranking
@@ -880,7 +880,7 @@ person's whole profile.
 
 Both of those are tuned against real repositories rather than by taste. The
 measure is a project's own CODEOWNERS file: index only its commit history, hold
-the ownership file out, and ask peepwho who knows each area. The labels are
+the ownership file out, and ask whotoask who knows each area. The labels are
 written by that project's maintainers, so the answer is not graded by us.
 
 A reason reading `zwave (topic, not lately)` means the person knows the subject
@@ -906,7 +906,7 @@ on-call) describe the present and never decay.
 
 ## Policy
 
-The egress policy decides what peepwho may send to a model. `strict` (default)
+The egress policy decides what whotoask may send to a model. `strict` (default)
 permits nothing beyond a local model server; non-local `--ollama-url` and
 `--openai-url` values and the cloud providers count as egress and are refused.
 `redacted` permits only the known provider hosts (`api.anthropic.com`,
@@ -916,7 +916,7 @@ people leave as numbered roles (title, team, matched terms), channels leave as
 numbered matched terms with no names or topics, the model returns numbers, and
 the summary is written locally. `open` sends full candidate detail to any
 host. The policy does not gate indexing, which talks only to the sources you
-name with your tokens when you run `peepwho index`, or the bot posting answers
+name with your tokens when you run `whotoask index`, or the bot posting answers
 back to your Slack workspace.
 
 An organization can also pin `"private_channels": "deny"` to keep private
@@ -924,7 +924,7 @@ channels out of the index, and `"archive": "deny"` to forbid keeping the words
 of any conversation, whatever flags a user passes.
 
 An organization can pin the policy with a locked file. A locked
-`/etc/peepwho/policy.json` always wins: `PEEPWHO_POLICY_FILE` and `--policy` are
+`/etc/whotoask/policy.json` always wins: `WHOTOASK_POLICY_FILE` and `--policy` are
 then ignored. The lock constrains the installed binary for regular users; it
 is not a security boundary against an administrator. Private-channel ingest
 can be denied the same way. See `examples/policy.json`.
@@ -932,14 +932,14 @@ can be denied the same way. See `examples/policy.json`.
 ## App core
 
 The `core` package is the surface the Mac and iPhone apps call, bound with
-`gomobile bind ./core` as the PeepwhoCore framework. Calls take strings and
+`gomobile bind ./core` as the WhoToAskCore framework. Calls take strings and
 integers and return the same JSON `--json` prints, or an error.
 
 The host supplies every secret. `Open(dir, key)` takes the base64 index key
-from `peepwho vault keygen`, or empty for a plain index. Source tokens come
+from `whotoask vault keygen`, or empty for a plain index. Source tokens come
 from a `Secrets` the host sets with `SetSecrets`: one method, `Get(name)`,
 returning the secret stored under an environment variable name such as
-`PEEPWHO_JIRA_TOKEN`, or empty when unset. Without one, every token reads as
+`WHOTOASK_JIRA_TOKEN`, or empty when unset. Without one, every token reads as
 empty. The core never reads the environment or a keychain, and `make
 core-deps` fails the build when it links the command line or a keychain
 package.
@@ -962,7 +962,7 @@ a "no index yet" error, `Status` reports zero counts and no build time, and
 `Index` or `Refresh` builds the index.
 
 `Index(source, flags, nowUnix)` reads one source and merges it into the index.
-`flags` holds the flags `peepwho index` takes, one argument per line, so a
+`flags` holds the flags `whotoask index` takes, one argument per line, so a
 path with a space needs no quoting: `--repo-path`, then the path on the next
 line, or `--file=/path/people.csv` on one. Every run merges, so to start over
 call `Wipe` and index again. `--policy` is refused, since the core runs only
@@ -980,7 +980,7 @@ could run, such as when nothing was ever indexed. Questions asked while either
 call runs answer from the index as it was until the new one is loaded.
 
 `Wipe(dir)` is a function, not a handle method, so a lost key never blocks
-it. It deletes the files `peepwho wipe` deletes and then the directory when it
+it. It deletes the files `whotoask wipe` deletes and then the directory when it
 is left empty, and returns `{"removed": [...]}`. Credentials in the app's own
 Keychain are the app's to delete.
 
@@ -1000,14 +1000,14 @@ Keychain are the app's to delete.
 
 ## Files
 
-Everything lives under `--data-dir` (default `~/.peepwho`):
+Everything lives under `--data-dir` (default `~/.whotoask`):
 
 | File            | What it holds                                                                    |
 | --------------- | -------------------------------------------------------------------------------- |
 | `index.json`    | The graph, postings, embeddings, aliases, and a capped Slack text sample per person. |
 | `feedback.json` | Votes and the queries behind them, kept apart so they survive re-indexing. Encrypted with the same key as the index. |
 | `changes.json`  | Who and what joined or left in each of the last 100 index runs that changed anything, stamped with the run's time. A first index logs nothing. Encrypted with the same key as the index. |
-| `episodes.json` | Past conversations: who took part, where, when, the link back, and matched terms. Written by `peepwho index --episodes`, and by `peepwho connect`, which records conversations as a matter of course. Holds the words themselves only after an `--archive` index. Encrypted with the same key as the index. |
+| `episodes.json` | Past conversations: who took part, where, when, the link back, and matched terms. Written by `whotoask index --episodes`, and by `whotoask connect`, which records conversations as a matter of course. Holds the words themselves only after an `--archive` index. Encrypted with the same key as the index. |
 | `index.sources.json` | The per-source records the index was built from, redacted to stemmed terms, so a `--merge` rebuilds without re-reading every source. Encrypted with the same key as the index. |
 | `index.state.json` | Per-source incremental watermarks: the newest activity time indexed for each source and scope, so a `--merge` fetches only what changed. Encrypted with the same key as the index. |
 | `refresh.json` | The flags each source and scope was last indexed with, when each last ran, and why its last try failed, so a refresh replays them. Encrypted with the same key as the index. |

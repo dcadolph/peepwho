@@ -1,4 +1,4 @@
-// peepwho org chart: an interactive, filterable, navigable view of the reporting
+// whotoask org chart: an interactive, filterable, navigable view of the reporting
 // graph. Reads /api/directory (people with managerId, team, topics). No external
 // libraries: the page CSP is default-src 'self'.
 (function () {
@@ -547,14 +547,14 @@
 	function downloadICS(people) {
 		var start = new Date(Date.now() + 3600000); start.setMinutes(0, 0, 0);
 		var end = new Date(start.getTime() + 1800000);
-		var lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//peepwho//org chart//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "BEGIN:VEVENT",
-			"UID:peepwho-" + icsStamp(start) + "@peepwho", "DTSTAMP:" + icsStamp(new Date()), "DTSTART:" + icsStamp(start), "DTEND:" + icsStamp(end),
-			"SUMMARY:peepwho: " + people.map(function (p) { return p.name; }).join(", ")];
+		var lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//whotoask//org chart//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "BEGIN:VEVENT",
+			"UID:whotoask-" + icsStamp(start) + "@whotoask", "DTSTAMP:" + icsStamp(new Date()), "DTSTART:" + icsStamp(start), "DTEND:" + icsStamp(end),
+			"SUMMARY:whotoask: " + people.map(function (p) { return p.name; }).join(", ")];
 		people.forEach(function (p) { if (p.email) lines.push("ATTENDEE;CN=" + p.name + ";RSVP=TRUE:mailto:" + p.email); });
 		lines.push("END:VEVENT", "END:VCALENDAR");
 		var blob = new Blob([lines.join(String.fromCharCode(13, 10))], { type: "text/calendar;charset=utf-8" });
 		var url = URL.createObjectURL(blob);
-		var a = document.createElement("a"); a.href = url; a.download = "peepwho-event.ics";
+		var a = document.createElement("a"); a.href = url; a.download = "whotoask-event.ics";
 		document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 	}
 	function updateContactBar() {
@@ -617,7 +617,7 @@
 		if (!rows.length) { toast("Nothing on screen to export"); return; }
 		// Reading order: down the chart, then across.
 		rows.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
-		downloadCSV("peepwho-org-chart.csv", [
+		downloadCSV("whotoask-org-chart.csv", [
 			"Name", "Title", "Team", "Org", "Email", "Reports to", "Direct reports",
 			"Holds alone", "Gone quiet", "Works on"
 		], rows.map(function (r) { return r[2]; }));
@@ -730,7 +730,7 @@
 	function init() {
 		wire();
 		api("/api/directory").then(function (dir) {
-			if (!dir.people || !dir.people.length) { showEmpty("Nothing indexed yet. Run peepwho index against a source, then reload."); return; }
+			if (!dir.people || !dir.people.length) { showEmpty("Nothing indexed yet. Run whotoask index against a source, then reload."); return; }
 			buildGraph(dir);
 			populateFilters(dir);
 			render();

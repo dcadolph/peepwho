@@ -20,9 +20,9 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/pflag"
 
-	"github.com/dcadolph/peepwho/internal/fakeapi"
-	"github.com/dcadolph/peepwho/internal/policy"
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/fakeapi"
+	"github.com/dcadolph/whotoask/internal/policy"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // TestInvocationsRoundTrip verifies the refresh config saves and loads, and a
@@ -286,7 +286,7 @@ func TestRefresh(t *testing.T) {
 				Dir: dir, Log: &log, Now: func() time.Time { return now },
 				Policy: policy.Default(),
 				Creds: func(env string) string {
-					if env == "PEEPWHO_JIRA_TOKEN" {
+					if env == "WHOTOASK_JIRA_TOKEN" {
 						return test.Token
 					}
 					return ""
@@ -435,7 +435,7 @@ func TestRefreshNothingRecorded(t *testing.T) {
 	t.Parallel()
 	x := &Indexer{Dir: Dir(t.TempDir()), Log: &bytes.Buffer{}}
 	_, err := x.Refresh(context.Background(), nil, time.Now())
-	if !errors.Is(err, ErrBadArgs) || !errors.Is(err, ErrNothingRecorded) || strings.Contains(err.Error(), "peepwho") {
+	if !errors.Is(err, ErrBadArgs) || !errors.Is(err, ErrNothingRecorded) || strings.Contains(err.Error(), "whotoask") {
 		t.Errorf("Refresh = %v, want ErrBadArgs and ErrNothingRecorded naming no command", err)
 	}
 }

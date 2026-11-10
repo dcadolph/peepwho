@@ -12,30 +12,30 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/recall"
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/recall"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // scaleEnv opts a run into the scale measurements. They synthesize large
 // companies and take minutes, so an ordinary `go test ./...` skips them.
-const scaleEnv = "PEEPWHO_SCALE"
+const scaleEnv = "WHOTOASK_SCALE"
 
 // embedDim is the vector width of a typical local embedding model, used to
 // profile the memory and query cost of embeddings without standing up a model.
 const embedDim = 768
 
-// TestScale measures what peepwho costs as a company grows: how long ingest
+// TestScale measures what whotoask costs as a company grows: how long ingest
 // takes, how large the files get, how long a cold start takes, and how fast it
 // answers, both by keyword and, with vectors filled, by meaning. The store is
 // one JSON file read whole on every command, so the question this answers is
 // where that stops being reasonable.
 //
-//	PEEPWHO_SCALE=1 go test ./internal/simorg/ -run TestScale -v -timeout 30m
+//	WHOTOASK_SCALE=1 go test ./internal/simorg/ -run TestScale -v -timeout 30m
 func TestScale(t *testing.T) {
 	if os.Getenv(scaleEnv) == "" {
-		t.Skipf("set %s=1 to measure how peepwho scales", scaleEnv)
+		t.Skipf("set %s=1 to measure how whotoask scales", scaleEnv)
 	}
 	sizes := []struct {
 		Name string

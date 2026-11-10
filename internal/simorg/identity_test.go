@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/slack"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/slack"
 )
 
 // buildIdentity runs the real ingest path over a company built to break
@@ -57,7 +57,7 @@ func buildIdentity(t *testing.T, spec IdentitySpec) (*index.Index, *IdentityOrg)
 // TestIdentityNeverConfusesPeople is the test that matters most for a tool
 // whose whole job is naming the right human. Two people who share a display
 // name must never become one: merging them would hand one person's
-// conversations, expertise, and past work to somebody else. Peepwho cannot be
+// conversations, expertise, and past work to somebody else. WhoToAsk cannot be
 // run against a real workspace before it has customers, so the traps a real
 // workspace contains are planted deliberately and at volume.
 func TestIdentityNeverConfusesPeople(t *testing.T) {

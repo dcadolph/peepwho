@@ -11,7 +11,7 @@ import (
 
 	"github.com/coder/websocket"
 
-	"github.com/dcadolph/peepwho/internal/slack"
+	"github.com/dcadolph/whotoask/internal/slack"
 )
 
 // wsConn is the minimal WebSocket the socket runner needs.
@@ -192,7 +192,7 @@ func (s *SocketRunner) Run(ctx context.Context) error {
 		if time.Since(start) >= steadyPeriod {
 			backoff = initialBackoff
 		}
-		fmt.Fprintf(s.log, "peepwho bot: reconnecting in %s after: %v\n", backoff, err)
+		fmt.Fprintf(s.log, "whotoask bot: reconnecting in %s after: %v\n", backoff, err)
 		if !sleepCtx(ctx, backoff) {
 			return nil
 		}
@@ -253,7 +253,7 @@ func (s *SocketRunner) session(ctx context.Context, conn wsConn) error {
 				err := conn.Ping(probe)
 				cancel()
 				if err != nil && alive.Err() == nil {
-					fmt.Fprintf(s.log, "peepwho bot: connection stopped answering: %v\n", err)
+					fmt.Fprintf(s.log, "whotoask bot: connection stopped answering: %v\n", err)
 					_ = conn.Close()
 					return
 				}
@@ -377,7 +377,7 @@ func (s *SocketRunner) ack(ctx context.Context, conn wsConn, id string) {
 func routeEvent(ctx context.Context, e *Engine, r Replier, botUserID string, ev slackEvent, log io.Writer) {
 	defer func() {
 		if rec := recover(); rec != nil {
-			fmt.Fprintf(log, "peepwho bot: handler panic: %v\n", rec)
+			fmt.Fprintf(log, "whotoask bot: handler panic: %v\n", rec)
 		}
 	}()
 	if ev.BotID != "" || (botUserID != "" && ev.User == botUserID) {
@@ -396,7 +396,7 @@ func routeEvent(ctx context.Context, e *Engine, r Replier, botUserID string, ev 
 	defer cancel()
 	event := Event{Text: ev.Text, Channel: ev.Channel, ThreadTS: thread, User: ev.User}
 	if err := e.Handle(ctx, event, r); err != nil {
-		fmt.Fprintf(log, "peepwho bot: handle: %v\n", err)
+		fmt.Fprintf(log, "whotoask bot: handle: %v\n", err)
 	}
 }
 

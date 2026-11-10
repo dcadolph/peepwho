@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // TestAutoJoin covers the unique-match join, the ambiguity guard, the

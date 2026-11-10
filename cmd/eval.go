@@ -8,15 +8,15 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/eval"
-	"github.com/dcadolph/peepwho/internal/render"
+	"github.com/dcadolph/whotoask/internal/eval"
+	"github.com/dcadolph/whotoask/internal/render"
 )
 
 // newEvalCmd builds the eval command, which measures the current index and
 // compares it against a saved measurement.
 //
-// It is hidden because it answers a question about peepwho rather than about the
-// organization peepwho was pointed at, so it belongs to whoever is changing the
+// It is hidden because it answers a question about whotoask rather than about the
+// organization whotoask was pointed at, so it belongs to whoever is changing the
 // ranking rather than to whoever is using the tool.
 func newEvalCmd(opts *options) *cobra.Command {
 	var baseline, save string
@@ -27,11 +27,11 @@ func newEvalCmd(opts *options) *cobra.Command {
 		Long: `Measure how well the current index answers, and what could be limiting it.
 
 The score is agreement: how often the owner an organization declared for an area
-is also the person peepwho says leads it. Read it alongside the numbers under it,
+is also the person whotoask says leads it. Read it alongside the numbers under it,
 because a disagreement has three different causes and only one of them is a bug.
 An owner with no recorded work anywhere is usually an identity that was never
 joined. An owner who works elsewhere but never in their own area is paper
-ownership, and peepwho is probably right. An owner merely out-worked in their own
+ownership, and whotoask is probably right. An owner merely out-worked in their own
 area is the arguable case.
 
 Save a measurement before a change and compare after it. Two runs are only
@@ -39,9 +39,9 @@ compared when they cover the same sources, since adding one moves every number
 here for reasons that have nothing to do with quality.
 
 Examples:
-  peepwho eval
-  peepwho eval --save before.json
-  peepwho eval --baseline before.json`,
+  whotoask eval
+  whotoask eval --save before.json
+  whotoask eval --baseline before.json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ix, err := opts.loadIndex(cmd)

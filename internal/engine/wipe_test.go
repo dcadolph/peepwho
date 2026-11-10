@@ -10,7 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // writeWipeFiles creates each name under dir with placeholder content.
@@ -23,8 +23,8 @@ func writeWipeFiles(t *testing.T, dir string, names ...string) {
 	}
 }
 
-// TestWipe verifies a wipe lists and removes every peepwho file with its lock
-// and temporary siblings, keeps a file peepwho did not write along with the
+// TestWipe verifies a wipe lists and removes every whotoask file with its lock
+// and temporary siblings, keeps a file whotoask did not write along with the
 // directory, and refuses a symlink without removing anything.
 func TestWipe(t *testing.T) {
 	t.Parallel()
@@ -46,7 +46,7 @@ func TestWipe(t *testing.T) {
 			"episodes.json", "feedback.json", "facts.json", "changes.json", "changes.json.tmp-123",
 			"refresh.json", "attest.key", "sample.json",
 		},
-	}, { // Test 1: A file peepwho did not write survives, and so does the directory.
+	}, { // Test 1: A file whotoask did not write survives, and so does the directory.
 		Files:    []string{"index.json", "notes.txt"},
 		WantPlan: []string{"index.json"}, WantLeft: []string{"notes.txt"}, WantDirOK: true,
 	}, { // Test 2: A symlink at a kept path stops the plan and nothing is removed.

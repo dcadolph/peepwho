@@ -16,9 +16,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/resolve"
-	"github.com/dcadolph/peepwho/internal/seal"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/seal"
 )
 
 // riskJSONName is the file a bare attestation writes the scored report to.
@@ -35,12 +35,12 @@ func newAttestCmd(opts *options) *cobra.Command {
 		Long: `Write the current knowledge-risk finding to risk.json in a directory, with a
 signed manifest beside it. manifest.json lists every file by size and sha256,
 and manifest.sig is an ed25519 signature over the exact bytes of manifest.json.
-Anyone can check it offline with peepwho verify, with no account and nothing
+Anyone can check it offline with whotoask verify, with no account and nothing
 sent anywhere.
 
 The signing key is created once under the data directory and reused. Publish
-the output of peepwho attest key somewhere a reader trusts, so they can pin it
-with peepwho verify --key.`,
+the output of whotoask attest key somewhere a reader trusts, so they can pin it
+with whotoask verify --key.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ix, err := opts.loadIndex(cmd)
@@ -59,7 +59,7 @@ with peepwho verify --key.`,
 			return opts.render(cmd.OutOrStdout(), view, func(w io.Writer, s style) {
 				fmt.Fprintf(w, "%s %d file%s into %s with key %s\n",
 					s.Accent("sealed:"), view.Files, plural(view.Files), view.Dir, view.KeyID)
-				fmt.Fprintf(w, "%s\n", s.Dim("check it with: peepwho verify "+view.Dir))
+				fmt.Fprintf(w, "%s\n", s.Dim("check it with: whotoask verify "+view.Dir))
 				renderNotFor(w, s)
 			})
 		},
@@ -86,9 +86,9 @@ func newAttestKeyCmd(opts *options) *cobra.Command {
 		Use:   "key",
 		Short: "Print this install's public sealing key and key id",
 		Long: `Print the public key this install signs seals with, and its key id. Publish
-it somewhere a reader already trusts. A reader who passes it to peepwho verify
+it somewhere a reader already trusts. A reader who passes it to whotoask verify
 --key knows the seal came from this install and not from anyone who can run
-peepwho.`,
+whotoask.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			priv, err := opts.attestKey()
@@ -144,11 +144,11 @@ func sealFinding(
 		return seal.Manifest{}, fmt.Errorf("attest: encode claim: %w", err)
 	}
 	return seal.Write(dir, seal.Manifest{
-		Product:        "peepwho",
+		Product:        "whotoask",
 		ProductVersion: version,
 		CreatedAt:      now.UTC().Format(time.RFC3339),
 		Subject:        riskSubject(ix),
-		Claim:          seal.Claim{Type: "peepwho.knowledge-risk/1", Payload: payload},
+		Claim:          seal.Claim{Type: "whotoask.knowledge-risk/1", Payload: payload},
 		Files:          files,
 	}, priv)
 }

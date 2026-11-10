@@ -7,13 +7,13 @@ import (
 	"testing"
 )
 
-// BenchmarkGitFetch measures the heaviest thing peepwho does: reading a real
+// BenchmarkGitFetch measures the heaviest thing whotoask does: reading a real
 // repository's history. It needs a clone, so it only runs when one is named:
 //
-//	PEEPWHO_BENCH_REPO=/path/to/clone go test ./internal/connector/ \
+//	WHOTOASK_BENCH_REPO=/path/to/clone go test ./internal/connector/ \
 //	  -run xxx -bench GitFetch -benchtime 1x -cpuprofile /tmp/cpu.prof
 //
-// PEEPWHO_BENCH_COMMITS caps the window; the default is enough to be
+// WHOTOASK_BENCH_COMMITS caps the window; the default is enough to be
 // representative without waiting minutes for every run.
 //
 // WHAT THIS MEASURED, on two years of home-assistant, so the next person does
@@ -40,12 +40,12 @@ import (
 // first. Variance is about 5% run to run, which is wider than four of the five
 // results above.
 func BenchmarkGitFetch(b *testing.B) {
-	repo := os.Getenv("PEEPWHO_BENCH_REPO")
+	repo := os.Getenv("WHOTOASK_BENCH_REPO")
 	if repo == "" {
-		b.Skip("set PEEPWHO_BENCH_REPO to a git clone")
+		b.Skip("set WHOTOASK_BENCH_REPO to a git clone")
 	}
 	max := 8000
-	if v := os.Getenv("PEEPWHO_BENCH_COMMITS"); v != "" {
+	if v := os.Getenv("WHOTOASK_BENCH_COMMITS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			max = n
 		}

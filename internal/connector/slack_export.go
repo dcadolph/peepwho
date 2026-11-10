@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/slack"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/slack"
 )
 
 // SlackExportOptions configures the Slack export connector.
@@ -260,7 +260,7 @@ func (s *SlackExport) reportUnread(fsys fs.FS) {
 	} {
 		if raw, err := readExportJSON[[]json.RawMessage](fsys, f.name); err == nil && len(raw) > 0 {
 			fmt.Fprintf(s.opts.Log,
-				"slack export: %d %s in the export are never read; peepwho indexes channels, not mail\n",
+				"slack export: %d %s in the export are never read; whotoask indexes channels, not mail\n",
 				len(raw), f.what)
 		}
 	}

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/slack"
+	"github.com/dcadolph/whotoask/internal/slack"
 )
 
 // TestSlackOldestSince verifies the history window floor is used by default and

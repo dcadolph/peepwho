@@ -10,8 +10,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/engine"
-	"github.com/dcadolph/peepwho/internal/keyring"
+	"github.com/dcadolph/whotoask/internal/engine"
+	"github.com/dcadolph/whotoask/internal/keyring"
 )
 
 // wipeWord is what a person types to confirm a wipe. A word rather than a y/n
@@ -20,33 +20,33 @@ const wipeWord = "wipe"
 
 // wipePlan is what a wipe would remove.
 type wipePlan struct {
-	// Files are the paths peepwho wrote under the data directory, present now.
+	// Files are the paths whotoask wrote under the data directory, present now.
 	Files []string
-	// Credentials are the keychain entries peepwho stored, present now.
+	// Credentials are the keychain entries whotoask stored, present now.
 	Credentials []string
 }
 
 // empty reports whether there is nothing to remove.
 func (p wipePlan) empty() bool { return len(p.Files) == 0 && len(p.Credentials) == 0 }
 
-// newWipeCmd builds the wipe command, which removes every file peepwho writes
+// newWipeCmd builds the wipe command, which removes every file whotoask writes
 // under the data directory and every credential it stored in the keychain.
 func newWipeCmd(opts *options) *cobra.Command {
 	var yes bool
 	cmd := &cobra.Command{
 		Use:   "wipe",
-		Short: "Delete everything peepwho stored on this machine",
-		Long: `Delete every file peepwho writes under the data directory and every
-credential peepwho connect saved in the OS keychain. The index, its sources,
+		Short: "Delete everything whotoask stored on this machine",
+		Long: `Delete every file whotoask writes under the data directory and every
+credential whotoask connect saved in the OS keychain. The index, its sources,
 remembered conversations and their archive, feedback, facts, the refresh config,
 and the attestation signing key all go. It lists what it will remove and asks
 you to type "wipe" first; --yes skips the question for scripts.
 
-Files peepwho did not write are left in place, so pointing --data-dir at a
+Files whotoask did not write are left in place, so pointing --data-dir at a
 shared directory never deletes anything else. Environment variables and a
 scheduled refresh are outside its reach, and it names any that remain.`,
-		Example: `  peepwho wipe
-  peepwho wipe --data-dir /var/lib/peepwho --yes`,
+		Example: `  whotoask wipe
+  whotoask wipe --data-dir /var/lib/whotoask --yes`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			out := cmd.ErrOrStderr()
@@ -55,7 +55,7 @@ scheduled refresh are outside its reach, and it names any that remain.`,
 				return err
 			}
 			if plan.empty() {
-				fmt.Fprintf(out, "nothing to wipe: no peepwho files in %s and no stored credentials\n",
+				fmt.Fprintf(out, "nothing to wipe: no whotoask files in %s and no stored credentials\n",
 					opts.dataDir)
 				warnWipeLeftovers(out)
 				return nil
@@ -95,7 +95,7 @@ func planWipe(opts *options) (wipePlan, error) {
 	return plan, nil
 }
 
-// credentialNames returns every credential name peepwho connect can store,
+// credentialNames returns every credential name whotoask connect can store,
 // sorted and without duplicates.
 func credentialNames() []string {
 	var names []string
@@ -160,7 +160,7 @@ func warnWipeLeftovers(w io.Writer) {
 	}
 	if plist, err := schedulePlistPath(); err == nil {
 		if _, err := os.Stat(plist); err == nil {
-			fmt.Fprintln(w, "a weekly refresh is still scheduled; remove it with: peepwho schedule --remove")
+			fmt.Fprintln(w, "a weekly refresh is still scheduled; remove it with: whotoask schedule --remove")
 		}
 	}
 }

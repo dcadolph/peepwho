@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/recall"
+	"github.com/dcadolph/whotoask/internal/recall"
 )
 
 // recallPrefix is the word that turns a question about who knows something
@@ -16,7 +16,7 @@ const recallPrefix = "recall"
 // The answer lists the conversations one person took part in, so posting it
 // where others can read it is never the fallback.
 const noPrivateReply = "I can only answer recall privately, and I cannot send a private " +
-	"message here. Ask me in a direct message, or use the /peepwho slash command."
+	"message here. Ask me in a direct message, or use the /whotoask slash command."
 
 // RecallFunc answers what a user worked through before. The user is the
 // identifier the transport knows them by, which the resolver maps to a person,
@@ -111,7 +111,7 @@ func (e *Engine) Recall(ctx context.Context, user, query string, limit int) (str
 
 // FormatRecall renders a recall answer as Slack mrkdwn: who was with you,
 // where, when, and a link back. Every value from the graph is escaped, and the
-// only links are the ones peepwho built itself.
+// only links are the ones whotoask built itself.
 func FormatRecall(query string, ans recall.Answer) string {
 	if len(ans.Episodes) == 0 {
 		return "Nothing found for *" + escapeMrkdwn(query) + "* in the conversations you took " +

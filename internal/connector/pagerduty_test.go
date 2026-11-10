@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/pagerduty"
+	"github.com/dcadolph/whotoask/internal/pagerduty"
 )
 
 // TestPagerDutyFetch verifies on-call users get the topics of the services they

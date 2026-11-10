@@ -1,4 +1,4 @@
-module github.com/dcadolph/peepwho
+module github.com/dcadolph/whotoask
 
 go 1.26.6
 

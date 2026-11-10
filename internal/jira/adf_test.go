@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// TestADFText verifies Jira's rich-text tree flattens to the words peepwho
+// TestADFText verifies Jira's rich-text tree flattens to the words whotoask
 // indexes, and that shapes it cannot read yield nothing rather than an error.
 func TestADFText(t *testing.T) {
 	t.Parallel()

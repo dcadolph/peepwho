@@ -14,8 +14,8 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/dcadolph/peepwho/internal/util"
-	"github.com/dcadolph/peepwho/internal/vault"
+	"github.com/dcadolph/whotoask/internal/util"
+	"github.com/dcadolph/whotoask/internal/vault"
 )
 
 // Invocations records, per source and per scope within it, the run an index

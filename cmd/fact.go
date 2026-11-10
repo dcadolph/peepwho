@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/fact"
-	"github.com/dcadolph/peepwho/internal/render"
+	"github.com/dcadolph/whotoask/internal/fact"
+	"github.com/dcadolph/whotoask/internal/render"
 )
 
 // newFactCmd builds the fact command group: record a typed statement a crawl
@@ -26,10 +26,10 @@ to the index so it survives re-indexing.
 
 Relations: %s
 
-  peepwho fact record team:payments not_owned_by service:checkout --detail "moved to Checkout team"
-  peepwho fact list team:payments
-  peepwho fact forget --source catalog
-  cat facts.json | peepwho fact import --source catalog -`, strings.Join(fact.Relations(), ", ")),
+  whotoask fact record team:payments not_owned_by service:checkout --detail "moved to Checkout team"
+  whotoask fact list team:payments
+  whotoask fact forget --source catalog
+  cat facts.json | whotoask fact import --source catalog -`, strings.Join(fact.Relations(), ", ")),
 	}
 	cmd.AddCommand(newFactRecordCmd(opts), newFactListCmd(opts), newFactForgetCmd(opts), newFactImportCmd(opts))
 	return cmd
@@ -136,7 +136,7 @@ func newFactImportCmd(opts *options) *cobra.Command {
 omitted. With --source, every existing fact from that source is replaced, so an
 import is the whole of what that source currently asserts.
 
-  cat catalog.json | peepwho fact import --source catalog -`,
+  cat catalog.json | whotoask fact import --source catalog -`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			file := ""

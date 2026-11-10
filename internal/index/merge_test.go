@@ -3,8 +3,8 @@ package index
 import (
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // TestMergeAccumulatesTheSamePerson checks a second reading of somebody adds to

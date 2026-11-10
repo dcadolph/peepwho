@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/github"
+	"github.com/dcadolph/whotoask/internal/github"
 )
 
 // TestGitHubIncrementalSkipsSnapshots verifies an incremental GitHub read skips

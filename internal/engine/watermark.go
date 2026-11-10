@@ -4,10 +4,10 @@ import (
 	"errors"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/state"
-	"github.com/dcadolph/peepwho/internal/util"
-	"github.com/dcadolph/peepwho/internal/vault"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/state"
+	"github.com/dcadolph/whotoask/internal/util"
+	"github.com/dcadolph/whotoask/internal/vault"
 )
 
 // loadState reads the watermarks, calling Unlock when they are sealed under a key

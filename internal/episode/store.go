@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/text"
-	"github.com/dcadolph/peepwho/internal/vector"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/text"
+	"github.com/dcadolph/whotoask/internal/vector"
 )
 
 // DefaultHalfLife is the age at which an episode's score halves. Recall

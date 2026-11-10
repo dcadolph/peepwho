@@ -1,4 +1,4 @@
-// Package httputil holds the shared request loop for peepwho's API clients:
+// Package httputil holds the shared request loop for whotoask's API clients:
 // bounded rate-limit retries, a size-limited body read, and Retry-After
 // parsing. Each client supplies its own request, auth, and status handling.
 package httputil

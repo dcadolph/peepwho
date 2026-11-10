@@ -3,7 +3,7 @@ package index
 import (
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
+	"github.com/dcadolph/whotoask/internal/connector"
 )
 
 // TestSameNameMailboxJoins covers the split the same-name rule misses. That

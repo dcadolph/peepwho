@@ -1,4 +1,4 @@
-// Package text normalizes free text into the tokens peepwho matches on. Every
+// Package text normalizes free text into the tokens whotoask matches on. Every
 // index in the program shares it, so a posting key and a query term are always
 // produced by the same rules.
 package text
@@ -32,7 +32,7 @@ var stopwords = map[string]bool{
 	"someone": true, "somebody": true, "please": true, "thanks": true,
 	"hey": true, "hi": true, "hello": true, "should": true, "would": true,
 	// Quantifiers and qualifiers. A question is mostly these, and none of them
-	// names a subject: asked who knows the most about something, peepwho was
+	// names a subject: asked who knows the most about something, whotoask was
 	// answering with whoever had touched a file called most.
 	"most": true, "more": true, "less": true, "least": true, "many": true,
 	"much": true, "few": true, "new": true, "old": true, "first": true, "last": true, "next": true, "other": true,
@@ -135,7 +135,7 @@ func Stem(token string) string {
 
 // StemMatch is StemMatches with the word it found. Reporting a correction is
 // only useful if it names what was matched: told that "zigby" was corrected,
-// somebody still does not know whether peepwho read it as zigbee or as zigzag.
+// somebody still does not know whether whotoask read it as zigbee or as zigzag.
 func StemMatch(want string, texts ...string) (string, bool) {
 	for _, txt := range texts {
 		for _, tok := range Tokenize(txt) {

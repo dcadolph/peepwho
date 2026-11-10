@@ -9,11 +9,11 @@ import (
 	"slices"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/index"
+	"github.com/dcadolph/whotoask/internal/index"
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/secret"
+	"github.com/dcadolph/whotoask/internal/secret"
 )
 
 // staleAfter is how old an index may get before doctor flags it for a refresh.
@@ -27,7 +27,7 @@ const (
 	levelOK checkLevel = iota
 	// levelWarn marks a check that works but should be addressed.
 	levelWarn
-	// levelFail marks a check that stops peepwho from answering.
+	// levelFail marks a check that stops whotoask from answering.
 	levelFail
 )
 
@@ -126,7 +126,7 @@ func diagnose(f doctorFacts) []finding {
 			Name:   "index",
 			Level:  levelFail,
 			Detail: detail,
-			Fix:    "peepwho index --source org-csv --file people.csv",
+			Fix:    "whotoask index --source org-csv --file people.csv",
 		})
 		// Nothing else is knowable without an index; the credential survey below
 		// still helps the user get to a first index.
@@ -141,7 +141,7 @@ func diagnose(f doctorFacts) []finding {
 				Name:   "content",
 				Level:  levelWarn,
 				Detail: "index holds no people",
-				Fix:    "peepwho index --source org-csv --file people.csv",
+				Fix:    "whotoask index --source org-csv --file people.csv",
 			})
 		}
 		out = append(out, freshnessFinding(f))
@@ -151,7 +151,7 @@ func diagnose(f doctorFacts) []finding {
 				Name:   "embeddings",
 				Level:  levelWarn,
 				Detail: "no vectors; semantic and llm ask modes are unavailable",
-				Fix:    "peepwho index --merge --embed",
+				Fix:    "whotoask index --merge --embed",
 			})
 		}
 		out = append(out, encryptionFinding(f))
@@ -214,7 +214,7 @@ func ownershipFinding(f doctorFacts) (finding, bool) {
 		Name:   "ownership",
 		Level:  levelWarn,
 		Detail: detail + ", so their areas all read as drifted",
-		Fix:    "peepwho identity --unlinked, then map those handles to addresses in an alias file",
+		Fix:    "whotoask identity --unlinked, then map those handles to addresses in an alias file",
 	}, true
 }
 
@@ -232,7 +232,7 @@ func encryptionFinding(f doctorFacts) finding {
 			Name:   "encryption",
 			Level:  levelWarn,
 			Detail: "an encryption key is configured but the index file on disk is still plaintext",
-			Fix:    "peepwho vault encrypt",
+			Fix:    "whotoask vault encrypt",
 		}
 	}
 	return finding{Name: "encryption", Level: levelOK, Detail: "index file is not encrypted at rest"}
@@ -241,7 +241,7 @@ func encryptionFinding(f doctorFacts) finding {
 // freshnessFinding checks how old the index is against staleAfter.
 func freshnessFinding(f doctorFacts) finding {
 	if f.BuiltAt.IsZero() {
-		return finding{Name: "freshness", Level: levelWarn, Detail: "build time unknown", Fix: "peepwho index --full"}
+		return finding{Name: "freshness", Level: levelWarn, Detail: "build time unknown", Fix: "whotoask index --full"}
 	}
 	age := f.Now.Sub(f.BuiltAt).Round(time.Hour)
 	if age > staleAfter {
@@ -249,7 +249,7 @@ func freshnessFinding(f doctorFacts) finding {
 			Name:   "freshness",
 			Level:  levelWarn,
 			Detail: fmt.Sprintf("last built %s ago", age),
-			Fix:    "peepwho index --merge",
+			Fix:    "whotoask index --merge",
 		}
 	}
 	return finding{Name: "freshness", Level: levelOK, Detail: fmt.Sprintf("last built %s ago", age)}
@@ -267,7 +267,7 @@ func staleSourceFindings(f doctorFacts) []finding {
 				Name:   "source:" + name,
 				Level:  levelWarn,
 				Detail: fmt.Sprintf("%s is indexed but its credentials are missing, so it cannot refresh", name),
-				Fix:    "peepwho connect",
+				Fix:    "whotoask connect",
 			})
 		}
 	}
@@ -289,7 +289,7 @@ func credentialFindings(f doctorFacts) []finding {
 			Name:   "connectors",
 			Level:  levelWarn,
 			Detail: "no live connector credentials are set",
-			Fix:    "peepwho connect",
+			Fix:    "whotoask connect",
 		}}
 	}
 	var out []finding
@@ -333,7 +333,7 @@ func configuredConnectors() map[string]bool {
 	}
 }
 
-// newDoctorCmd builds the doctor command: it diagnoses why peepwho cannot answer
+// newDoctorCmd builds the doctor command: it diagnoses why whotoask cannot answer
 // or is misconfigured, prints the exact fix for each problem, and exits nonzero
 // when something is broken so it can gate a script.
 func newDoctorCmd(opts *options) *cobra.Command {
@@ -342,7 +342,7 @@ func newDoctorCmd(opts *options) *cobra.Command {
 		Short: "Diagnose configuration and index problems and print the fix for each",
 		Long: `Check the index and the connector credentials, report what is wrong, and print
 the exact command that fixes each problem. Exits nonzero when a problem stops
-peepwho from answering, so it works as a gate in a script.`,
+whotoask from answering, so it works as a gate in a script.`,
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {

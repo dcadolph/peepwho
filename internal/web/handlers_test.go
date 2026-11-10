@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // TestCLIHandler covers the plain-text command mirror: a known command comes
@@ -111,7 +111,7 @@ func TestAttestHandler(t *testing.T) {
 	// Test 1: Download mode serves the zip under the artifact's name.
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/attest?download=1", nil))
-	if cd := rec.Header().Get("Content-Disposition"); !strings.Contains(cd, "peepwho-finding.zip") {
+	if cd := rec.Header().Get("Content-Disposition"); !strings.Contains(cd, "whotoask-finding.zip") {
 		t.Errorf("download Content-Disposition = %q, want the artifact filename", cd)
 	}
 	if rec.Body.String() != "PK-zip" || rec.Header().Get("Content-Type") != "application/zip" {

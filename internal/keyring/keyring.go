@@ -1,6 +1,6 @@
-// Package keyring resolves peepwho's at-rest encryption key from the environment
-// and builds the file codec. PEEPWHO_INDEX_KEY holds a base64-encoded 32-byte key
-// for automation, and PEEPWHO_INDEX_PASSPHRASE holds a passphrase for humans. When
+// Package keyring resolves whotoask's at-rest encryption key from the environment
+// and builds the file codec. WHOTOASK_INDEX_KEY holds a base64-encoded 32-byte key
+// for automation, and WHOTOASK_INDEX_PASSPHRASE holds a passphrase for humans. When
 // neither is set the index stays plain JSON. The OS keychain is a planned third
 // source that will slot in behind the same codec.
 package keyring
@@ -12,15 +12,15 @@ import (
 	"os"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/vault"
+	"github.com/dcadolph/whotoask/internal/vault"
 )
 
 // Environment variables that supply the at-rest key.
 const (
 	// EnvKey holds a base64-encoded 32-byte key. It takes precedence.
-	EnvKey = "PEEPWHO_INDEX_KEY"
+	EnvKey = "WHOTOASK_INDEX_KEY"
 	// EnvPassphrase holds a passphrase whose key is derived per file.
-	EnvPassphrase = "PEEPWHO_INDEX_PASSPHRASE"
+	EnvPassphrase = "WHOTOASK_INDEX_PASSPHRASE"
 )
 
 // FromEnv returns an encrypting codec configured from the environment, or a nil
@@ -60,7 +60,7 @@ func Source() string {
 	}
 }
 
-// GenerateKey returns a fresh random key encoded for PEEPWHO_INDEX_KEY.
+// GenerateKey returns a fresh random key encoded for WHOTOASK_INDEX_KEY.
 func GenerateKey() (string, error) {
 	key := make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {

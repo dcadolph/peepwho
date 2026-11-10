@@ -12,13 +12,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/engine"
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/feedback"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/resolve"
-	"github.com/dcadolph/peepwho/internal/simorg"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/engine"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/feedback"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/simorg"
 )
 
 // demoPerson is who the demo's recall view starts as: the engineer the sample
@@ -42,7 +42,7 @@ const (
 	demoPlacesListed = 40
 )
 
-// newDemoCmd builds the demo command, which explores peepwho on a simulated
+// newDemoCmd builds the demo command, which explores whotoask on a simulated
 // company with no credentials or setup.
 func newDemoCmd(opts *options) *cobra.Command {
 	var cfg webConfig
@@ -54,7 +54,7 @@ func newDemoCmd(opts *options) *cobra.Command {
 	open := true
 	cmd := &cobra.Command{
 		Use:   "demo",
-		Short: "Run peepwho on your own repository, or on a simulated company",
+		Short: "Run whotoask on your own repository, or on a simulated company",
 		Long: `Serve the web UI over an index built here and now.
 
 Point it at a repository you already have and it reads that repository's git
@@ -62,7 +62,7 @@ history and opens on what it found: the directories the work rests on, and the
 ones resting on a single person. Every name is checkable against the same git
 log, which is the point of running it on your own code rather than on a sample.
 
-  peepwho demo --repo .
+  whotoask demo --repo .
 
 With no --repo it builds a simulated company instead. The simulation covers
 all eight sources, so identity joins, recency, confidence, and feedback all
@@ -72,7 +72,7 @@ Either way nothing is fetched from the network and no credentials are needed.
 Nothing is written outside a temporary directory, discarded when the demo stops.
 
 To try cloud AI on the sample data, export a provider key (such as
-PEEPWHO_ANTHROPIC_KEY) and add --policy redacted. Only do this for a demo you keep
+WHOTOASK_ANTHROPIC_KEY) and add --policy redacted. Only do this for a demo you keep
 to yourself: the demo serves with no token, so a publicly reachable one with a key
 set becomes an open relay to your paid account.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -81,7 +81,7 @@ set becomes an open relay to your paid account.`,
 				return demoRepo(cmd, opts, cfg, repoPaths, maxCommits, open)
 			}
 
-			dir, err := os.MkdirTemp("", "peepwho-demo-*")
+			dir, err := os.MkdirTemp("", "whotoask-demo-*")
 			if err != nil {
 				return fmt.Errorf("demo: %w", err)
 			}
@@ -95,7 +95,7 @@ set becomes an open relay to your paid account.`,
 				sources = 8
 			}
 
-			fmt.Fprintln(cmd.ErrOrStderr(), "peepwho demo: indexing a simulated company (sample data only)")
+			fmt.Fprintln(cmd.ErrOrStderr(), "whotoask demo: indexing a simulated company (sample data only)")
 			ix, err := buildIndex(dir)
 			if err != nil {
 				return err
@@ -118,7 +118,7 @@ set becomes an open relay to your paid account.`,
 
 			link := "http://" + cfg.addr + "/?q=" + url.QueryEscape(query)
 			fmt.Fprintf(cmd.ErrOrStderr(),
-				"peepwho demo: %d people, %d channels across %d sources\npeepwho demo: try %s\n",
+				"whotoask demo: %d people, %d channels across %d sources\nwhotoask demo: try %s\n",
 				len(ix.Graph.People), len(ix.Graph.Channels), sources, link)
 			if open {
 				go openBrowser(link)
@@ -158,7 +158,7 @@ func demoRepo(
 	cmd *cobra.Command, opts *options, cfg webConfig, paths []string, maxCommits int, open bool,
 ) error {
 	log := cmd.ErrOrStderr()
-	fmt.Fprintf(log, "peepwho demo: reading %s\n", strings.Join(paths, ", "))
+	fmt.Fprintf(log, "whotoask demo: reading %s\n", strings.Join(paths, ", "))
 
 	git := connector.NewGitHistory(connector.GitOptions{
 		Paths: paths, SinceDays: demoSinceDays, MaxCommits: maxCommits, Log: log,
@@ -182,7 +182,7 @@ func demoRepo(
 		resolve.PlaceLeads(ix, git.DirWork(), git.WorkTotals(), demoMinPlaceWork, 3),
 		demoPlacesListed)
 
-	dir, err := os.MkdirTemp("", "peepwho-demo-*")
+	dir, err := os.MkdirTemp("", "whotoask-demo-*")
 	if err != nil {
 		return fmt.Errorf("demo: %w", err)
 	}
@@ -197,9 +197,9 @@ func demoRepo(
 	// simulation serve open exists because there is nothing there to protect.
 	link := "http://" + cfg.addr + "/#/exposure"
 	people, places := len(ix.Graph.People), len(cfg.places)
-	fmt.Fprintf(log, "peepwho demo: %d %s, %d place%s, %d resting on one person\n",
+	fmt.Fprintf(log, "whotoask demo: %d %s, %d place%s, %d resting on one person\n",
 		people, personNoun(people), places, plural(places), soleHeld(cfg.places))
-	fmt.Fprintf(log, "peepwho demo: open %s\n", link)
+	fmt.Fprintf(log, "whotoask demo: open %s\n", link)
 	if open {
 		go openBrowser(link)
 	}
@@ -240,7 +240,7 @@ func saveDemo(
 		return fmt.Errorf("demo: %w", err)
 	}
 	if embed {
-		fmt.Fprintln(cmd.ErrOrStderr(), "peepwho demo: embedding, this takes a minute")
+		fmt.Fprintln(cmd.ErrOrStderr(), "whotoask demo: embedding, this takes a minute")
 		if err := ix.Embed(cmd.Context(), engine.NewDocOllama(cfg.embedModel, cfg.ollamaURL)); err != nil {
 			return fmt.Errorf("demo: embed: %w", err)
 		}
@@ -254,7 +254,7 @@ func saveDemo(
 		}
 	}
 	fmt.Fprintf(cmd.ErrOrStderr(),
-		"peepwho demo: wrote the sample company to %s\npeepwho demo: try peepwho --data-dir %s risk\n",
+		"whotoask demo: wrote the sample company to %s\nwhotoask demo: try whotoask --data-dir %s risk\n",
 		dir, dir)
 	return nil
 }

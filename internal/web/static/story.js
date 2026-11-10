@@ -137,7 +137,7 @@
       "<h2>" + s.title + "</h2>" +
       "<p>" + s.why + "</p>" +
       (s.closing
-        ? '<pre class="story-install">go install github.com/dcadolph/peepwho@latest\npeepwho demo</pre>'
+        ? '<pre class="story-install">go install github.com/dcadolph/whotoask@latest\nwhotoask demo</pre>'
         : "") +
       '<div class="story-row"><div class="story-dots">' + dots + "</div>" +
       '<div class="story-btns">' +

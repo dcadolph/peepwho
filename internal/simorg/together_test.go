@@ -3,11 +3,11 @@ package simorg
 import (
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // TestGeneratedCompanyHasWorkThatCrossesAreas checks the sample company contains
-// work spanning two subjects at once, and that peepwho finds the connections.
+// work spanning two subjects at once, and that whotoask finds the connections.
 //
 // It is here because the generator once produced a company of sealed cells:
 // every commit touched one area, every ticket named one label, and nothing was
@@ -67,7 +67,7 @@ func TestGeneratedCompanyHasWorkThatCrossesAreas(t *testing.T) {
 // TestGeneratedCompanyHasWorkOneLeadHolds checks the sample company contains a
 // joined body of work resting on a single person.
 //
-// It is the heaviest finding peepwho makes and the generated company had nothing
+// It is the heaviest finding whotoask makes and the generated company had nothing
 // to show for it, so the public demo displayed an empty panel where the best
 // thing in the report belongs. Neighbouring subjects now deliberately fall to
 // one owner, which is how a real company looks: somebody ends up holding a whole

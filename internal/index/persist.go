@@ -13,12 +13,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/identity"
-	"github.com/dcadolph/peepwho/internal/invindex"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/util"
-	"github.com/dcadolph/peepwho/internal/vault"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/identity"
+	"github.com/dcadolph/whotoask/internal/invindex"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/util"
+	"github.com/dcadolph/whotoask/internal/vault"
 )
 
 // snapshotSchema is the snapshot layout this build writes and requires on read.

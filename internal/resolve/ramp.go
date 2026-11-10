@@ -4,7 +4,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/connector"
+	"github.com/dcadolph/whotoask/internal/connector"
 )
 
 // rampMinArrivals is the fewest observed arrivals worth reporting a middle of.
@@ -15,7 +15,7 @@ const rampMinArrivals = 12
 // Ramp is what a repository's own history says about moving into an unfamiliar
 // area: how long it took the people who did it, and how many did not.
 //
-// It is deliberately not a forecast. Peepwho's published holdout showed this
+// It is deliberately not a forecast. WhoToAsk's published holdout showed this
 // model does not predict who will be busy later, and a report that turned
 // around and predicted how long a successor would take would be claiming the
 // thing the measurement refused. Every field here describes commits that have

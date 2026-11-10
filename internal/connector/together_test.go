@@ -37,7 +37,7 @@ func touch(t *testing.T, dir, path string) {
 	}
 }
 
-// TestSubjectsChangedTogetherAreTied checks peepwho learns that two areas belong
+// TestSubjectsChangedTogetherAreTied checks whotoask learns that two areas belong
 // to one body of knowledge from the work itself. Every other notion of
 // relatedness it has runs through the people who hold both subjects, which
 // cannot then be evidence about those people without arguing in a circle.

@@ -42,7 +42,7 @@ func TestFromPerson(t *testing.T) {
 }
 
 // TestSearchTextAndFileNames verifies shared files contribute what they are
-// called and nothing more. peepwho never downloads a file, so a video or an
+// called and nothing more. whotoask never downloads a file, so a video or an
 // installer costs nothing beyond its name, and that name is often the most
 // searchable thing in the conversation.
 func TestSearchTextAndFileNames(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // maxADFText caps the plain text taken from one rich field. An issue
@@ -36,7 +36,7 @@ type adfNode struct {
 // string, so the words in an issue are unsearchable until the tree is walked.
 // Sites and API versions that send a plain string are passed through, and
 // anything unrecognized yields nothing rather than an error, since a field
-// peepwho cannot read must not fail an index run.
+// whotoask cannot read must not fail an index run.
 func adfText(raw json.RawMessage) string {
 	if len(raw) == 0 {
 		return ""

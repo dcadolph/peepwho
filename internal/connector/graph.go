@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/graph"
+	"github.com/dcadolph/whotoask/internal/graph"
 )
 
 // Graph ingests the org chart from Microsoft Graph, turning each directory user

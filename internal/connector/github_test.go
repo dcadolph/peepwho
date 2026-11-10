@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/github"
+	"github.com/dcadolph/whotoask/internal/github"
 )
 
 // TestGitHubFetch verifies topics come from repo metadata, PR labels and titles,

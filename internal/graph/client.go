@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/httputil"
+	"github.com/dcadolph/whotoask/internal/httputil"
 )
 
 const (

@@ -12,13 +12,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // scheduleLabel is the launchd label for the weekly refresh agent.
-const scheduleLabel = "dev.peepwho.refresh"
+const scheduleLabel = "app.whotoask.refresh"
 
-// launchdPlist renders the launchd agent that runs `peepwho refresh` weekly. It
+// launchdPlist renders the launchd agent that runs `whotoask refresh` weekly. It
 // is a pure function so its output can be tested without touching launchctl.
 // Every interpolated value is XML-escaped: a path holding '&' is a normal
 // path, and unescaped it produces an invalid plist whose only symptom is a
@@ -79,17 +79,17 @@ func newScheduleCmd(opts *options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "schedule",
 		Short: "Install, remove, or check a weekly launchd refresh (macOS)",
-		Long: `Install a launchd agent that runs "peepwho refresh" every Sunday at 3am, so the
+		Long: `Install a launchd agent that runs "whotoask refresh" every Sunday at 3am, so the
 graph stays current without remembering to. macOS only; on other systems run
-"peepwho refresh" from cron.
+"whotoask refresh" from cron.
 
-  peepwho schedule --install
-  peepwho schedule --status
-  peepwho schedule --remove`,
+  whotoask schedule --install
+  whotoask schedule --status
+  whotoask schedule --remove`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if runtime.GOOS != "darwin" {
-				return fmt.Errorf("%w: schedule is macOS only; run `peepwho refresh` from cron elsewhere", ErrBadArgs)
+				return fmt.Errorf("%w: schedule is macOS only; run `whotoask refresh` from cron elsewhere", ErrBadArgs)
 			}
 			if countTrue(install, remove, status) != 1 {
 				return fmt.Errorf("%w: pass exactly one of --install, --remove, or --status", ErrBadArgs)
@@ -143,7 +143,7 @@ func scheduleInstall(cmd *cobra.Command, opts *options, plistPath string) error 
 	if err != nil {
 		return fmt.Errorf("schedule: resolve data dir: %w", err)
 	}
-	logPath := filepath.Join(home, "Library", "Logs", "peepwho-refresh.log")
+	logPath := filepath.Join(home, "Library", "Logs", "whotoask-refresh.log")
 	if err := os.MkdirAll(filepath.Dir(plistPath), 0o755); err != nil {
 		return fmt.Errorf("schedule: create LaunchAgents dir: %w", err)
 	}

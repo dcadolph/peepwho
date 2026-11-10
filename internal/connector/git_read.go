@@ -20,7 +20,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
 
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // readRepo walks one repository's log, accumulating per-author topic counts,
@@ -650,7 +650,7 @@ var automationEmails = map[string]bool{
 
 // IsAutomationName reports whether a display name belongs to an automation
 // account. It is the name-only half of the author check, exported because a
-// benchmark judging peepwho has to hold its ground truth to the same standard:
+// benchmark judging whotoask has to hold its ground truth to the same standard:
 // scoring a predictor against a future full of bots rewards whichever
 // predictor failed to filter them.
 func IsAutomationName(name string) bool {

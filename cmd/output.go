@@ -7,7 +7,7 @@ import (
 
 	"golang.org/x/term"
 
-	"github.com/dcadolph/peepwho/internal/render"
+	"github.com/dcadolph/whotoask/internal/render"
 )
 
 // style is the render package's color switch, kept under its short name for

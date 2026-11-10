@@ -8,11 +8,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/engine"
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/secret"
-	"github.com/dcadolph/peepwho/internal/vault"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/engine"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/secret"
+	"github.com/dcadolph/whotoask/internal/vault"
 )
 
 // Credential environment variables, named in the engine's source registry.
@@ -52,21 +52,21 @@ Sources and their credentials:
   codeowners  --file CODEOWNERS|repo-root                none
   git         --repo-path DIR (repeatable)               none
   json        --file FILE or - for stdin                 none
-  slack       [--include-private] [--slack-join]         PEEPWHO_SLACK_TOKEN
+  slack       [--include-private] [--slack-join]         WHOTOASK_SLACK_TOKEN
   slack-export --file export.zip|DIR [--include-private]  none
-  github      --repo o/r | --github-org ORG              PEEPWHO_GITHUB_TOKEN
-  jira        --jira-project KEY | --jira-jql JQL        PEEPWHO_JIRA_URL/EMAIL/TOKEN
-              (--jira-server for self-hosted Server/DC)   PEEPWHO_JIRA_URL[/TOKEN]
-  confluence  --confluence-space KEY | --confluence-cql  PEEPWHO_CONFLUENCE_* (or Jira's)
-              (--confluence-server for self-hosted)       PEEPWHO_CONFLUENCE_URL[/TOKEN]
-  pagerduty   (no scope flags)                           PEEPWHO_PAGERDUTY_TOKEN
-  graph       (no scope flags)                           PEEPWHO_GRAPH_TOKEN
-              (PEEPWHO_GRAPH_URL for a sovereign cloud)
+  github      --repo o/r | --github-org ORG              WHOTOASK_GITHUB_TOKEN
+  jira        --jira-project KEY | --jira-jql JQL        WHOTOASK_JIRA_URL/EMAIL/TOKEN
+              (--jira-server for self-hosted Server/DC)   WHOTOASK_JIRA_URL[/TOKEN]
+  confluence  --confluence-space KEY | --confluence-cql  WHOTOASK_CONFLUENCE_* (or Jira's)
+              (--confluence-server for self-hosted)       WHOTOASK_CONFLUENCE_URL[/TOKEN]
+  pagerduty   (no scope flags)                           WHOTOASK_PAGERDUTY_TOKEN
+  graph       (no scope flags)                           WHOTOASK_GRAPH_TOKEN
+              (WHOTOASK_GRAPH_URL for a sovereign cloud)
 
 Start with the org chart, then merge everything else onto it:
-  peepwho index --source org-csv --file people.csv
-  peepwho index --source slack --merge
-  peepwho index --source git --repo-path ~/src/billing --merge`,
+  whotoask index --source org-csv --file people.csv
+  whotoask index --source slack --merge
+  whotoask index --source git --repo-path ~/src/billing --merge`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runIndex(cmd, opts, &req)
 		},

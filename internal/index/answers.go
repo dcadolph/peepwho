@@ -7,9 +7,9 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/text"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/text"
 )
 
 // answerWeight is what answering in one conversation contributes to holding its
@@ -65,7 +65,7 @@ type AnswerCredit struct {
 // login lands on the person their commits belong to.
 //
 // Nothing in the product calls this. It is reached only from
-// `peepwho eval owners --answer-topics`, and it is kept because the measurement
+// `whotoask eval owners --answer-topics`, and it is kept because the measurement
 // it failed is worth being able to repeat rather than because it earns its
 // place. Measured 2026-09-15 against the OWNERS files of kubernetes/test-infra
 // and kubernetes/kubernetes: 842 and 340 episodes credited, 29,743 and 14,572

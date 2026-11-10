@@ -6,7 +6,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/episode"
+	"github.com/dcadolph/whotoask/internal/episode"
 )
 
 // Record is one normalized observation from a source. A KindPerson record
@@ -39,7 +39,7 @@ type Record struct {
 	// deliberately, which makes it the strongest topic evidence a source can give.
 	Topics []string
 	// RecentTopics are the subjects this person worked on lately, a subset of
-	// Topics. Peepwho answers with whoever knows a subject best, and knowing it
+	// Topics. WhoToAsk answers with whoever knows a subject best, and knowing it
 	// best is not the same as still working on it: on a real repository the
 	// leading expert of two subjects in five had already stopped touching them,
 	// and was less than half as likely to still hold the subject a while later.

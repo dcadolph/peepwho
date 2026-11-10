@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/index"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/index"
 )
 
 // newSurvivalRepo builds two areas that both lose their leading person after

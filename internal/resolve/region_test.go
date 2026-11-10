@@ -5,8 +5,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/index"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/index"
 )
 
 // tied returns a record tying one subject to several others.
@@ -26,7 +26,7 @@ func held(name, email string, topics ...string) connector.Record {
 	}
 }
 
-// TestRegionsFindWorkThatMovesTogether checks peepwho reports a connected body
+// TestRegionsFindWorkThatMovesTogether checks whotoask reports a connected body
 // of work resting on one person as a single finding. Per-subject risk shows
 // three separate small problems where there is really one large one: whoever
 // takes the work over has to learn all of it at once.

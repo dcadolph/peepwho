@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/fakeapi"
+	"github.com/dcadolph/whotoask/internal/fakeapi"
 )
 
 // newReviewedRepo builds a repository where a pull request lands through a
@@ -87,7 +87,7 @@ func TestAssessPlacesReviewCredit(t *testing.T) {
 
 	dir := t.TempDir()
 	out := filepath.Join(dir, "assessment")
-	t.Setenv("PEEPWHO_GITHUB_TOKEN", "test-token")
+	t.Setenv("WHOTOASK_GITHUB_TOKEN", "test-token")
 
 	if _, stderr, err := runCmd(t, "assess", "--data-dir", dir,
 		"--repo-path", repo, "--github-repo", "acme/platform",

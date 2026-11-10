@@ -26,7 +26,7 @@ func gitRun(t *testing.T, dir string, args ...string) {
 // TestShallowCloneIsCalledOut checks a truncated history is reported rather
 // than passed off as the whole story. A shallow clone reads without error and
 // yields an index with almost no memory in it, which is indistinguishable from
-// a company where nobody built anything unless peepwho says so.
+// a company where nobody built anything unless whotoask says so.
 func TestShallowCloneIsCalledOut(t *testing.T) {
 	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {

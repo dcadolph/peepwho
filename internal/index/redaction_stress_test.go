@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/vault"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/vault"
 )
 
 // TestRedactionEncryptionMergeCycles stresses the three newest interacting

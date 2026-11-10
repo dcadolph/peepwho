@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/jira"
+	"github.com/dcadolph/whotoask/internal/jira"
 )
 
 // TestJQLUsesUserTimezone verifies the incremental clause renders the watermark

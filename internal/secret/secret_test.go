@@ -47,7 +47,7 @@ func (f *fakeKeychain) Delete(name string) error {
 // TestResolve verifies the environment wins over the keychain, the keychain is
 // the fallback, and a missing or failing lookup resolves to empty.
 func TestResolve(t *testing.T) { //nolint:tparallel // Subtests call t.Setenv.
-	const name = "PEEPWHO_TEST_TOKEN"
+	const name = "WHOTOASK_TEST_TOKEN"
 	tests := []struct {
 		Keychain   map[string]string
 		FailGet    error
@@ -79,7 +79,7 @@ func TestResolve(t *testing.T) { //nolint:tparallel // Subtests call t.Setenv.
 
 // TestSource verifies Source names where a value would be read from.
 func TestSource(t *testing.T) { //nolint:tparallel // Subtests call t.Setenv.
-	const name = "PEEPWHO_TEST_TOKEN"
+	const name = "WHOTOASK_TEST_TOKEN"
 	tests := []struct {
 		Env        string
 		WantResult string
@@ -109,7 +109,7 @@ func TestSource(t *testing.T) { //nolint:tparallel // Subtests call t.Setenv.
 // TestSaveWritesToKeychain verifies Save stores a value the keychain then
 // resolves when the environment is empty.
 func TestSaveWritesToKeychain(t *testing.T) {
-	const name = "PEEPWHO_TEST_TOKEN"
+	const name = "WHOTOASK_TEST_TOKEN"
 	t.Setenv(name, "")
 	kc := &fakeKeychain{data: map[string]string{}}
 	s := NewWith(kc)

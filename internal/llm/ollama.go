@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/httputil"
+	"github.com/dcadolph/whotoask/internal/httputil"
 )
 
 // defaultBaseURL is the local Ollama server address.

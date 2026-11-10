@@ -6,8 +6,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/render"
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/render"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // newDirectoryCmd builds the directory command, a browsable inventory of
@@ -23,9 +23,9 @@ topics. With no argument it prints all four. Use it to see the terms your team's
 data actually contains when a question comes back empty.
 
 Examples:
-  peepwho directory
-  peepwho directory people
-  peepwho directory topics`,
+  whotoask directory
+  whotoask directory people
+  whotoask directory topics`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ix, err := opts.loadIndex(cmd)

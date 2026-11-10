@@ -7,10 +7,10 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // newFixture builds an index of two people and an episode store holding one
@@ -117,7 +117,7 @@ func TestWhoResolvesSourceIdentifiers(t *testing.T) {
 	}
 }
 
-// TestKnownSeparatesEmptyCases verifies peepwho can tell "you were in no
+// TestKnownSeparatesEmptyCases verifies whotoask can tell "you were in no
 // indexed conversation" from "nothing is indexed", which is what the empty
 // answer explains to the user.
 func TestKnownSeparatesEmptyCases(t *testing.T) {

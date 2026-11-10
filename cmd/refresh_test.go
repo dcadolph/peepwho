@@ -10,8 +10,8 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/engine"
-	"github.com/dcadolph/peepwho/internal/policy"
+	"github.com/dcadolph/whotoask/internal/engine"
+	"github.com/dcadolph/whotoask/internal/policy"
 )
 
 // TestIndexRecordsEveryScope indexes two files in separate org-csv runs and a
@@ -93,7 +93,7 @@ func TestRecordedPolicy(t *testing.T) {
 	for testNum, test := range tests {
 		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
 			t.Parallel()
-			root := &cobra.Command{Use: "peepwho"}
+			root := &cobra.Command{Use: "whotoask"}
 			root.PersistentFlags().String("policy", "strict", "")
 			sub := &cobra.Command{Use: "refresh"}
 			root.AddCommand(sub)

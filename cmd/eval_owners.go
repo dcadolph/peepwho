@@ -6,9 +6,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/ownersbench"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/ownersbench"
 )
 
 // evalOwnersArgs holds the flags of the eval owners command.
@@ -35,7 +35,7 @@ type evalOwnersArgs struct {
 	JSON bool
 }
 
-// newEvalOwnersCmd builds the eval owners subcommand, which scores peepwho's
+// newEvalOwnersCmd builds the eval owners subcommand, which scores whotoask's
 // ownership claim against a repository's own OWNERS files.
 func newEvalOwnersCmd(opts *options) *cobra.Command {
 	var a evalOwnersArgs
@@ -43,12 +43,12 @@ func newEvalOwnersCmd(opts *options) *cobra.Command {
 		Use:    "owners",
 		Short:  "Score ownership recovery against a repo's own OWNERS files",
 		Hidden: true,
-		Long: `Score peepwho against the ownership humans wrote down: the OWNERS files
+		Long: `Score whotoask against the ownership humans wrote down: the OWNERS files
 projects in the Kubernetes ecosystem maintain for real governance, aliases
 expanded to individuals.
 
 This measures ownership recovery, not expertise. The naive baseline is git's
-top committers per directory, printed beside every peepwho number, and the
+top committers per directory, printed beside every whotoask number, and the
 directories where the baseline misses are reported as their own cohort: they
 are the only ones that can tell this tool apart from counting commits.
 
@@ -66,9 +66,9 @@ subjects in the index. Both read the same saved bytes, so two runs that differ
 in these flags differ in scoring and in nothing else.
 
 Examples:
-  peepwho eval owners --repo ~/src/kubernetes
-  peepwho eval owners --repo ~/src/kubernetes --use-index --data-dir ./k8sidx
-  peepwho eval owners --repo ~/src/kubernetes --use-index --data-dir ./k8sidx \
+  whotoask eval owners --repo ~/src/kubernetes
+  whotoask eval owners --repo ~/src/kubernetes --use-index --data-dir ./k8sidx
+  whotoask eval owners --repo ~/src/kubernetes --use-index --data-dir ./k8sidx \
     --probe ./k8sidx/probe.json --credit answered`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -193,21 +193,21 @@ func applyOwnersProbe(
 	return loaded, totals, nil
 }
 
-// printOwnersScore writes the human score: peepwho beside the git baseline,
+// printOwnersScore writes the human score: whotoask beside the git baseline,
 // the discriminating cohort, and one line per judged directory.
 func printOwnersScore(out io.Writer, res *ownersbench.Result, topK int) {
-	w, n := res.Score(func(d ownersbench.DirResult) bool { return d.PeepwhoHit })
+	w, n := res.Score(func(d ownersbench.DirResult) bool { return d.WhoToAskHit })
 	g, _ := res.Score(func(d ownersbench.DirResult) bool { return d.GitHit })
 	cohC := res.CohortC()
 	cw := 0
 	for _, d := range cohC {
-		if d.PeepwhoHit {
+		if d.WhoToAskHit {
 			cw++
 		}
 	}
 	fmt.Fprintf(out, "judged %d directories (of %d with truth; dropped %d quiet, %d ambiguous, %d unmappable)\n",
 		n, res.TruthDirs, res.DroppedQuiet, res.DroppedAmbiguous, res.DroppedUnmappable)
-	fmt.Fprintf(out, "peepwho names an approver in its top %d:  %d/%d (%.0f%%)\n",
+	fmt.Fprintf(out, "whotoask names an approver in its top %d:  %d/%d (%.0f%%)\n",
 		topK, w, n, 100*float64(w)/float64(n))
 	fmt.Fprintf(out, "git top-%d committers baseline:         %d/%d (%.0f%%)\n",
 		topK, g, n, 100*float64(g)/float64(n))
@@ -217,13 +217,13 @@ func printOwnersScore(out io.Writer, res *ownersbench.Result, topK int) {
 	}
 	for _, d := range res.Dirs {
 		mark := "."
-		if d.PeepwhoHit {
+		if d.WhoToAskHit {
 			mark = "Y"
 		}
 		base := "."
 		if d.GitHit {
 			base = "Y"
 		}
-		fmt.Fprintf(out, "  %s %s  %-46s peepwho=%v\n", mark, base, d.Dir, d.PeepwhoTop)
+		fmt.Fprintf(out, "  %s %s  %-46s whotoask=%v\n", mark, base, d.Dir, d.WhoToAskTop)
 	}
 }

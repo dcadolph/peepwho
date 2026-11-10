@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/fakeapi"
-	"github.com/dcadolph/peepwho/internal/state"
+	"github.com/dcadolph/whotoask/internal/fakeapi"
+	"github.com/dcadolph/whotoask/internal/state"
 )
 
 // TestJiraIncrementalReindex runs a full index then a --merge re-index against a

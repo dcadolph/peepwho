@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/fact"
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/fact"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // TestDateText pins the date rendering: a zero time is an empty string, not

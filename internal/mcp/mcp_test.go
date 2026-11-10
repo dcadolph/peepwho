@@ -12,7 +12,7 @@ import (
 
 // testServer returns a server with one echo tool and one failing tool.
 func testServer() *Server {
-	s := New("peepwho", "test", io.Discard)
+	s := New("whotoask", "test", io.Discard)
 	s.AddTool(Tool{
 		Name:        "echo",
 		Description: "Echo the input back.",
@@ -75,7 +75,7 @@ func TestHandshakeAndTools(t *testing.T) {
 		t.Errorf("protocolVersion = %v, want the client's echoed back", init["protocolVersion"])
 	}
 	server := init["serverInfo"].(map[string]any)
-	if server["name"] != "peepwho" {
+	if server["name"] != "whotoask" {
 		t.Errorf("serverInfo = %v", server)
 	}
 

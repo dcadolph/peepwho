@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Quality floors. These are deliberately below where peepwho scores today, so
+// Quality floors. These are deliberately below where whotoask scores today, so
 // the test catches a real regression rather than failing on noise. Raise them
 // when ranking genuinely improves; never lower one to make a build pass.
 const (
@@ -77,7 +77,7 @@ func TestNoArchiveRecallQuality(t *testing.T) {
 	}
 }
 
-// TestRankingQuality scores peepwho against a company built with known answers.
+// TestRankingQuality scores whotoask against a company built with known answers.
 // Without this, a ranking change can only be judged by eye on one query; with
 // it, a change that helps one question and quietly breaks thirty is visible.
 func TestRankingQuality(t *testing.T) {

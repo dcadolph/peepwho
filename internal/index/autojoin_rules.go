@@ -4,9 +4,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/identity"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/identity"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // joinRun holds the state the AutoJoin passes share while they run, so each

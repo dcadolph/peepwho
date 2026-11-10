@@ -45,7 +45,7 @@ func TestSlashHandlerDispatches(t *testing.T) {
 	t.Parallel()
 	ch := make(chan string, 1)
 	h := NewSlashHandler(okEngine(), chanResponder{ch: ch}, testSecret, WithSlashClock(fixedNow))
-	body := "command=%2Fpeepwho&text=billing&user_id=U2&response_url=" +
+	body := "command=%2Fwhotoask&text=billing&user_id=U2&response_url=" +
 		"https%3A%2F%2Fhooks.slack.com%2FT123"
 
 	rec := httptest.NewRecorder()
@@ -86,7 +86,7 @@ func TestSocketSlashEnvelope(t *testing.T) {
 		WithResponder(chanResponder{ch: ch}))
 	conn := &fakeConn{reads: [][]byte{
 		[]byte(`{"type":"slash_commands","envelope_id":"s1","payload":{` +
-			`"command":"/peepwho","text":"billing","user_id":"U2",` +
+			`"command":"/whotoask","text":"billing","user_id":"U2",` +
 			`"response_url":"https://hooks.slack.com/T"}}`),
 	}}
 

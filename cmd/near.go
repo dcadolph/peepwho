@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/render"
+	"github.com/dcadolph/whotoask/internal/render"
 )
 
 // newNearCmd builds the near command, which ranks the people who work nearest a
@@ -23,8 +23,8 @@ more than a broad channel, org-wide groups are ignored, and permission tiers of
 one group (store-admin, store-write) are folded together. PERSON is an email, an
 id, or an exact name.
 
-  peepwho near alice@example.com
-  peepwho near "Kim Ray" --limit 5`,
+  whotoask near alice@example.com
+  whotoask near "Kim Ray" --limit 5`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ix, err := opts.loadIndex(cmd)
@@ -34,7 +34,7 @@ id, or an exact name.
 			who := strings.Join(args, " ")
 			p := ix.FindPerson(who)
 			if p == nil {
-				return fmt.Errorf("%w: no person matches %q; try an email, or run `peepwho directory`", ErrBadArgs, who)
+				return fmt.Errorf("%w: no person matches %q; try an email, or run `whotoask directory`", ErrBadArgs, who)
 			}
 			nearList := ix.Near(p.ID, limit)
 			view := map[string]any{

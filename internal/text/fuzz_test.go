@@ -7,7 +7,7 @@ import (
 )
 
 // FuzzNormalizers feeds the tokenizer family arbitrary bytes, since it runs
-// over every message, name, and title peepwho ever ingests, in whatever
+// over every message, name, and title whotoask ever ingests, in whatever
 // encoding a source emits. Properties: nothing panics, tokens are never empty,
 // a slug never contains a space, and normalizing twice equals normalizing
 // once, so re-indexing cannot drift.
@@ -51,7 +51,7 @@ func FuzzNormalizers(f *testing.F) {
 }
 
 // FuzzScrub feeds the credential scrubber arbitrary bytes, since it runs over
-// every message and title peepwho ingests and a panic there loses the record.
+// every message and title whotoask ingests and a panic there loses the record.
 // Properties: nothing panics, text with no findings passes through unchanged,
 // every finding leaves the mark behind, and valid UTF-8 stays valid.
 func FuzzScrub(f *testing.F) {

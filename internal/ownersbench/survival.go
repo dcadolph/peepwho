@@ -5,10 +5,10 @@ import (
 	"io"
 	"sort"
 
-	"github.com/dcadolph/peepwho/internal/index"
+	"github.com/dcadolph/whotoask/internal/index"
 )
 
-// SurvivalConfig bounds a concentration-survival run: peepwho names the places
+// SurvivalConfig bounds a concentration-survival run: whotoask names the places
 // resting on one person, knowing only the past, and the future says whether
 // those places went quiet when that person stopped.
 type SurvivalConfig struct {
@@ -50,13 +50,13 @@ func (c SurvivalConfig) withDefaults() SurvivalConfig {
 	return c
 }
 
-// SurvivalDir is one place peepwho made a concentration claim about.
+// SurvivalDir is one place whotoask made a concentration claim about.
 type SurvivalDir struct {
 	// Dir is the directory relative to the repository root.
 	Dir string `json:"dir"`
-	// Holder is the person peepwho said the place rested on.
+	// Holder is the person whotoask said the place rested on.
 	Holder string `json:"holder"`
-	// Concentrated reports whether peepwho called the place single-held.
+	// Concentrated reports whether whotoask called the place single-held.
 	Concentrated bool `json:"concentrated"`
 	// HolderStayed reports whether that person worked there after the cutoff.
 	HolderStayed bool `json:"holderStayed"`
@@ -75,8 +75,8 @@ type SurvivalResult struct {
 }
 
 // Rates returns how often a place went quiet after its holder stopped, split
-// by whether peepwho had called it single-held. The claim under test is that
-// concentration predicts fragility: a place peepwho flagged should go quiet
+// by whether whotoask had called it single-held. The claim under test is that
+// concentration predicts fragility: a place whotoask flagged should go quiet
 // more often, when its holder leaves, than one it did not flag.
 func (r *SurvivalResult) Rates() (flaggedQuiet, flagged, otherQuiet, other int) {
 	for _, d := range r.Dirs {
@@ -98,12 +98,12 @@ func (r *SurvivalResult) Rates() (flaggedQuiet, flagged, otherQuiet, other int) 
 }
 
 // RunSurvival tests the claim the product actually makes. For every place
-// busy enough before the cutoff, it records who peepwho said it rested on and
-// whether peepwho called it single-held, then reads the future: did that
+// busy enough before the cutoff, it records who whotoask said it rested on and
+// whether whotoask called it single-held, then reads the future: did that
 // person keep working there, and did the place go quiet.
 //
 // The comparison that matters is among places whose holder stopped. If
-// concentration means anything, those peepwho flagged should fall silent more
+// concentration means anything, those whotoask flagged should fall silent more
 // often than those it did not.
 func RunSurvival(ix *index.Index, cfg SurvivalConfig) (*SurvivalResult, error) {
 	cfg = cfg.withDefaults()
@@ -180,8 +180,8 @@ func (r *SurvivalResult) Report(w io.Writer) {
 		}
 		return 100 * float64(a) / float64(b)
 	}
-	fmt.Fprintf(w, "  peepwho called single-held: %d of %d went quiet (%.0f%%)\n", fq, f, pct(fq, f))
-	fmt.Fprintf(w, "  peepwho did not:            %d of %d went quiet (%.0f%%)\n", oq, o, pct(oq, o))
+	fmt.Fprintf(w, "  whotoask called single-held: %d of %d went quiet (%.0f%%)\n", fq, f, pct(fq, f))
+	fmt.Fprintf(w, "  whotoask did not:            %d of %d went quiet (%.0f%%)\n", oq, o, pct(oq, o))
 	if f == 0 || o == 0 {
 		fmt.Fprintln(w, "  one side is empty, so the comparison carries nothing")
 		return

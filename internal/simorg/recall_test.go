@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/recall"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/recall"
 )
 
 // TestRecallPipeline runs the whole recall path over the simulated workspace:

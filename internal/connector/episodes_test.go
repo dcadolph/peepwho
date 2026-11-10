@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/fakeapi"
-	"github.com/dcadolph/peepwho/internal/github"
-	"github.com/dcadolph/peepwho/internal/jira"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/pagerduty"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/fakeapi"
+	"github.com/dcadolph/whotoask/internal/github"
+	"github.com/dcadolph/whotoask/internal/jira"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/pagerduty"
 )
 
 // episodeByID finds an episode by ID so assertions do not depend on order.
@@ -217,7 +217,7 @@ func TestPagerDutyEpisodes(t *testing.T) {
 	}
 }
 
-// TestJiraServerEpisodes verifies peepwho reads a self-hosted Server or Data
+// TestJiraServerEpisodes verifies whotoask reads a self-hosted Server or Data
 // Center Jira: v2 shape, username identity, and no email. This is the shape a
 // public tracker such as Apache's Jira returns, where an assignee has a name
 // but no account id and no visible email, and it once produced zero episodes

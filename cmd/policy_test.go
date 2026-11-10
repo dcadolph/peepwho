@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/dcadolph/peepwho/internal/policy"
+	"github.com/dcadolph/whotoask/internal/policy"
 )
 
 // TestResolvePolicy covers flag, system file, env file, and lock precedence.

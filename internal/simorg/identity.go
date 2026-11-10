@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // IdentitySpec describes a company built to break identity resolution. Every
@@ -80,7 +80,7 @@ func (o *IdentityOrg) Close() {
 }
 
 // GenerateIdentity builds a company designed to break identity resolution.
-// Peepwho cannot be tested against a real workspace, so the traps a real
+// WhoToAsk cannot be tested against a real workspace, so the traps a real
 // workspace contains are planted deliberately and at volume: people who share
 // a name, people scattered across three identifier styles, shared mailboxes
 // that act like people, and people who talk everywhere but belong to one team.

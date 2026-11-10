@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // Profile is everything the index knows about one person: the person, their

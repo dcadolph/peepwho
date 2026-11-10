@@ -5,8 +5,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/identity"
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/identity"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // Canonicalize rewrites the graph so every person appears once under their

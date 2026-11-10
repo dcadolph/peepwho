@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // Spec describes an organization to synthesize. The zero value is a small but
@@ -133,7 +133,7 @@ var subjects = []struct {
 	// contains the words of its own topic name and shares no word, nor any
 	// word that stems to the same root, with another list. That disjointness
 	// is what makes a single owner the provably correct answer: a miss is
-	// peepwho failing to find them, never two people having a fair claim.
+	// whotoask failing to find them, never two people having a fair claim.
 	Words []string
 	// Anchored is how someone asks months later, remembering one word of the
 	// subject and describing the rest in their own words. This is the normal
@@ -205,7 +205,7 @@ var subjects = []struct {
 // shares a word with any subject, on purpose. A team name is a strong explicit
 // signal in ranking, far stronger than a passing mention, so a team called
 // Search would make everyone on it a better answer for "search indexing" than
-// the person who actually owns it. That is peepwho behaving correctly, and it
+// the person who actually owns it. That is whotoask behaving correctly, and it
 // would make a scored miss meaningless.
 var teams = []string{
 	"Ledger", "Insights", "Infrastructure", "Security",
@@ -467,7 +467,7 @@ func generateHistory(
 	var threads []thread
 	count := 0
 	// History runs up to the present. An index decays what it reads by age, so
-	// a corpus stamped years in the past tests how peepwho treats abandoned
+	// a corpus stamped years in the past tests how whotoask treats abandoned
 	// archives rather than a living company: fluency written in 2020 loses to
 	// a stray mention written a year later on decay alone.
 	var ts int

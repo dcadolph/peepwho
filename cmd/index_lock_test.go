@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // TestFirstRunIntoAMissingDataDir runs each command that takes a store lock
@@ -44,7 +44,7 @@ func TestFirstRunIntoAMissingDataDir(t *testing.T) {
 			t.Parallel()
 			// Two levels below the temp directory, so neither the data
 			// directory nor its parent exists when the lock is taken.
-			dir := filepath.Join(t.TempDir(), "never-existed", ".peepwho")
+			dir := filepath.Join(t.TempDir(), "never-existed", ".whotoask")
 			args := append(append([]string{}, test.Args...), "--data-dir", dir)
 			if _, stderr, err := runCmd(t, args...); err != nil {
 				t.Fatalf("%s into a missing data dir: %v\n%s", test.Name, err, stderr)
@@ -65,7 +65,7 @@ func TestFirstRunIntoAMissingDataDir(t *testing.T) {
 // behind.
 func TestForgetLeavesNothingBehindWithNoIndex(t *testing.T) {
 	t.Parallel()
-	dir := filepath.Join(t.TempDir(), "never-existed", ".peepwho")
+	dir := filepath.Join(t.TempDir(), "never-existed", ".whotoask")
 	_, _, err := runCmd(t, "forget", "--data-dir", dir, "--yes", "jane@corp.com")
 	if err == nil {
 		t.Fatal("forget with no index: want error, got nil")

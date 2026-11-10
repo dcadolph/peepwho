@@ -7,10 +7,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/render"
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/render"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // namesATeam reports whether an owner id names a group rather than a person.
@@ -71,10 +71,10 @@ whose two never met looks exactly like one who does nothing. --unlinked lists
 those owners, worst first, which is the worklist for an alias file.
 
 Examples:
-  peepwho identity
-  peepwho identity kim
-  peepwho identity --unlinked
-  peepwho identity --json`,
+  whotoask identity
+  whotoask identity kim
+  whotoask identity --unlinked
+  whotoask identity --json`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ix, err := opts.loadIndex(cmd)
@@ -135,7 +135,7 @@ func buildIdentityView(ix *index.Index) render.IdentityView {
 }
 
 // filterIdentityView narrows the view to people whose id, email, or name
-// contains the query, so `peepwho identity kim` audits one person's merges.
+// contains the query, so `whotoask identity kim` audits one person's merges.
 func filterIdentityView(v render.IdentityView, query string) render.IdentityView {
 	q := strings.ToLower(strings.TrimSpace(query))
 	if q == "" {

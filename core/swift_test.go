@@ -11,7 +11,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/dcadolph/peepwho/internal/engine"
+	"github.com/dcadolph/whotoask/internal/engine"
 )
 
 // updateSwift rewrites the fixtures the Swift decode tests read when set.

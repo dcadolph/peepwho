@@ -4,14 +4,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
+	"github.com/dcadolph/whotoask/internal/connector"
 )
 
 // TestCorrectionPrefersTheEstablishedWord checks a typo is read as the word the
 // organization uses rather than as one of its own misspellings. Real material
 // contains both, and a misspelling sits exactly as close to a typo as the
 // correct word does, so whichever sorted first used to win: asked about
-// "blutooth", peepwho answered with a directory misspelled "blueooth".
+// "blutooth", whotoask answered with a directory misspelled "blueooth".
 func TestCorrectionPrefersTheEstablishedWord(t *testing.T) {
 	t.Parallel()
 	ix := New()

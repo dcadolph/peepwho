@@ -9,11 +9,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/invindex"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/util"
-	"github.com/dcadolph/peepwho/internal/vault"
-	"github.com/dcadolph/peepwho/internal/vector"
+	"github.com/dcadolph/whotoask/internal/invindex"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/util"
+	"github.com/dcadolph/whotoask/internal/vault"
+	"github.com/dcadolph/whotoask/internal/vector"
 )
 
 // snapshot is the serializable form of a store. The participant index is

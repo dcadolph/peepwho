@@ -1,4 +1,4 @@
-// Package jira is a minimal Jira Cloud client scoped to what peepwho ingests:
+// Package jira is a minimal Jira Cloud client scoped to what whotoask ingests:
 // issues and the people on them. Credentials are held only in memory, never
 // serialized, and never logged.
 package jira
@@ -16,8 +16,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/httputil"
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/httputil"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // API bases for the two Jira deployments. Cloud speaks v3 and returns rich text
@@ -122,7 +122,7 @@ func NewServer(baseURL, token string, opts ...Option) *Client {
 	return c
 }
 
-// User is the subset of a Jira user peepwho reads.
+// User is the subset of a Jira user whotoask reads.
 type User struct {
 	// AccountID is the stable account identifier on Jira Cloud.
 	AccountID string `json:"accountId"`
@@ -159,7 +159,7 @@ type Component struct {
 	Name string `json:"name"`
 }
 
-// Issue is the subset of an issue peepwho reads.
+// Issue is the subset of an issue whotoask reads.
 type Issue struct {
 	// Key is the issue key, for example PROJ-12.
 	Key string `json:"key"`

@@ -18,7 +18,7 @@ func TestStyleHelpersPlain(t *testing.T) {
 	p.Step("Pick a %s", "source")
 	p.Detail("What this source adds.")
 	p.Hint("Skip with enter.")
-	p.Command("export PEEPWHO_SLACK_TOKEN=...")
+	p.Command("export WHOTOASK_SLACK_TOKEN=...")
 	p.Success("saved")
 	p.Blank()
 	p.Warn("token looks short")
@@ -27,7 +27,7 @@ func TestStyleHelpersPlain(t *testing.T) {
 	wantOut := "==> Pick a source\n" +
 		"    What this source adds.\n" +
 		"    Skip with enter.\n" +
-		"        export PEEPWHO_SLACK_TOKEN=...\n" +
+		"        export WHOTOASK_SLACK_TOKEN=...\n" +
 		"    ✓ saved\n" +
 		"\n"
 	if diff := cmp.Diff(wantOut, out.String()); diff != "" {

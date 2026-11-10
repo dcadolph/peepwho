@@ -1,4 +1,4 @@
-// Package web serves the peepwho web UI: a search page and a JSON ask API over
+// Package web serves the whotoask web UI: a search page and a JSON ask API over
 // the same engine the CLI uses.
 package web
 
@@ -20,11 +20,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/feedback"
-	"github.com/dcadolph/peepwho/internal/llm"
-	"github.com/dcadolph/peepwho/internal/recall"
-	"github.com/dcadolph/peepwho/internal/report"
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/feedback"
+	"github.com/dcadolph/whotoask/internal/llm"
+	"github.com/dcadolph/whotoask/internal/recall"
+	"github.com/dcadolph/whotoask/internal/report"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // assets holds the embedded templates and static files.
@@ -106,16 +106,16 @@ type Config struct {
 	// Recall answers what one person worked through before, at /api/recall;
 	// nil disables it. The request names the person, and nothing here proves
 	// that name, so a caller who can reach this endpoint can ask as anyone.
-	// Set it only where the caller can only be the person running peepwho.
+	// Set it only where the caller can only be the person running whotoask.
 	Recall RecallFunc
 	// RecallMe is the identity the recall view starts with, usually the
-	// person running peepwho. It is a starting point, not an authorization:
+	// person running whotoask. It is a starting point, not an authorization:
 	// the caller can change it, which is why recall is served on loopback
 	// only.
 	RecallMe string
 	// Brief renders the knowledge-risk brief as one self-contained page, at
 	// /report/risk.html, so the finding on screen can be handed to somebody
-	// who does not have peepwho. Nil leaves the route unregistered.
+	// who does not have whotoask. Nil leaves the route unregistered.
 	Brief BriefFunc
 	// Exposure reports where the organization is exposed, at /api/exposure;
 	// nil disables it.
@@ -141,7 +141,7 @@ type Config struct {
 	Ready func() bool
 }
 
-// Handler returns the peepwho web handler: an index page, embedded assets, and a
+// Handler returns the whotoask web handler: an index page, embedded assets, and a
 // JSON ask API. It panics if cfg.Ask is nil.
 func Handler(cfg Config) (http.Handler, error) {
 	if cfg.Ask == nil {
@@ -292,7 +292,7 @@ func securityHeaders(next http.Handler) http.Handler {
 }
 
 // authCookie names the session cookie set after a token is presented.
-const authCookie = "peepwho_token"
+const authCookie = "whotoask_token"
 
 // requireToken gates every request behind the shared token. A token query
 // parameter sets a strict same-site cookie so a shared link keeps working
@@ -306,7 +306,7 @@ const authCookie = "peepwho_token"
 func requireToken(token string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !tokenOK(token, r) {
-			w.Header().Set("WWW-Authenticate", `Bearer realm="peepwho"`)
+			w.Header().Set("WWW-Authenticate", `Bearer realm="whotoask"`)
 			writeError(w, http.StatusUnauthorized, "missing or wrong token")
 			return
 		}
@@ -355,7 +355,7 @@ func tokenOK(token string, r *http.Request) bool {
 // indexHandler serves the search page at the root path.
 func indexHandler(tmpl *template.Template, cfg Config) http.HandlerFunc {
 	data := struct {
-		// Version is the running peepwho version.
+		// Version is the running whotoask version.
 		Version string
 		// Recall reports whether the recall view is available.
 		Recall bool
@@ -392,9 +392,9 @@ func indexHandler(tmpl *template.Template, cfg Config) http.HandlerFunc {
 // /api/person endpoints the search UI uses.
 func orgchartHandler(tmpl *template.Template, cfg Config) http.HandlerFunc {
 	data := struct {
-		// Version is the running peepwho version.
+		// Version is the running whotoask version.
 		Version string
-		// Me is the person running peepwho, for the "My team" jump.
+		// Me is the person running whotoask, for the "My team" jump.
 		Me string
 	}{Version: cfg.Version, Me: cfg.RecallMe}
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -577,7 +577,7 @@ func briefHandler(fn BriefFunc) http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Header().Set("Content-Disposition", `attachment; filename="peepwho-knowledge-risk.html"`)
+		w.Header().Set("Content-Disposition", `attachment; filename="whotoask-knowledge-risk.html"`)
 		_, _ = w.Write(buf.Bytes())
 	}
 }
@@ -671,7 +671,7 @@ func attestHandler(fn AttestFunc, logw io.Writer) http.HandlerFunc {
 		}
 		if r.URL.Query().Get("download") != "" {
 			w.Header().Set("Content-Type", "application/zip")
-			w.Header().Set("Content-Disposition", `attachment; filename="peepwho-finding.zip"`)
+			w.Header().Set("Content-Disposition", `attachment; filename="whotoask-finding.zip"`)
 			_, _ = w.Write(sealed.Archive)
 			return
 		}

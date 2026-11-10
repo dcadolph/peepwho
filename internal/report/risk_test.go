@@ -10,7 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // TestExposures checks per-topic risk is read back as per-person risk, which is
@@ -55,7 +55,7 @@ func TestCountUsesEveryScoredSubject(t *testing.T) {
 }
 
 // TestWriteRiskIsSelfContained checks the report travels. It has to open with
-// no network, no peepwho, and no server behind it, so nothing may be fetched at
+// no network, no whotoask, and no server behind it, so nothing may be fetched at
 // open time.
 func TestWriteRiskIsSelfContained(t *testing.T) {
 	t.Parallel()
@@ -236,7 +236,7 @@ func TestWriteRiskRampCarriesItsFraming(t *testing.T) {
 
 // TestWriteRiskEscapes checks a person or subject named after markup cannot
 // break the document, which matters because every name in it came from an
-// indexed source rather than from peepwho.
+// indexed source rather than from whotoask.
 func TestWriteRiskEscapes(t *testing.T) {
 	t.Parallel()
 	risks := []resolve.TopicRisk{{
@@ -265,7 +265,7 @@ const hostile = "<script>alert(\"x\")</script>\x00' onmouseover='y"
 
 // TestWriteRiskEscapesAssessmentFindings puts hostile text through every field
 // the assessment sections added. The names, directories and reasons all come
-// from indexed sources rather than from peepwho, so each is an injection point
+// from indexed sources rather than from whotoask, so each is an injection point
 // until the escaping is proved over it rather than over the topic table alone.
 func TestWriteRiskEscapesAssessmentFindings(t *testing.T) {
 	t.Parallel()

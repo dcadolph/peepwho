@@ -4,13 +4,13 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // TestGitOnlyIndexReportsRisk covers the shape of a first trial: somebody points
-// peepwho at a repository and nothing else, because that needs no credentials and
+// whotoask at a repository and nothing else, because that needs no credentials and
 // no chat integration. Knowledge risk is the thing they were sold, so an index
 // built from commit history alone has to produce it. It once did not, silently,
 // because commit history marked none of its subjects as stated and every view

@@ -1,10 +1,10 @@
-// peepwho theme engine. One shared file across every peepwho UI. Themes are pure
+// whotoask theme engine. One shared file across every whotoask UI. Themes are pure
 // CSS token sets selected by data-theme on the root; this only stores the choice
 // and reflects it, so no per-page work is needed. Runs in <head> before paint to
 // avoid a flash of the wrong theme (the page CSP allows same-origin scripts).
 (function () {
 	"use strict";
-	var KEY = "peepwho-theme";
+	var KEY = "whotoask-theme";
 	var THEMES = ["radar", "ink", "loom"];
 	var DEFAULT = "radar";
 
@@ -41,5 +41,5 @@
 	if (document.readyState !== "loading") wire();
 	else document.addEventListener("DOMContentLoaded", wire);
 
-	window.peepwhoTheme = { apply: apply, current: current, themes: THEMES };
+	window.whotoaskTheme = { apply: apply, current: current, themes: THEMES };
 })();

@@ -12,7 +12,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/dcadolph/peepwho/internal/secret"
+	"github.com/dcadolph/whotoask/internal/secret"
 )
 
 // errTestNoEntry is the test keychain's not-found error.
@@ -48,7 +48,7 @@ func (k *testKeychain) Delete(name string) error {
 	return nil
 }
 
-// newWipeFixture builds a data directory holding every file peepwho writes,
+// newWipeFixture builds a data directory holding every file whotoask writes,
 // with a lock and a leftover temporary file, and a keychain holding two
 // credentials. It returns the directory and the keychain.
 func newWipeFixture(t *testing.T) (string, *testKeychain) {
@@ -101,7 +101,7 @@ func dirEntries(t *testing.T, dir string) []string {
 	return names
 }
 
-// TestWipe verifies wipe removes every file peepwho writes and every stored
+// TestWipe verifies wipe removes every file whotoask writes and every stored
 // credential once confirmed, and nothing when declined.
 func TestWipe(t *testing.T) {
 	t.Parallel()
@@ -130,7 +130,7 @@ func TestWipe(t *testing.T) {
 	}, { // Test 3: Closed input declines.
 		Stdin: "", WantFiles: all, WantKeys: []string{"GITHUB", "SLACK", "UNRELATED"},
 		WantOut: "left everything as it was",
-	}, { // Test 4: A file peepwho did not write survives, and so does its directory.
+	}, { // Test 4: A file whotoask did not write survives, and so does its directory.
 		Args: []string{"--yes"}, Foreign: true, WantFiles: []string{"notes.txt"},
 		WantKeys: []string{"UNRELATED"}, WantOut: "wiped 12 files",
 	}}
@@ -160,7 +160,7 @@ func TestWipe(t *testing.T) {
 			}
 			got := make([]string, 0, len(kc.data))
 			for name := range kc.data {
-				got = append(got, strings.TrimSuffix(strings.TrimPrefix(name, "PEEPWHO_"), "_TOKEN"))
+				got = append(got, strings.TrimSuffix(strings.TrimPrefix(name, "WHOTOASK_"), "_TOKEN"))
 			}
 			if diff := cmp.Diff(test.WantKeys, got, cmpopts.SortSlices(func(a, b string) bool {
 				return a < b

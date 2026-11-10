@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/fakeapi"
+	"github.com/dcadolph/whotoask/internal/fakeapi"
 )
 
 // TestConfluenceServerEndToEnd runs the whole index-then-ask flow against a
@@ -32,7 +32,7 @@ func TestConfluenceServerEndToEnd(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	dir := t.TempDir()
-	t.Setenv("PEEPWHO_CONFLUENCE_URL", srv.URL)
+	t.Setenv("WHOTOASK_CONFLUENCE_URL", srv.URL)
 	_, stderr, err := runCmd(t, "index", "--source", "confluence", "--confluence-server",
 		"--confluence-space", "KAFKA", "--max-pages", "120", "--data-dir", dir)
 	if err != nil {

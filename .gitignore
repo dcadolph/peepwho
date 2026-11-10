@@ -1,5 +1,5 @@
 # Binary
-/peepwho
+/whotoask
 /bin/
 /dist/
 
@@ -19,7 +19,7 @@ coverage.*
 # Local index and ingested work data. Never commit under strict policy.
 /data/
 /index/
-.peepwho/
+.whotoask/
 *.bleve
 
 # Cloudflare deploy cache

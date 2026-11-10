@@ -6,17 +6,17 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/recall"
-	"github.com/dcadolph/peepwho/internal/resolve"
-	"github.com/dcadolph/peepwho/internal/slack"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/recall"
+	"github.com/dcadolph/whotoask/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/slack"
 )
 
 // Built is a generated company after the real pipeline has run over it: the
-// index and conversations peepwho would have from those sources, alongside the
+// index and conversations whotoask would have from those sources, alongside the
 // answers the company was built to have.
 type Built struct {
 	// Org is the generated company.
@@ -28,7 +28,7 @@ type Built struct {
 }
 
 // Embed fills the index and episode vectors through a local model, exactly as
-// `peepwho index --embed` would, so semantic mode can be scored against the
+// `whotoask index --embed` would, so semantic mode can be scored against the
 // same questions keyword mode was.
 func (b *Built) Embed(ctx context.Context, embedder index.Embedder) error {
 	if err := b.Index.Embed(ctx, embedder); err != nil {
@@ -74,7 +74,7 @@ func (b *Built) ScoreSemantic(ctx context.Context, embedder resolve.Embedder, ki
 
 // Build runs the real ingest path over a generated company. It uses the same
 // connectors, the same indexer, and the same episode store the binary uses, so
-// what is measured afterwards is peepwho rather than a stand-in for it.
+// what is measured afterwards is whotoask rather than a stand-in for it.
 func Build(spec Spec, dir string) (*Built, error) {
 	org := Generate(spec)
 	defer org.Close()
@@ -120,7 +120,7 @@ func BuildFrom(org *Org, dir string, spec Spec) (*Built, error) {
 	return &Built{Org: org, Index: ix, Episodes: store}, nil
 }
 
-// Score is how well peepwho answered a set of questions with known answers.
+// Score is how well whotoask answered a set of questions with known answers.
 type Score struct {
 	// Asked is how many questions were put to it.
 	Asked int

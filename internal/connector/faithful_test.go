@@ -8,22 +8,22 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/confluence"
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/fakeapi"
-	"github.com/dcadolph/peepwho/internal/github"
-	"github.com/dcadolph/peepwho/internal/jira"
-	"github.com/dcadolph/peepwho/internal/pagerduty"
-	"github.com/dcadolph/peepwho/internal/slack"
+	"github.com/dcadolph/whotoask/internal/confluence"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/fakeapi"
+	"github.com/dcadolph/whotoask/internal/github"
+	"github.com/dcadolph/whotoask/internal/jira"
+	"github.com/dcadolph/whotoask/internal/pagerduty"
+	"github.com/dcadolph/whotoask/internal/slack"
 )
 
 // These tests run the real connectors against servers that enforce the parts
 // of each API contract a hand-written stub ignores. A stub answers with
-// whatever its author typed no matter what was asked for, which is how peepwho
+// whatever its author typed no matter what was asked for, which is how whotoask
 // once shipped a Jira client that produced no episodes at all against a real
 // site while every test passed.
 
-// TestJiraAgainstFaithfulSite verifies peepwho reads a Jira site that returns
+// TestJiraAgainstFaithfulSite verifies whotoask reads a Jira site that returns
 // only the fields it was asked for. Nothing here hands back a field the client
 // forgot to request, so a query missing one shows up as absent data rather
 // than as a passing test.
@@ -68,7 +68,7 @@ func TestJiraAgainstFaithfulSite(t *testing.T) {
 		t.Errorf("episode = %+v", ep)
 	}
 	// The description is served as the rich-text tree Jira Cloud really sends,
-	// so this also proves peepwho reads that shape rather than a plain string.
+	// so this also proves whotoask reads that shape rather than a plain string.
 	if !strings.Contains(ep.Body, "retry ceiling") {
 		t.Errorf("episode body = %q, want the issue description flattened into it", ep.Body)
 	}
@@ -113,7 +113,7 @@ func TestJiraPagesThroughFaithfulSite(t *testing.T) {
 	}
 }
 
-// TestSlackAgainstFaithfulSite verifies peepwho reads a Slack workspace through
+// TestSlackAgainstFaithfulSite verifies whotoask reads a Slack workspace through
 // the restricted history tier: each history page returns only a few objects and
 // the first calls answer 429, so the client must page and retry rather than
 // under-read or abort. Slack was the one major source with no contract
@@ -193,7 +193,7 @@ func TestSlackAgainstFaithfulSite(t *testing.T) {
 	}
 }
 
-// TestGitHubAgainstFaithfulAPI verifies peepwho reads merged pull requests from
+// TestGitHubAgainstFaithfulAPI verifies whotoask reads merged pull requests from
 // an API that defaults to open ones and pages with a Link header. A client
 // that forgets state=all sees nothing merged here, which is what would happen
 // in production.
@@ -259,7 +259,7 @@ func TestGitHubAgainstFaithfulAPI(t *testing.T) {
 	}
 }
 
-// TestPagerDutyAgainstFaithfulAPI verifies peepwho reads resolved incidents from
+// TestPagerDutyAgainstFaithfulAPI verifies whotoask reads resolved incidents from
 // an API that actually applies the status filter and pages by offset, so a
 // client asking for the wrong status gets nothing rather than everything.
 func TestPagerDutyAgainstFaithfulAPI(t *testing.T) {
@@ -306,7 +306,7 @@ func TestPagerDutyAgainstFaithfulAPI(t *testing.T) {
 	}
 }
 
-// TestConfluenceAgainstFaithfulSite verifies peepwho reads a Confluence site
+// TestConfluenceAgainstFaithfulSite verifies whotoask reads a Confluence site
 // that withholds anything it was not asked to expand. Space, labels, history,
 // and version all arrive only when named, so an expansion dropped from the
 // query shows up as missing people rather than as a passing test.
@@ -393,7 +393,7 @@ func TestJiraReportsProgressWhilePaging(t *testing.T) {
 	}
 }
 
-// TestConfluenceServerAgainstFaithfulSite verifies peepwho reads a self-hosted
+// TestConfluenceServerAgainstFaithfulSite verifies whotoask reads a self-hosted
 // Server or Data Center wiki: the REST API at the site root, and username-based
 // creators with no account id or email. This is the shape Apache's public
 // Confluence returns, where identity must key on the username.

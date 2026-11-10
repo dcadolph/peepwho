@@ -37,7 +37,7 @@ func TestWhatEachSourceIsWorth(t *testing.T) {
 	// then where the work is recorded, then where it is discussed.
 	// org-csv is deliberately LAST. The generated CSV carries a topics column
 	// naming exactly what each person owns, which is the gauntlet's own answer
-	// key, so putting it first measures whether peepwho can read a spreadsheet.
+	// key, so putting it first measures whether whotoask can read a spreadsheet.
 	// Everything before it is work: what people committed, filed, wrote, and
 	// were paged for.
 	order := []string{"git", "github", "jira", "confluence", "pagerduty", "slack", "codeowners", "org-csv"}

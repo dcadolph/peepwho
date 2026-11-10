@@ -4,7 +4,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // topicAliases folds common surface forms of one concept onto a single canonical

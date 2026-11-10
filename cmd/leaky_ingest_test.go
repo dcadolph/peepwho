@@ -9,7 +9,7 @@ import (
 )
 
 // leakySecrets are the credentials planted in the leaky export. None of them
-// may survive into any file peepwho writes or any answer it prints.
+// may survive into any file whotoask writes or any answer it prints.
 var leakySecrets = []string{
 	"AKIAIOSFODNN7EXAMPLE",
 	"ghp_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789",
@@ -55,7 +55,7 @@ func writeLeakyExport(t *testing.T) string {
 }
 
 // TestLeakyIngestStoresNoSecrets indexes an export full of pasted credentials
-// and then reads every byte peepwho wrote and every answer it gives, looking
+// and then reads every byte whotoask wrote and every answer it gives, looking
 // for any of them. This is the privacy claim as a test: what lands in the
 // index is who talked about the deploy, never the key that was pasted.
 func TestLeakyIngestStoresNoSecrets(t *testing.T) {
@@ -68,7 +68,7 @@ func TestLeakyIngestStoresNoSecrets(t *testing.T) {
 		t.Fatalf("index: %v\n%s", err, stderr)
 	}
 
-	// Every file peepwho wrote, byte by byte.
+	// Every file whotoask wrote, byte by byte.
 	err := filepath.WalkDir(dataDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err

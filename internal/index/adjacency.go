@@ -8,8 +8,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // Adjacency tuning. Co-membership in a group is normalized by the group's size,

@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // OwnerDrift is a topic whose declared owner is not the person doing the work.
@@ -81,7 +81,7 @@ func ownerStanding(ix *index.Index, owners map[model.ID]bool, topic model.ID) st
 // prometheus/prometheus, whose CODEOWNERS assigns almost everything to
 // @prometheus/default-maintainers: every area it owns looked as though the work
 // had moved away, because the owner of record could never have done any. Both
-// verifiable findings there were wrong for this one reason. Peepwho cannot
+// verifiable findings there were wrong for this one reason. WhoToAsk cannot
 // enumerate a team's membership from a CODEOWNERS file, so the honest answer is
 // that these areas cannot be judged, not that they have drifted.
 func isTeam(id model.ID) bool {
@@ -420,7 +420,7 @@ func (r OwnershipReport) Share() float64 {
 // deterministic over the graph, no model required.
 //
 // It can only speak for what was indexed: an owner whose work lives somewhere
-// peepwho was not pointed at looks like an owner who does nothing, so the share
+// whotoask was not pointed at looks like an owner who does nothing, so the share
 // it reports is an upper bound on drift rather than a measurement of it.
 func Ownership(ix *index.Index) OwnershipReport {
 	report := OwnershipReport{}

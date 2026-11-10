@@ -3,7 +3,7 @@ package cmd
 import (
 	"errors"
 
-	"github.com/dcadolph/peepwho/internal/engine"
+	"github.com/dcadolph/whotoask/internal/engine"
 )
 
 // ErrUnknownSource indicates an unsupported --source value. It is the engine's
@@ -22,7 +22,7 @@ var ErrServe = errors.New("cannot serve")
 // ErrNoIndex indicates the index could not be loaded.
 var ErrNoIndex = errors.New("no index")
 
-// ErrNoIdentity indicates peepwho could not tell who is asking, which personal
+// ErrNoIdentity indicates whotoask could not tell who is asking, which personal
 // recall needs before it can scope an answer.
 var ErrNoIdentity = errors.New("unknown identity")
 

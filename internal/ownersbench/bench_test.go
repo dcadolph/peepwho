@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/index"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/index"
 )
 
 // runGit runs one git command in dir, failing the test on error.
@@ -282,7 +282,7 @@ func TestRunSeparatesCohorts(t *testing.T) {
 	if !ok {
 		t.Fatalf("billing not judged; result %+v", res)
 	}
-	if !billing.GitHit || !billing.PeepwhoHit {
+	if !billing.GitHit || !billing.WhoToAskHit {
 		t.Errorf("billing = %+v, want both sides to find the owner who does the work", billing)
 	}
 	search, ok := byDir["search"]
@@ -293,9 +293,9 @@ func TestRunSeparatesCohorts(t *testing.T) {
 		t.Errorf("search gitTop = %v unexpectedly contains the quiet owner; "+
 			"the fixture no longer separates the cohorts", search.GitTop)
 	}
-	if !search.PeepwhoHit {
-		t.Errorf("search peepwhoTop = %v, want Quiet Owner: the lead score exists "+
-			"exactly to find the owner commit counting misses", search.PeepwhoTop)
+	if !search.WhoToAskHit {
+		t.Errorf("search whotoaskTop = %v, want Quiet Owner: the lead score exists "+
+			"exactly to find the owner commit counting misses", search.WhoToAskTop)
 	}
 	if len(res.CohortC()) == 0 {
 		t.Error("no cohort C directories; the discriminating cohort is empty")

@@ -46,9 +46,9 @@ func moduleVersion() string {
 func newVersionCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
-		Short: "Print the peepwho version",
+		Short: "Print the whotoask version",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			_, err := fmt.Fprintln(cmd.OutOrStdout(), "peepwho", version)
+			_, err := fmt.Fprintln(cmd.OutOrStdout(), "whotoask", version)
 			return err
 		},
 	}

@@ -7,16 +7,16 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/engine"
-	"github.com/dcadolph/peepwho/internal/mcp"
-	"github.com/dcadolph/peepwho/internal/recall"
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/engine"
+	"github.com/dcadolph/whotoask/internal/mcp"
+	"github.com/dcadolph/whotoask/internal/recall"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // mcpAskLimit bounds results per section for MCP answers.
 const mcpAskLimit = 25
 
-// newMCPCmd builds the mcp command, which serves peepwho's index to MCP
+// newMCPCmd builds the mcp command, which serves whotoask's index to MCP
 // clients such as Claude Code and Claude Desktop over stdio.
 func newMCPCmd(opts *options) *cobra.Command {
 	var (
@@ -25,17 +25,17 @@ func newMCPCmd(opts *options) *cobra.Command {
 	)
 	cmd := &cobra.Command{
 		Use:   "mcp",
-		Short: "Serve peepwho to MCP clients over stdio",
+		Short: "Serve whotoask to MCP clients over stdio",
 		Long: `Serve the index over the Model Context Protocol, so agent clients can ask
 who knows what mid-conversation. Register it once:
 
-  Claude Code:     claude mcp add peepwho -- peepwho mcp
-  Claude Desktop:  add {"peepwho": {"command": "peepwho", "args": ["mcp"]}}
+  Claude Code:     claude mcp add whotoask -- whotoask mcp
+  Claude Desktop:  add {"whotoask": {"command": "whotoask", "args": ["mcp"]}}
                    under mcpServers in claude_desktop_config.json
 
-Tools: peepwho_ask (keyword or semantic ranking), peepwho_recall (past
-conversations one person took part in), peepwho_person (full
-profile), and peepwho_directory (people, channels, teams, topics). There is
+Tools: whotoask_ask (keyword or semantic ranking), whotoask_recall (past
+conversations one person took part in), whotoask_person (full
+profile), and whotoask_directory (people, channels, teams, topics). There is
 no llm mode here on purpose: the calling agent is already a model, so it
 gets ranked candidates with reasons and does its own reading.
 
@@ -53,10 +53,10 @@ model. Wiring it in is the opt-in.`,
 			if err != nil {
 				return err
 			}
-			srv := mcp.New("peepwho", version, cmd.ErrOrStderr())
+			srv := mcp.New("whotoask", version, cmd.ErrOrStderr())
 			registerMCPTools(srv, eng, embedModel, ollamaURL)
 			registerRecallTool(srv, eng.Recaller(store))
-			fmt.Fprintln(cmd.ErrOrStderr(), "peepwho mcp: serving on stdio")
+			fmt.Fprintln(cmd.ErrOrStderr(), "whotoask mcp: serving on stdio")
 			return srv.Serve(cmd.Context(), cmd.InOrStdin(), cmd.OutOrStdout())
 		},
 	}
@@ -73,11 +73,11 @@ model. Wiring it in is the opt-in.`,
 // somebody else's history.
 func registerRecallTool(srv *mcp.Server, res *recall.Resolver) {
 	srv.AddTool(mcp.Tool{
-		Name: "peepwho_recall",
+		Name: "whotoask_recall",
 		Description: "Find the past conversation where a person worked something out, and who " +
 			"was in it. Returns people, place, date, and a link back to the conversation, " +
 			"never the messages themselves. Every answer covers only the named person's own " +
-			"conversations. Ask about the person running peepwho unless told otherwise.",
+			"conversations. Ask about the person running whotoask unless told otherwise.",
 		InputSchema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
@@ -99,11 +99,11 @@ func registerRecallTool(srv *mcp.Server, res *recall.Resolver) {
 			Limit int `json:"limit"`
 		}
 		if err := json.Unmarshal(args, &in); err != nil || in.Question == "" {
-			return "", fmt.Errorf("peepwho_recall needs a question")
+			return "", fmt.Errorf("whotoask_recall needs a question")
 		}
 		person := res.Who(in.Person)
 		if person == "" {
-			return "", fmt.Errorf("peepwho_recall needs a person, such as an email or slack:U123")
+			return "", fmt.Errorf("whotoask_recall needs a person, such as an email or slack:U123")
 		}
 		if in.Limit <= 0 || in.Limit > mcpAskLimit {
 			in.Limit = 5
@@ -124,7 +124,7 @@ func registerMCPTools(srv *mcp.Server, eng *engine.Engine, embedModel, ollamaURL
 // registerMCPAsk wires the ask tool, keyword or semantic, over the engine.
 func registerMCPAsk(srv *mcp.Server, eng *engine.Engine, embedModel, ollamaURL string) {
 	srv.AddTool(mcp.Tool{
-		Name: "peepwho_ask",
+		Name: "whotoask_ask",
 		Description: "Find who to talk to and which channel to ask in about a topic, " +
 			"ranked with reasons and strength from the organization's indexed work tools.",
 		InputSchema: json.RawMessage(`{
@@ -149,7 +149,7 @@ func registerMCPAsk(srv *mcp.Server, eng *engine.Engine, embedModel, ollamaURL s
 			Limit int `json:"limit"`
 		}
 		if err := json.Unmarshal(args, &in); err != nil || in.Question == "" {
-			return "", fmt.Errorf("peepwho_ask needs a question")
+			return "", fmt.Errorf("whotoask_ask needs a question")
 		}
 		if in.Mode == "llm" {
 			return "", fmt.Errorf("no llm mode here: you are the model; use keyword or semantic")
@@ -170,9 +170,9 @@ func registerMCPAsk(srv *mcp.Server, eng *engine.Engine, embedModel, ollamaURL s
 // registerMCPPerson wires the tool that returns one person's profile.
 func registerMCPPerson(srv *mcp.Server, eng *engine.Engine) {
 	srv.AddTool(mcp.Tool{
-		Name: "peepwho_person",
-		Description: "Everything peepwho knows about one person: title, team, org, manager, " +
-			"merged identities, channels, and expertise topics. Use the id from peepwho_ask results.",
+		Name: "whotoask_person",
+		Description: "Everything whotoask knows about one person: title, team, org, manager, " +
+			"merged identities, channels, and expertise topics. Use the id from whotoask_ask results.",
 		InputSchema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
@@ -187,7 +187,7 @@ func registerMCPPerson(srv *mcp.Server, eng *engine.Engine) {
 			ID string `json:"id"`
 		}
 		if err := json.Unmarshal(args, &in); err != nil || in.ID == "" {
-			return "", fmt.Errorf("peepwho_person needs an id")
+			return "", fmt.Errorf("whotoask_person needs an id")
 		}
 		profile, ok := eng.Person(in.ID)
 		if !ok {
@@ -200,7 +200,7 @@ func registerMCPPerson(srv *mcp.Server, eng *engine.Engine) {
 // registerMCPDirectory wires the tool that lists one directory of the index.
 func registerMCPDirectory(srv *mcp.Server, dir *resolve.Directory) {
 	srv.AddTool(mcp.Tool{
-		Name: "peepwho_directory",
+		Name: "whotoask_directory",
 		Description: "Browse everything indexed: people with teams and topics, channels with " +
 			"member counts, teams with sizes, or topics with how many people carry each.",
 		InputSchema: json.RawMessage(`{
@@ -218,7 +218,7 @@ func registerMCPDirectory(srv *mcp.Server, dir *resolve.Directory) {
 			Kind string `json:"kind"`
 		}
 		if err := json.Unmarshal(args, &in); err != nil {
-			return "", fmt.Errorf("peepwho_directory needs a kind")
+			return "", fmt.Errorf("whotoask_directory needs a kind")
 		}
 		switch in.Kind {
 		case "people":

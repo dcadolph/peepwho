@@ -28,8 +28,8 @@ func TestEveryCommandIsDocumented(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			if !strings.Contains(reference, "## peepwho "+name+"\n") {
-				t.Errorf("docs/REFERENCE.md has no `## peepwho %s` section", name)
+			if !strings.Contains(reference, "## whotoask "+name+"\n") {
+				t.Errorf("docs/REFERENCE.md has no `## whotoask %s` section", name)
 			}
 		})
 	}

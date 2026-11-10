@@ -12,25 +12,25 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/graph"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/graph"
 )
 
 // Environment variables that hold each source's credentials. The caller
 // resolves the ones a source names in SourceSpec.Creds and passes the values
 // in SourceOptions.Creds, so building a source never reads the environment.
 const (
-	SlackTokenEnv      = "PEEPWHO_SLACK_TOKEN"
-	GitHubTokenEnv     = "PEEPWHO_GITHUB_TOKEN"
-	PagerDutyTokenEnv  = "PEEPWHO_PAGERDUTY_TOKEN"
-	GraphTokenEnv      = "PEEPWHO_GRAPH_TOKEN"
-	GraphURLEnv        = "PEEPWHO_GRAPH_URL"
-	JiraURLEnv         = "PEEPWHO_JIRA_URL"
-	JiraEmailEnv       = "PEEPWHO_JIRA_EMAIL"
-	JiraTokenEnv       = "PEEPWHO_JIRA_TOKEN"
-	ConfluenceURLEnv   = "PEEPWHO_CONFLUENCE_URL"
-	ConfluenceEmailEnv = "PEEPWHO_CONFLUENCE_EMAIL"
-	ConfluenceTokenEnv = "PEEPWHO_CONFLUENCE_TOKEN"
+	SlackTokenEnv      = "WHOTOASK_SLACK_TOKEN"
+	GitHubTokenEnv     = "WHOTOASK_GITHUB_TOKEN"
+	PagerDutyTokenEnv  = "WHOTOASK_PAGERDUTY_TOKEN"
+	GraphTokenEnv      = "WHOTOASK_GRAPH_TOKEN"
+	GraphURLEnv        = "WHOTOASK_GRAPH_URL"
+	JiraURLEnv         = "WHOTOASK_JIRA_URL"
+	JiraEmailEnv       = "WHOTOASK_JIRA_EMAIL"
+	JiraTokenEnv       = "WHOTOASK_JIRA_TOKEN"
+	ConfluenceURLEnv   = "WHOTOASK_CONFLUENCE_URL"
+	ConfluenceEmailEnv = "WHOTOASK_CONFLUENCE_EMAIL"
+	ConfluenceTokenEnv = "WHOTOASK_CONFLUENCE_TOKEN"
 )
 
 // SourceOptions holds everything a source constructor reads. The per-source
@@ -273,12 +273,12 @@ func newConfluence(o SourceOptions) (connector.Source, error) {
 	if o.Confluence.Server {
 		if site == "" {
 			return nil, fmt.Errorf(
-				"%w: set PEEPWHO_CONFLUENCE_URL (or PEEPWHO_JIRA_URL) for the Server site",
+				"%w: set WHOTOASK_CONFLUENCE_URL (or WHOTOASK_JIRA_URL) for the Server site",
 				ErrBadArgs)
 		}
 	} else if site == "" || email == "" || token == "" {
 		return nil, fmt.Errorf(
-			"%w: set PEEPWHO_CONFLUENCE_URL, EMAIL, and TOKEN (or the Jira ones, "+
+			"%w: set WHOTOASK_CONFLUENCE_URL, EMAIL, and TOKEN (or the Jira ones, "+
 				"or pass --confluence-server for a self-hosted site)", ErrBadArgs)
 	}
 	co := o.Confluence

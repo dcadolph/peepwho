@@ -10,25 +10,25 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/keyring"
-	"github.com/dcadolph/peepwho/internal/util"
-	"github.com/dcadolph/peepwho/internal/vault"
+	"github.com/dcadolph/whotoask/internal/keyring"
+	"github.com/dcadolph/whotoask/internal/util"
+	"github.com/dcadolph/whotoask/internal/vault"
 )
 
 // newVaultCmd builds the vault command group for index encryption at rest.
 func newVaultCmd(opts *options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "vault",
-		Short: "Encrypt peepwho's on-disk stores at rest",
+		Short: "Encrypt whotoask's on-disk stores at rest",
 		Long: `Encrypt what is on disk so a stolen laptop or a stray backup cannot read your
-people graph or what peepwho kept beside it. Four stores are covered: the index,
+people graph or what whotoask kept beside it. Four stores are covered: the index,
 the conversation store holding retained message text, the recorded facts, and
 the feedback votes. Encryption turns on whenever a key is configured:
 
-  PEEPWHO_INDEX_KEY         a base64 32-byte key, best for automation
-  PEEPWHO_INDEX_PASSPHRASE  a passphrase, prompted if unset on a terminal
+  WHOTOASK_INDEX_KEY         a base64 32-byte key, best for automation
+  WHOTOASK_INDEX_PASSPHRASE  a passphrase, prompted if unset on a terminal
 
-Generate a key with "peepwho vault keygen". With a key set, every write is
+Generate a key with "whotoask vault keygen". With a key set, every write is
 encrypted and every read decrypts. Reading an encrypted file without the key
 fails rather than exposing anything.`,
 	}
@@ -127,11 +127,11 @@ func newVaultEncryptCmd(opts *options) *cobra.Command {
 			}
 			if c == nil {
 				return fmt.Errorf(
-					"%w: no key configured; run `peepwho vault keygen` and set %s", ErrBadArgs, keyring.EnvKey)
+					"%w: no key configured; run `whotoask vault keygen` and set %s", ErrBadArgs, keyring.EnvKey)
 			}
 			enc, err := isEncryptedOnDisk(opts.indexPath())
 			if errors.Is(err, fs.ErrNotExist) {
-				return fmt.Errorf("%w: run `peepwho index` first", ErrNoIndex)
+				return fmt.Errorf("%w: run `whotoask index` first", ErrNoIndex)
 			}
 			if err != nil {
 				return err
@@ -181,7 +181,7 @@ func newVaultDecryptCmd(opts *options) *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			enc, err := isEncryptedOnDisk(opts.indexPath())
 			if errors.Is(err, fs.ErrNotExist) {
-				return fmt.Errorf("%w: run `peepwho index` first", ErrNoIndex)
+				return fmt.Errorf("%w: run `whotoask index` first", ErrNoIndex)
 			}
 			if err != nil {
 				return err

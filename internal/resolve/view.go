@@ -5,8 +5,8 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // Strength labels partition the zero-to-one match range for display.

@@ -13,12 +13,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/resolve"
-	"github.com/dcadolph/peepwho/internal/seal"
-	"github.com/dcadolph/peepwho/internal/secret"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/seal"
+	"github.com/dcadolph/whotoask/internal/secret"
 )
 
 // assessDeparturesListed caps how many people the departure file covers.
@@ -123,7 +123,7 @@ mixes with your own index.
 The output directory holds the deliverable:
 
   summary.md           the executive summary: findings, questions, actions
-  report.html          the knowledge-risk brief, readable without peepwho
+  report.html          the knowledge-risk brief, readable without whotoask
   findings.json        every scored topic: bus factor, level, experts
   ownership.json       where the owner on paper is not the one doing the work
   systems.json         each significant directory and who its work rests on
@@ -134,7 +134,7 @@ The output directory holds the deliverable:
   identity.json        which records were judged one person, and which were not
   aliases.json         the suggested joins, in the format --aliases reads
   manifest.json        every file above by size and sha256, signed
-  manifest.sig         the signature; check it all with peepwho verify
+  manifest.sig         the signature; check it all with whotoask verify
   README.txt           what each file is and how to verify the seal
 
 An identity left split reads as two people covering each other, so it flatters
@@ -142,10 +142,10 @@ every coverage figure. Run it once, review aliases.json, and run it again with
 --aliases pointing at the reviewed file.
 
 Examples:
-  peepwho assess --repo-path ./target-repo --out acme-assessment
-  peepwho assess --repo-path ./target-repo --github-repo acme/platform
-  peepwho assess --repo-path ./svc-a --repo-path ./svc-b --slack-export export.zip
-  peepwho assess --repo-path ./target-repo --aliases acme-assessment/aliases.json`,
+  whotoask assess --repo-path ./target-repo --out acme-assessment
+  whotoask assess --repo-path ./target-repo --github-repo acme/platform
+  whotoask assess --repo-path ./svc-a --repo-path ./svc-b --slack-export export.zip
+  whotoask assess --repo-path ./target-repo --aliases acme-assessment/aliases.json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runAssess(cmd, opts, &a)
@@ -175,7 +175,7 @@ func (a *assessArgs) register(cmd *cobra.Command) {
 			"the inferred joins. The deliverable's aliases.json is written in this "+
 			"format, so reviewing it and passing it back is the fix for a split "+
 			"identity.")
-	f.StringVar(&a.OutDir, "out", "", "Output directory (default peepwho-assessment-<date>).")
+	f.StringVar(&a.OutDir, "out", "", "Output directory (default whotoask-assessment-<date>).")
 	f.IntVar(&a.Top, "top", assessDeparturesListed, "People to cover in the departure file.")
 	f.IntVar(&a.GitSinceDays, "git-since-days", 730,
 		"How far back to read git history. Two years, because an assessment is about "+
@@ -193,7 +193,7 @@ func runAssess(cmd *cobra.Command, opts *options, a *assessArgs) error {
 			"--org-csv, or --codeowners", ErrBadArgs)
 	}
 	if a.OutDir == "" {
-		a.OutDir = "peepwho-assessment-" + opts.now().Format("20060102")
+		a.OutDir = "whotoask-assessment-" + opts.now().Format("20060102")
 	}
 	if err := os.MkdirAll(a.OutDir, 0o755); err != nil {
 		return fmt.Errorf("assess: %w", err)
@@ -701,7 +701,7 @@ func (d *deliverable) write() error {
 }
 
 // assessFileNotes explains each file of the deliverable to somebody who has
-// never run peepwho. The README lists only the files this run produced, so it
+// never run whotoask. The README lists only the files this run produced, so it
 // never describes a file that is not there.
 var assessFileNotes = map[string]string{
 	"summary.md": "The executive summary: what was found, the questions it\n" +
@@ -732,7 +732,7 @@ var assessFileNotes = map[string]string{
 		"                     not a judgement of ability.",
 	"checks.json": "One paste-ready git command per reported system, counting\n" +
 		"                     the same history the finding was counted from, so any\n" +
-		"                     row can be checked without peepwho.",
+		"                     row can be checked without whotoask.",
 	"ramp.json": "What this history says about moving into an unfamiliar\n" +
 		"                     area: how long the people who did it took, and how many\n" +
 		"                     started and did not carry on. Observed, not predicted.",
@@ -747,7 +747,7 @@ var assessFileNotes = map[string]string{
 // is taken and so are never in it.
 func assessReadme(names []string) string {
 	var b strings.Builder
-	b.WriteString("This directory is a peepwho knowledge-risk assessment.\n\n")
+	b.WriteString("This directory is a whotoask knowledge-risk assessment.\n\n")
 	for _, name := range names {
 		note := assessFileNotes[name]
 		if note == "" {
@@ -764,7 +764,7 @@ func assessReadme(names []string) string {
 Checking the seal takes one command, run from inside this directory, and it
 sends nothing anywhere:
 
-    peepwho verify .
+    whotoask verify .
 
 It checks that manifest.sig is a valid signature over manifest.json, then that
 every file above still has the size and sha256 the manifest records. It names
@@ -773,7 +773,7 @@ there is either.
 
 The signature proves the manifest has not changed since it was signed, by the
 key it names. To know whose key that is, ask whoever sent this directory for
-the output of peepwho attest key, and add --key with that public key.
+the output of whotoask attest key, and add --key with that public key.
 `)
 	return b.String()
 }

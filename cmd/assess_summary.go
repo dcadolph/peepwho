@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // summaryListed caps how many entries each summary section prints; the full
@@ -73,7 +73,7 @@ func assessSummary(ix *index.Index, res *assessment) string {
 		writeSystems(&b, res.Places)
 		if len(res.Checks) > 0 {
 			b.WriteString(
-				"\nEvery system above is checkable without peepwho: checks.json carries " +
+				"\nEvery system above is checkable without whotoask: checks.json carries " +
 					"one paste-ready git command per system, counting the same window " +
 					"of history this assessment read. When a row is doubted, run its " +
 					"command rather than arguing with the report.\n")
@@ -125,7 +125,7 @@ func writeSummaryScope(b *strings.Builder, ix *index.Index, res *assessment, c a
 			"Crossings: %d %s between subjects have only ever been made by one person.%s\n",
 			len(spans), pick(len(spans), "connection", "connections"), coveredSpans(spans))
 	}
-	b.WriteString("\nThe language throughout is deliberate: peepwho measures observed work, " +
+	b.WriteString("\nThe language throughout is deliberate: whotoask measures observed work, " +
 		"not competence. A finding says what the record shows and who it points to, " +
 		"and every one traces to the evidence in the data files beside this summary.\n")
 	b.WriteString(rampParagraph(res.Ramp))
@@ -375,7 +375,7 @@ func covers(bus int) string {
 // the reading that what it did not find is not there.
 func assessLimits(split []resolve.SplitName) string {
 	var b strings.Builder
-	b.WriteString("\nWhat would change these numbers: peepwho sees only what it was " +
+	b.WriteString("\nWhat would change these numbers: whotoask sees only what it was " +
 		"pointed at, so knowledge held somewhere unindexed reads as knowledge nobody " +
 		"has. Every figure here is therefore a floor on concentration rather than a " +
 		"measurement of it.\n")

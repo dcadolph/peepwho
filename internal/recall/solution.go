@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // maxSolutionNotes caps the messages shown for one conversation. A person is
@@ -32,7 +32,7 @@ const summarySystem = "You summarize work conversations for the person who took 
 func (r *Resolver) SetSummarizer(s Summarizer) { r.summarizer = s }
 
 // Solution is what a kept conversation says about how something was worked
-// out. It exists only for conversations whose content peepwho holds.
+// out. It exists only for conversations whose content whotoask holds.
 type Solution struct {
 	// Summary is a written account of how it resolved, present only when a
 	// model wrote one.
@@ -55,7 +55,7 @@ type Note struct {
 	At string `json:"at,omitempty"`
 }
 
-// solution renders the kept content of a conversation, or nil when peepwho
+// solution renders the kept content of a conversation, or nil when whotoask
 // holds only a pointer to it.
 func (r *Resolver) solution(ctx context.Context, ep *episode.Episode) *Solution {
 	if !ep.Archived() {

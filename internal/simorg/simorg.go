@@ -1,4 +1,4 @@
-// Package simorg simulates a small company across every source peepwho reads,
+// Package simorg simulates a small company across every source whotoask reads,
 // serving each tool's wire format from in-process HTTP servers. It exercises
 // the full pipeline end to end, at the wire level, without any credentials.
 package simorg
@@ -18,14 +18,14 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
-	"github.com/dcadolph/peepwho/internal/confluence"
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/github"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/jira"
-	"github.com/dcadolph/peepwho/internal/pagerduty"
-	"github.com/dcadolph/peepwho/internal/slack"
+	"github.com/dcadolph/whotoask/internal/confluence"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/github"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/jira"
+	"github.com/dcadolph/whotoask/internal/pagerduty"
+	"github.com/dcadolph/whotoask/internal/slack"
 )
 
 // The simulated cast. The Payments team is Angela, Oscar, Kevin, and Pam;

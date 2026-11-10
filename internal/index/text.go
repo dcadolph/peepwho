@@ -1,7 +1,7 @@
 package index
 
 import (
-	"github.com/dcadolph/peepwho/internal/text"
+	"github.com/dcadolph/whotoask/internal/text"
 )
 
 // The index shares one normalizer with every other searchable store in the

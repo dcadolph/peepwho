@@ -3,7 +3,7 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/policy"
+	"github.com/dcadolph/whotoask/internal/policy"
 )
 
 // newRefreshCmd builds the refresh command, which re-indexes every source with
@@ -17,7 +17,7 @@ indexed with and merging the result. Sources indexed in separate runs, such as
 two repositories, are each replayed. It is what a scheduled refresh runs, so the
 graph stays current without retyping each source's scope.
 
-  peepwho refresh`,
+  whotoask refresh`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			x := opts.indexer(cmd)

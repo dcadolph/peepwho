@@ -5,8 +5,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/feedback"
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/feedback"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // TestServeConcurrent drives Profile, SetFeedback, and Search against one index

@@ -1,6 +1,6 @@
 package cmd
 
-import "github.com/dcadolph/peepwho/internal/engine"
+import "github.com/dcadolph/whotoask/internal/engine"
 
 // explainSourceError turns a low-level fetch failure into an actionable message
 // naming the source and the credential to check. It is the engine's

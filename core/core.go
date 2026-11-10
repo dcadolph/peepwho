@@ -1,5 +1,5 @@
-// Package core is the peepwho surface the Mac and iPhone apps call through
-// gomobile, bound as the PeepwhoCore framework.
+// Package core is the whotoask surface the Mac and iPhone apps call through
+// gomobile, bound as the WhoToAskCore framework.
 //
 // The API is flat because gomobile restricts what crosses the language
 // boundary: strings, ints, and bools in, JSON strings and errors out. Answers
@@ -28,13 +28,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/engine"
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/policy"
-	"github.com/dcadolph/peepwho/internal/recall"
-	"github.com/dcadolph/peepwho/internal/vault"
+	"github.com/dcadolph/whotoask/internal/engine"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/policy"
+	"github.com/dcadolph/whotoask/internal/recall"
+	"github.com/dcadolph/whotoask/internal/vault"
 )
 
 // defaultLimit is the result count used when a caller passes zero or less.
@@ -43,7 +43,7 @@ const defaultLimit = 5
 // maxLimit caps results per call so a bad argument cannot ask for everything.
 const maxLimit = 100
 
-// Handle is an opened peepwho data directory usable from Swift. Its methods
+// Handle is an opened whotoask data directory usable from Swift. Its methods
 // are safe to call from several threads: a question asked while Index or
 // Refresh runs answers from the index as it was until the new one is loaded.
 type Handle struct {
@@ -88,7 +88,7 @@ type loaded struct {
 type Secrets interface {
 	// Get returns the secret stored under name, or empty when it is unset.
 	// Names are the environment variable names the command line reads, such as
-	// PEEPWHO_JIRA_TOKEN, so the app and the command line agree on them.
+	// WHOTOASK_JIRA_TOKEN, so the app and the command line agree on them.
 	Get(name string) string
 }
 
@@ -168,7 +168,7 @@ func (h *Handle) secret(name string) string {
 }
 
 // Open opens the data directory at dir. key is the base64 index key that
-// `peepwho vault keygen` prints and PEEPWHO_INDEX_KEY holds, or empty for a
+// `whotoask vault keygen` prints and WHOTOASK_INDEX_KEY holds, or empty for a
 // plain index. A sealed index opened with no key, or with the wrong key, fails
 // here with an error that names the key, rather than on the first question. A
 // directory with no index yet, or none at all, opens unbuilt: Index or Refresh
@@ -222,7 +222,7 @@ func keyCodec(key string) (vault.Codec, error) {
 	}
 	raw, err := base64.StdEncoding.DecodeString(key)
 	if err != nil {
-		return nil, fmt.Errorf("core: the index key must be base64, as peepwho vault keygen prints it: %w", err)
+		return nil, fmt.Errorf("core: the index key must be base64, as whotoask vault keygen prints it: %w", err)
 	}
 	c, err := vault.NewKeyCipher(raw)
 	if err != nil {
@@ -237,11 +237,11 @@ func keyCodec(key string) (vault.Codec, error) {
 func openError(path string, codec vault.Codec, err error) error {
 	switch {
 	case errors.Is(err, vault.ErrEncrypted) && engine.NeedsKey(path):
-		return fmt.Errorf("core: %s is sealed: open it with the index key from peepwho vault keygen: %w",
+		return fmt.Errorf("core: %s is sealed: open it with the index key from whotoask vault keygen: %w",
 			path, err)
 	case errors.Is(err, vault.ErrEncrypted):
 		return fmt.Errorf("core: %s is sealed with a passphrase: the app opens only an index sealed "+
-			"with the index key from peepwho vault keygen: %w", path, err)
+			"with the index key from whotoask vault keygen: %w", path, err)
 	case codec != nil && errors.Is(err, vault.ErrCorrupt):
 		return fmt.Errorf("core: the index key does not open %s: %w", path, err)
 	default:
@@ -991,9 +991,9 @@ type wipeView struct {
 	Removed []string `json:"removed"`
 }
 
-// Wipe deletes every file peepwho keeps in the data directory at dir, then the
+// Wipe deletes every file whotoask keeps in the data directory at dir, then the
 // directory itself when nothing else is left in it. It needs no key, so a lost
-// key never blocks a wipe. Files peepwho did not write are left in place. A
+// key never blocks a wipe. Files whotoask did not write are left in place. A
 // handle open on dir still answers from memory afterward, so drop it. The
 // host's own Keychain items are the host's to delete.
 func Wipe(dir string) (out string, err error) {

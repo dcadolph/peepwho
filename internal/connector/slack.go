@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/slack"
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/slack"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // Default Slack ingest bounds. Standard depth pulls roughly six months of
@@ -45,7 +45,7 @@ type SlackOptions struct {
 	MaxMessages int
 	// MaxChannels caps channels processed; zero means all.
 	MaxChannels int
-	// Episodes records the conversations behind the messages, so peepwho can
+	// Episodes records the conversations behind the messages, so whotoask can
 	// point back at the discussion that solved something.
 	Episodes bool
 	// MaxEpisodesPerChannel caps episodes kept per channel; zero uses the
@@ -271,7 +271,7 @@ func (s *Slack) Fetch(ctx context.Context) ([]Record, error) {
 			// case: the app is installed but not yet invited anywhere.
 			fmt.Fprintf(s.opts.Log,
 				"slack: the bot is not a member of any channel, so no messages could be read. "+
-					"In Slack, invite it with `/invite @peepwho` in the channels you want indexed, "+
+					"In Slack, invite it with `/invite @whotoask` in the channels you want indexed, "+
 					"then run this again\n")
 		case read == 0:
 			// Not a membership problem, so the token cannot read history at

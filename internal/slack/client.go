@@ -1,4 +1,4 @@
-// Package slack is a minimal Slack Web API client scoped to what peepwho needs
+// Package slack is a minimal Slack Web API client scoped to what whotoask needs
 // to ingest: workspace users, channels, and message history. The token is held
 // only in memory, never serialized, and never logged.
 package slack
@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/httputil"
+	"github.com/dcadolph/whotoask/internal/httputil"
 )
 
 // defaultBaseURL is the Slack Web API root.
@@ -77,7 +77,7 @@ func New(token string, opts ...Option) *Client {
 	return c
 }
 
-// Profile holds the subset of a Slack user profile peepwho uses.
+// Profile holds the subset of a Slack user profile whotoask uses.
 type Profile struct {
 	// RealName is the user's display name.
 	RealName string `json:"real_name"`
@@ -155,13 +155,13 @@ type Message struct {
 	// LatestReply is the timestamp of the most recent reply in the thread.
 	LatestReply string `json:"latest_reply"`
 	// Files are the files shared in the message. Only the metadata Slack
-	// already sent is read; peepwho never downloads file content.
+	// already sent is read; whotoask never downloads file content.
 	Files []File `json:"files"`
 }
 
 // File is a file shared in a message. Slack sends this metadata inside the
-// history payload that peepwho already reads, so a shared document costs no
-// extra request. Only the name and kind are kept: peepwho never downloads a
+// history payload that whotoask already reads, so a shared document costs no
+// extra request. Only the name and kind are kept: whotoask never downloads a
 // file, so a video, an installer, or a slide deck is never transferred, stored,
 // or indexed beyond what it is called.
 type File struct {

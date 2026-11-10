@@ -12,15 +12,15 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/fact"
-	"github.com/dcadolph/peepwho/internal/feedback"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/state"
-	"github.com/dcadolph/peepwho/internal/vault"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/fact"
+	"github.com/dcadolph/whotoask/internal/feedback"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/state"
+	"github.com/dcadolph/whotoask/internal/vault"
 )
 
-// Dir is a data directory and the names of the files peepwho keeps in it.
+// Dir is a data directory and the names of the files whotoask keeps in it.
 type Dir string
 
 // Index returns the index file path.
@@ -61,7 +61,7 @@ func (d Dir) AttestKey() string { return filepath.Join(string(d), "attest.key") 
 // Sample returns the path of the marker that says the index holds sample data.
 func (d Dir) Sample() string { return filepath.Join(string(d), "sample.json") }
 
-// Files returns every file peepwho keeps in the directory, in a fixed order.
+// Files returns every file whotoask keeps in the directory, in a fixed order.
 func (d Dir) Files() []string {
 	return []string{
 		d.Index(), d.Sources(), d.State(), d.Episodes(), d.Feedback(), d.Facts(),

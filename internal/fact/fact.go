@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/util"
-	"github.com/dcadolph/peepwho/internal/vault"
+	"github.com/dcadolph/whotoask/internal/util"
+	"github.com/dcadolph/whotoask/internal/vault"
 )
 
 // knownRelations is the closed set of relations a fact may assert. A relation

@@ -1,6 +1,6 @@
 // Taking things with you.
 //
-// Every answer peepwho gives is on its way somewhere else: pasted into a ticket,
+// Every answer whotoask gives is on its way somewhere else: pasted into a ticket,
 // dropped in a channel, attached to a review, carried into a meeting. A value
 // you can read on screen and cannot take with you is half an answer, so the
 // affordance for leaving with it belongs next to the thing itself rather than

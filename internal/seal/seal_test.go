@@ -46,9 +46,9 @@ func newTestSealDir(t *testing.T, priv ed25519.PrivateKey) string {
 		}
 	}
 	_, err := Write(dir, Manifest{
-		Product: "peepwho", ProductVersion: "test", CreatedAt: "2026-11-03T00:00:00Z",
+		Product: "whotoask", ProductVersion: "test", CreatedAt: "2026-11-03T00:00:00Z",
 		Subject: Subject{Type: "org", ID: "org:test"},
-		Claim:   Claim{Type: "peepwho.knowledge-risk/1", Payload: json.RawMessage(`{"critical":2}`)},
+		Claim:   Claim{Type: "whotoask.knowledge-risk/1", Payload: json.RawMessage(`{"critical":2}`)},
 		Files: []File{
 			{Path: "summary.md", MediaType: "text/markdown", Role: "summary"},
 			{Path: "findings.json", MediaType: "application/json", Role: "findings"},

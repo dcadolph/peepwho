@@ -6,11 +6,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // PlanWipe lists the files present now that a wipe of dir removes: each file
-// peepwho keeps, its lock, and any temporary file an interrupted atomic write
+// whotoask keeps, its lock, and any temporary file an interrupted atomic write
 // left beside it. Anything at those paths that is not a regular file, such as
 // a symlink, stops the plan, so a wipe never follows a link out of dir.
 func PlanWipe(dir Dir) ([]string, error) {
@@ -47,7 +47,7 @@ func Wipe(dir Dir, files []string) error {
 		}
 	}
 	// os.Remove refuses a directory that still holds anything, which is the
-	// point: only a directory peepwho emptied goes.
+	// point: only a directory whotoask emptied goes.
 	_ = os.Remove(string(dir)) //nolint:errcheck // A non-empty or missing directory stays as it is.
 	return errors.Join(errs...)
 }

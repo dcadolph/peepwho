@@ -16,15 +16,15 @@ import (
 func TestRepo(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		io.WriteString(w, `{"name":"peepwho","full_name":"o/peepwho",`+
+		io.WriteString(w, `{"name":"whotoask","full_name":"o/whotoask",`+
 			`"description":"find people","topics":["search","people"]}`)
 	}))
 	t.Cleanup(srv.Close)
-	repo, err := New("ghp-test", WithBaseURL(srv.URL)).Repo(context.Background(), "o", "peepwho")
+	repo, err := New("ghp-test", WithBaseURL(srv.URL)).Repo(context.Background(), "o", "whotoask")
 	if err != nil {
 		t.Fatalf("Repo: %v", err)
 	}
-	if repo.Name != "peepwho" || len(repo.Topics) != 2 {
+	if repo.Name != "whotoask" || len(repo.Topics) != 2 {
 		t.Errorf("repo = %+v", repo)
 	}
 }

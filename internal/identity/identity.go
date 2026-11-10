@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // Resolver unions identifiers that belong to the same person and resolves any

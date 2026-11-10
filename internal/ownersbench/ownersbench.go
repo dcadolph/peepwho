@@ -1,4 +1,4 @@
-// Package ownersbench scores a peepwho index against a repository's own
+// Package ownersbench scores a whotoask index against a repository's own
 // human-authored ownership: the OWNERS files projects in the Kubernetes
 // ecosystem maintain for real governance. Maintainers wrote those lists for
 // their own reasons, reviewed by other maintainers, which makes them the

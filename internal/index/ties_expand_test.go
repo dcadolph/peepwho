@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
+	"github.com/dcadolph/whotoask/internal/connector"
 )
 
 // tieFixture builds an index where billing-retries and kafka-lag travel
@@ -35,7 +35,7 @@ func tieFixture(t *testing.T) *Index {
 }
 
 // TestAskReachesThroughTheTieGraph covers the search path reading the
-// co-occurrence graph. Before this, peepwho's most distinctive structure fed
+// co-occurrence graph. Before this, whotoask's most distinctive structure fed
 // the risk views only, and a question about billing retries could not surface
 // the person holding the subject it travels with.
 func TestAskReachesThroughTheTieGraph(t *testing.T) {

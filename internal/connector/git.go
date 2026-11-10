@@ -21,7 +21,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/filesystem"
 
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // Git history ingest bounds. A year of history captures current ownership;
@@ -51,7 +51,7 @@ type GitOptions struct {
 	// UntilDays stops the window short of today, excluding anything more recent
 	// than this many days ago. Zero reads up to the present. It exists so an
 	// index can be built from what was known at a past date, which is the only
-	// way to ask whether peepwho would have pointed at the right person before
+	// way to ask whether whotoask would have pointed at the right person before
 	// the answer was visible in the history it was reading.
 	UntilDays int
 	// MaxCommits caps commits read per repository; zero means 2000.
@@ -303,7 +303,7 @@ func (g *GitHistory) Fetch(ctx context.Context) ([]Record, error) {
 	// dated at their most recent commit, so recency decay applies to the person
 	// rather than to each contribution.
 	//
-	// That is deliberate for the question peepwho is usually asked, which is who
+	// That is deliberate for the question whotoask is usually asked, which is who
 	// to go to now, and it is invisible over a window of a year. It stops being
 	// invisible over a long one. Indexing thirteen years of home-assistant/core
 	// tripled the areas whose declared owner is out-worked, from 113 to 270,
@@ -458,7 +458,7 @@ func dotGit(path string) (billy.Filesystem, error) {
 		// repository it was added from. Following the link alone finds a
 		// repository whose every commit is missing, so follow it the rest of
 		// the way to the shared directory. History is shared between them, and
-		// history is all peepwho reads.
+		// history is all whotoask reads.
 		return worktreeCommon(dot)
 	}
 	if _, err := os.Stat(filepath.Join(path, "HEAD")); err == nil {
@@ -625,7 +625,7 @@ func pickNames(counts map[string]map[string]int) map[string]string {
 // changedPaths lists the files one commit touched, by comparing its tree with
 // its first parent's. Only the trees are needed for that. Asking the commit for
 // its stats instead builds a full textual patch of every changed file, which is
-// far more work for a result peepwho throws away, and fails outright on the
+// far more work for a result whotoask throws away, and fails outright on the
 // partial clones large repositories are usually fetched as, where the file
 // contents were never downloaded.
 func changedPaths(c *object.Commit) ([]string, error) {

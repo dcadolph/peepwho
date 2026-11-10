@@ -3,8 +3,8 @@ package index
 import (
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // TestCanonicalizeStoreRelinksWithoutStaleKeys verifies that re-resolving a

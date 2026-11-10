@@ -1,6 +1,6 @@
-// Package report renders peepwho findings as a self-contained HTML document.
+// Package report renders whotoask findings as a self-contained HTML document.
 // The point of the format is that it travels: a manager can forward the file
-// to somebody who has never installed peepwho, and it still explains itself.
+// to somebody who has never installed whotoask, and it still explains itself.
 package report
 
 import (
@@ -11,14 +11,14 @@ import (
 	"sort"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 //go:embed risk.html
 var files embed.FS
 
 // Brief is a knowledge-risk report: the finding, plus everything a reader
-// needs to judge it without peepwho in front of them.
+// needs to judge it without whotoask in front of them.
 type Brief struct {
 	// Generated is when the report was written.
 	Generated time.Time

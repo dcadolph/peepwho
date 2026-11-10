@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/resolve"
-	"github.com/dcadolph/peepwho/internal/slack"
+	"github.com/dcadolph/whotoask/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/slack"
 )
 
 // fakeConn yields canned frames then EOF, recording writes.

@@ -10,7 +10,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // codeStop are path segments and file extensions too generic to be topics.

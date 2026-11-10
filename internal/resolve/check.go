@@ -8,7 +8,7 @@ import (
 )
 
 // CheckCommand is the one-line command a reader pastes to check a finding
-// against the same history it was counted from, with no peepwho involved.
+// against the same history it was counted from, with no whotoask involved.
 //
 // It exists because the reader's staff engineer will say the finding is wrong,
 // and the difference between an argument and a settled question is whether the

@@ -7,7 +7,7 @@ import (
 )
 
 // FuzzParseCodeOwners feeds arbitrary bytes to the CODEOWNERS parser, which
-// reads files peepwho's user does not control. It must never panic, and every
+// reads files whotoask's user does not control. It must never panic, and every
 // record it returns must carry a pattern.
 func FuzzParseCodeOwners(f *testing.F) {
 	f.Add("* @org/team\n/docs/ @writer\n")

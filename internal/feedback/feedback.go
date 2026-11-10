@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/util"
-	"github.com/dcadolph/peepwho/internal/vault"
+	"github.com/dcadolph/whotoask/internal/util"
+	"github.com/dcadolph/whotoask/internal/vault"
 )
 
 // Votes a user can cast on one result.

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/graph"
+	"github.com/dcadolph/whotoask/internal/graph"
 )
 
 // oneBody is an HTTP doer that returns the same body for every request.

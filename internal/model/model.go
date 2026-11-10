@@ -1,5 +1,5 @@
 // Package model defines the normalized expertise graph: the people, teams,
-// orgs, and topics that peepwho indexes and ranks.
+// orgs, and topics that whotoask indexes and ranks.
 package model
 
 import (
@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // ID is a stable identifier for a graph entity.
@@ -108,7 +108,7 @@ type Topic struct {
 	// sources is the strongest evidence a topic is real rather than a stray word.
 	Sources []string
 	// Near are the subjects this one is worked on alongside. It is the only
-	// thing peepwho knows about a subject that does not come through the people
+	// thing whotoask knows about a subject that does not come through the people
 	// who hold it: two areas changed in the same commit are related whoever
 	// changed them, and everything else relates subjects by their shared
 	// experts, which cannot then be evidence about expertise without arguing in
@@ -182,7 +182,7 @@ type Channel struct {
 	Topics map[ID]float64
 }
 
-// Graph holds the full set of entities peepwho has indexed.
+// Graph holds the full set of entities whotoask has indexed.
 type Graph struct {
 	// People maps person ID to person.
 	People map[ID]*Person `json:"people"`

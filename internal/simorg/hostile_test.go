@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // TestHostileQueries pushes the junk a search box actually receives through the
-// resolver. None of it should panic, error, or hang: a question peepwho cannot
+// resolver. None of it should panic, error, or hang: a question whotoask cannot
 // answer is an empty answer, not a crash.
 func TestHostileQueries(t *testing.T) {
 	t.Parallel()

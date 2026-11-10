@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/confluence"
+	"github.com/dcadolph/whotoask/internal/confluence"
 )
 
 // TestConfluenceFetch verifies authors get topics from labels, title words, and

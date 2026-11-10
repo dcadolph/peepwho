@@ -36,37 +36,37 @@ func TestMCPTools(t *testing.T) {
 		WantError bool
 		WantText  string
 	}{{ // Test 0: Keyword ask finds people.
-		Tool: "peepwho_ask", Args: `{"question":"billing retries"}`, WantText: "people",
+		Tool: "whotoask_ask", Args: `{"question":"billing retries"}`, WantText: "people",
 	}, { // Test 1: No llm mode over MCP.
-		Tool: "peepwho_ask", Args: `{"question":"billing retries","mode":"llm"}`, WantError: true,
+		Tool: "whotoask_ask", Args: `{"question":"billing retries","mode":"llm"}`, WantError: true,
 		WantText: "no llm mode",
 	}, { // Test 2: An ask with no question is refused.
-		Tool: "peepwho_ask", Args: `{}`, WantError: true, WantText: "needs a question",
+		Tool: "whotoask_ask", Args: `{}`, WantError: true, WantText: "needs a question",
 	}, { // Test 3: A known person returns a profile.
-		Tool: "peepwho_person", Args: fmt.Sprintf(`{"id":%q}`, demoPerson), WantText: demoPerson,
+		Tool: "whotoask_person", Args: fmt.Sprintf(`{"id":%q}`, demoPerson), WantText: demoPerson,
 	}, { // Test 4: An unknown person is an error.
-		Tool: "peepwho_person", Args: `{"id":"nobody@nowhere.test"}`, WantError: true,
+		Tool: "whotoask_person", Args: `{"id":"nobody@nowhere.test"}`, WantError: true,
 		WantText: "unknown person",
 	}, { // Test 5: A person call with no id is refused.
-		Tool: "peepwho_person", Args: `{}`, WantError: true, WantText: "needs an id",
+		Tool: "whotoask_person", Args: `{}`, WantError: true, WantText: "needs an id",
 	}, { // Test 6: The people directory lists the demo person.
-		Tool: "peepwho_directory", Args: `{"kind":"people"}`, WantText: demoPerson,
+		Tool: "whotoask_directory", Args: `{"kind":"people"}`, WantText: demoPerson,
 	}, { // Test 7: Channels list.
-		Tool: "peepwho_directory", Args: `{"kind":"channels"}`, WantText: "[",
+		Tool: "whotoask_directory", Args: `{"kind":"channels"}`, WantText: "[",
 	}, { // Test 8: Teams list.
-		Tool: "peepwho_directory", Args: `{"kind":"teams"}`, WantText: "[",
+		Tool: "whotoask_directory", Args: `{"kind":"teams"}`, WantText: "[",
 	}, { // Test 9: Topics list.
-		Tool: "peepwho_directory", Args: `{"kind":"topics"}`, WantText: "[",
+		Tool: "whotoask_directory", Args: `{"kind":"topics"}`, WantText: "[",
 	}, { // Test 10: An unknown kind is an error.
-		Tool: "peepwho_directory", Args: `{"kind":"pets"}`, WantError: true, WantText: "unknown kind",
+		Tool: "whotoask_directory", Args: `{"kind":"pets"}`, WantError: true, WantText: "unknown kind",
 	}, { // Test 11: Recall answers over the demo person's conversations.
-		Tool: "peepwho_recall", Args: fmt.Sprintf(`{"question":"payment webhook retries","person":%q}`,
+		Tool: "whotoask_recall", Args: fmt.Sprintf(`{"question":"payment webhook retries","person":%q}`,
 			demoPerson), WantText: "{",
 	}, { // Test 12: Recall needs a person.
-		Tool: "peepwho_recall", Args: `{"question":"payment webhook retries"}`, WantError: true,
+		Tool: "whotoask_recall", Args: `{"question":"payment webhook retries"}`, WantError: true,
 		WantText: "needs a person",
 	}, { // Test 13: Recall needs a question.
-		Tool: "peepwho_recall", Args: `{}`, WantError: true, WantText: "needs a question",
+		Tool: "whotoask_recall", Args: `{}`, WantError: true, WantText: "needs a question",
 	}}
 	var in strings.Builder
 	for testNum, test := range tests {

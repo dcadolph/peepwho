@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/httputil"
+	"github.com/dcadolph/whotoask/internal/httputil"
 )
 
 // OpenAI-compatible API defaults.
@@ -103,7 +103,7 @@ type openaiMessage struct {
 	Content string `json:"content"`
 }
 
-// openaiResponse is the subset of the chat-completions response peepwho reads.
+// openaiResponse is the subset of the chat-completions response whotoask reads.
 type openaiResponse struct {
 	// Choices holds the completions; the first carries the reply.
 	Choices []struct {

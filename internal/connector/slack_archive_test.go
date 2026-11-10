@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/slack"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/slack"
 )
 
 // TestThreadTSOf verifies the thread timestamp is recovered from an episode
@@ -85,7 +85,7 @@ func TestNotesFrom(t *testing.T) {
 }
 
 // TestNotesFromFiles verifies a message carrying only a shared file is kept as
-// what it is called, since peepwho never reads file content but the name is
+// what it is called, since whotoask never reads file content but the name is
 // often the most useful thing in the conversation.
 func TestNotesFromFiles(t *testing.T) {
 	t.Parallel()

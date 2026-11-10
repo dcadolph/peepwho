@@ -6,8 +6,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/engine"
-	"github.com/dcadolph/peepwho/internal/render"
+	"github.com/dcadolph/whotoask/internal/engine"
+	"github.com/dcadolph/whotoask/internal/render"
 )
 
 // newSearchCmd builds the search command, a direct lookup of people and channels
@@ -23,9 +23,9 @@ query, ranked by how directly they match. This is a direct lookup; use ask to
 rank people by who knows a subject.
 
 Examples:
-  peepwho search kim
-  peepwho search payments
-  peepwho search "staff engineer"`,
+  whotoask search kim
+  whotoask search payments
+  whotoask search "staff engineer"`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ix, err := opts.loadIndex(cmd)

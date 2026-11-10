@@ -7,20 +7,20 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/engine"
-	"github.com/dcadolph/peepwho/internal/fact"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/engine"
+	"github.com/dcadolph/whotoask/internal/fact"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // newForgetCmd builds the forget command, which purges one person from
-// everything peepwho stores.
+// everything whotoask stores.
 func newForgetCmd(opts *options) *cobra.Command {
 	var yes bool
 	cmd := &cobra.Command{
 		Use:   "forget <email or name>",
 		Short: "Purge a person from the index, remembered conversations, and facts",
-		Long: `Purge a person from everything peepwho stores on this machine.
+		Long: `Purge a person from everything whotoask stores on this machine.
 
 Their records are removed from the index under every identity they were known
 by, references to them are stripped from channel membership and org relations,
@@ -36,8 +36,8 @@ Two caveats:
     keep them out, remove them at the source or stop indexing it.
 
 Examples:
-  peepwho forget jane@example.com
-  peepwho forget "Jane Roe" --yes`,
+  whotoask forget jane@example.com
+  whotoask forget "Jane Roe" --yes`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runForgetPerson(cmd, opts, args[0], yes)

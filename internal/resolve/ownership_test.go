@@ -5,8 +5,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/index"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/index"
 )
 
 // TestOwnershipDrift checks that a CODEOWNERS-declared owner who is not the

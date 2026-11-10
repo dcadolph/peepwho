@@ -8,9 +8,9 @@ import (
 
 func TestLaunchdPlist(t *testing.T) {
 	t.Parallel()
-	p := launchdPlist("dev.peepwho.refresh", "/usr/local/bin/peepwho", "/data", "/logs/r.log")
+	p := launchdPlist("app.whotoask.refresh", "/usr/local/bin/whotoask", "/data", "/logs/r.log")
 	wants := []string{
-		"dev.peepwho.refresh", "/usr/local/bin/peepwho", "<string>refresh</string>",
+		"app.whotoask.refresh", "/usr/local/bin/whotoask", "<string>refresh</string>",
 		"<string>/data</string>", "/logs/r.log", "StartCalendarInterval",
 	}
 	for _, want := range wants {
@@ -26,8 +26,8 @@ func TestLaunchdPlist(t *testing.T) {
 // reporting the agent installed.
 func TestLaunchdPlistEscapesXML(t *testing.T) {
 	t.Parallel()
-	dir := "/Users/d/Library/Mobile Documents/R&D <beta>/peepwho"
-	p := launchdPlist("dev.peepwho.refresh", "/usr/local/bin/peepwho", dir, "/logs/r.log")
+	dir := "/Users/d/Library/Mobile Documents/R&D <beta>/whotoask"
+	p := launchdPlist("app.whotoask.refresh", "/usr/local/bin/whotoask", dir, "/logs/r.log")
 
 	if !strings.Contains(p, "R&amp;D &lt;beta&gt;") {
 		t.Errorf("plist does not escape the path: %s", p)

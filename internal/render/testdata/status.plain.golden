@@ -1,9 +1,9 @@
 
-peepwho index
+whotoask index
 
   People    12  3 teams · 40 subjects · 5 channels
   Built     Mar 14, 3:09 PM  (15m ago)
   Sources   github (8), slack (4)
   At rest   encryption on · embeddings off
-  File      /var/lib/peepwho/index.db
+  File      /var/lib/whotoask/index.db
 

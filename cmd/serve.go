@@ -16,18 +16,18 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/engine"
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/feedback"
-	"github.com/dcadolph/peepwho/internal/httputil"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/policy"
-	"github.com/dcadolph/peepwho/internal/recall"
-	"github.com/dcadolph/peepwho/internal/render"
-	"github.com/dcadolph/peepwho/internal/report"
-	"github.com/dcadolph/peepwho/internal/resolve"
-	"github.com/dcadolph/peepwho/internal/seal"
-	"github.com/dcadolph/peepwho/internal/web"
+	"github.com/dcadolph/whotoask/internal/engine"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/feedback"
+	"github.com/dcadolph/whotoask/internal/httputil"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/policy"
+	"github.com/dcadolph/whotoask/internal/recall"
+	"github.com/dcadolph/whotoask/internal/render"
+	"github.com/dcadolph/whotoask/internal/report"
+	"github.com/dcadolph/whotoask/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/seal"
+	"github.com/dcadolph/whotoask/internal/web"
 )
 
 // shutdownTimeout bounds how long serve waits for in-flight requests to finish.
@@ -35,7 +35,7 @@ const shutdownTimeout = 5 * time.Second
 
 // serveTokenEnv holds the bearer token that gates every request when the web
 // UI binds beyond localhost. Serving off-loopback without it is refused.
-const serveTokenEnv = "PEEPWHO_SERVE_TOKEN"
+const serveTokenEnv = "WHOTOASK_SERVE_TOKEN"
 
 // webConfig carries the resolver settings shared by serve and demo.
 type webConfig struct {
@@ -79,17 +79,17 @@ func newServeCmd(opts *options) *cobra.Command {
 	var cfg webConfig
 	cmd := &cobra.Command{
 		Use:   "serve",
-		Short: "Serve the peepwho web UI on localhost",
+		Short: "Serve the whotoask web UI on localhost",
 		Long: `Serve the local web UI over the same engine as ask. Binds to localhost by
 default, so nothing leaves the machine. Queries are shareable links
 (/?q=who+owns+billing runs on load) and every result has feedback buttons.
 
 The AI mode's provider row shows live readiness. Local Ollama works under the
 default strict policy. Cloud providers (Claude, ChatGPT, Gemini) need their
-key exported (PEEPWHO_ANTHROPIC_KEY, PEEPWHO_OPENAI_KEY, PEEPWHO_GEMINI_KEY) and
+key exported (WHOTOASK_ANTHROPIC_KEY, WHOTOASK_OPENAI_KEY, WHOTOASK_GEMINI_KEY) and
 --policy redacted or open, since strict keeps everything on this machine.
 
-Binding beyond localhost requires PEEPWHO_SERVE_TOKEN; every request must then
+Binding beyond localhost requires WHOTOASK_SERVE_TOKEN; every request must then
 carry the token as a bearer header or a token query parameter, which sets a
 session cookie. Put TLS in front of it for anything beyond a trusted network.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -132,7 +132,7 @@ func addWebFlags(cmd *cobra.Command, cfg *webConfig, defaultAddr string) {
 // An answer is scoped to the person the request names, and the web app cannot
 // prove who is asking: a serve token gates the server, not one person's
 // history, and one token cannot tell two people apart. So recall is served
-// only where the caller can only be the person running peepwho: a loopback bind
+// only where the caller can only be the person running whotoask: a loopback bind
 // with no token. A token means the server is shared, whether directly or
 // behind a proxy that forwards to loopback, and recall stays off. The demo is
 // the exception: its history is sample data, so it serves recall openly.
@@ -312,7 +312,7 @@ func listenAndServe(cmd *cobra.Command, handler http.Handler, addr string) error
 	if _, port, err := net.SplitHostPort(addr); err == nil && port == "0" {
 		addr = ln.Addr().String()
 	}
-	fmt.Fprintf(cmd.ErrOrStderr(), "peepwho serving on http://%s (Ctrl-C to stop)\n", addr)
+	fmt.Fprintf(cmd.ErrOrStderr(), "whotoask serving on http://%s (Ctrl-C to stop)\n", addr)
 
 	select {
 	case err := <-errCh:
@@ -321,7 +321,7 @@ func listenAndServe(cmd *cobra.Command, handler http.Handler, addr string) error
 		}
 		return err
 	case <-ctx.Done():
-		fmt.Fprintln(cmd.ErrOrStderr(), "peepwho: shutting down")
+		fmt.Fprintln(cmd.ErrOrStderr(), "whotoask: shutting down")
 		shutCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
 		return srv.Shutdown(shutCtx)
@@ -412,7 +412,7 @@ func attestFn(ix *index.Index, opts *options, memoryKey bool, logw io.Writer) we
 	if memoryKey || err != nil {
 		_, key, genErr := ed25519.GenerateKey(nil)
 		if genErr != nil {
-			fmt.Fprintf(logw, "peepwho: attest disabled: %v\n", genErr)
+			fmt.Fprintf(logw, "whotoask: attest disabled: %v\n", genErr)
 			return nil
 		}
 		priv = key
@@ -422,13 +422,13 @@ func attestFn(ix *index.Index, opts *options, memoryKey bool, logw io.Writer) we
 		// cannot be checked against a stable key after a restart are worth
 		// much less than the feature promises, and the fix is one flag.
 		fmt.Fprintf(logw,
-			"peepwho: attest signing with a key held only in memory: %v\n"+
+			"whotoask: attest signing with a key held only in memory: %v\n"+
 				"  findings signed now will not verify against this install after a restart.\n"+
 				"  point --data-dir at somewhere writable to keep one key, "+
 				"such as a systemd StateDirectory.\n", err)
 	}
 	return func() (web.Sealed, error) {
-		dir, err := os.MkdirTemp("", "peepwho-seal-*")
+		dir, err := os.MkdirTemp("", "whotoask-seal-*")
 		if err != nil {
 			return web.Sealed{}, fmt.Errorf("attest: %w", err)
 		}
@@ -467,7 +467,7 @@ func modeReadiness(
 		modes["semantic"] = web.ModeInfo{
 			Ready: false,
 			Hint: "Matches by meaning, so \"failed payments\" can find \"billing retries\". " +
-				"This index has none yet: rebuild it with peepwho index --embed (uses local Ollama).",
+				"This index has none yet: rebuild it with whotoask index --embed (uses local Ollama).",
 		}
 	}
 
@@ -501,8 +501,8 @@ func demoModeHints(r web.ModesReport) web.ModesReport {
 		semanticHint = "Matches by meaning, so \"failed payments\" can find \"billing retries\". " +
 			"It runs on an embedding model you host yourself, so this public demo stays keyword only. " +
 			"Every answer you see here is deterministic, with no model involved."
-		modelHint = "Peepwho ranks deterministically and explains every answer, so a model is an " +
-			"upgrade rather than a requirement. Run peepwho yourself to point it at a local model, " +
+		modelHint = "WhoToAsk ranks deterministically and explains every answer, so a model is an " +
+			"upgrade rather than a requirement. Run whotoask yourself to point it at a local model, " +
 			"or at Claude, ChatGPT, or Gemini under a policy you set."
 		cloudHint = " This public demo carries no provider key on purpose: a shared server holding " +
 			"one would spend someone else's account."

@@ -1,4 +1,4 @@
-// Package recall answers the question peepwho's index cannot: not who knows
+// Package recall answers the question whotoask's index cannot: not who knows
 // about something, but when you worked through it before and who was with you.
 // An answer is a pointer, never a transcript: the people, the place, the date,
 // and a link back to the conversation in the tool it happened in.
@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // Resolver answers recall questions from an episode store, naming people from
@@ -100,7 +100,7 @@ type Query struct {
 	// and episodes that were embedded when indexed.
 	Meaning bool
 	// Explain includes how each problem was worked out, for conversations
-	// whose content peepwho keeps.
+	// whose content whotoask keeps.
 	Explain bool
 }
 
@@ -149,7 +149,7 @@ type Episode struct {
 	// zero to one.
 	Strength float64 `json:"strength"`
 	// Solution is how the problem was worked out, present only for
-	// conversations whose content peepwho keeps.
+	// conversations whose content whotoask keeps.
 	Solution *Solution `json:"solution,omitempty"`
 }
 
@@ -290,9 +290,9 @@ func (r *Resolver) scope() Scope {
 // gap in what was indexed rather than proof that nothing ever happened.
 func scopeNote(sources []string) string {
 	if len(sources) == 0 {
-		return "Nothing has been indexed yet: run peepwho index with --episodes."
+		return "Nothing has been indexed yet: run whotoask index with --episodes."
 	}
-	note := "Covers what peepwho has indexed from " + joinWords(sources) +
+	note := "Covers what whotoask has indexed from " + joinWords(sources) +
 		", within each source's history window."
 	for _, s := range sources {
 		if s == "slack" {

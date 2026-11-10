@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
+	"github.com/dcadolph/whotoask/internal/connector"
 )
 
 // TestSavedIndexHoldsNoReadableText verifies a saved index contains the stemmed

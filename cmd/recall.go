@@ -10,16 +10,16 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/engine"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/policy"
-	"github.com/dcadolph/peepwho/internal/recall"
-	"github.com/dcadolph/peepwho/internal/render"
+	"github.com/dcadolph/whotoask/internal/engine"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/policy"
+	"github.com/dcadolph/whotoask/internal/recall"
+	"github.com/dcadolph/whotoask/internal/render"
 )
 
 // meEnv names the environment variable identifying who is asking, so the
 // answer can be scoped to that person's own conversations.
-const meEnv = "PEEPWHO_ME"
+const meEnv = "WHOTOASK_ME"
 
 // newRecallCmd builds the recall command, which finds the conversation where
 // something was worked out before.
@@ -46,15 +46,15 @@ link back to the conversation in the tool it happened in. Opening the link uses
 your own access to that tool.
 
 Results cover only conversations you took part in. Identify yourself with --me,
-PEEPWHO_ME, or leave it unset to use your git email.
+WHOTOASK_ME, or leave it unset to use your git email.
 
 --me scopes the answer; it is not a login. Anyone who can read the index file can
 ask as anyone in it, so treat the index the way you would treat the exports it was
 built from.
 
 Examples:
-  peepwho recall "certificate renewal"
-  peepwho recall --me jane@example.com "kafka consumer lag"`,
+  whotoask recall "certificate renewal"
+  whotoask recall --me jane@example.com "kafka consumer lag"`,
 		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ix, err := opts.loadIndex(cmd)
@@ -106,7 +106,7 @@ Examples:
 	cmd.Flags().BoolVar(&meaning, "meaning", false,
 		"Match by meaning instead of exact words. Needs an index built with --episodes --embed.")
 	cmd.Flags().BoolVar(&explain, "how", false,
-		"Show how it was worked out, for conversations peepwho keeps. Needs --archive at index time.")
+		"Show how it was worked out, for conversations whotoask keeps. Needs --archive at index time.")
 	cmd.Flags().StringVar(&model, "model", "", "Ollama chat model that writes the account for --how.")
 	cmd.Flags().StringVar(&provider, "provider", "ollama",
 		"Model provider for --how: ollama, anthropic, openai, or gemini. Cloud providers need --policy open.")
@@ -170,7 +170,7 @@ func warnUnexplained(cmd *cobra.Command, ans recall.Answer, explain bool) {
 	}
 	fmt.Fprintln(cmd.ErrOrStderr(),
 		"--how found no kept conversation to work from. The words are kept by "+
-			"`peepwho index --episodes --archive`. Without them, "+
+			"`whotoask index --episodes --archive`. Without them, "+
 			"recall still names who helped and links back to the conversation itself.")
 }
 
@@ -209,7 +209,7 @@ func warnEmptyRecall(cmd *cobra.Command, res *recall.Resolver, ans recall.Answer
 	switch {
 	case res.Len() == 0:
 		fmt.Fprintln(w,
-			"No conversations indexed yet: run `peepwho index --source slack --episodes`.")
+			"No conversations indexed yet: run `whotoask index --source slack --episodes`.")
 	case !res.Known(person):
 		fmt.Fprintf(w,
 			"No indexed conversation includes %s. Check --me, and that the bot can read "+

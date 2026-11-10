@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/slack"
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/slack"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // Episode bounds for Slack. A thread is an episode outright; loose messages

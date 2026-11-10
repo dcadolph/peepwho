@@ -1,8 +1,8 @@
 package index
 
 import (
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // CanonicalizeStore re-resolves every stored conversation's participants

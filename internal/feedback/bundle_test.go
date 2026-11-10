@@ -8,7 +8,7 @@ import (
 )
 
 // TestBundleCarriesNoQueries is the promise the bundle makes, tested as a
-// property: a question asked of peepwho is itself a fact about the company, so
+// property: a question asked of whotoask is itself a fact about the company, so
 // no word of any query may survive into the report — only its silhouette.
 func TestBundleCarriesNoQueries(t *testing.T) {
 	t.Parallel()

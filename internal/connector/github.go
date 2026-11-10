@@ -14,10 +14,10 @@ import (
 
 	"sync"
 
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/github"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/github"
 
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // maxTopicWeight is where a topic's count stops counting one for one, so a
@@ -25,7 +25,7 @@ import (
 // score. Past it the count still grows, logarithmically, because a hard stop
 // here makes somebody who touched an area four times indistinguishable from
 // its owner who touched it three hundred, and telling those two apart is the
-// entire question peepwho is asked. maxTopicRepeat is where it finally stops,
+// entire question whotoask is asked. maxTopicRepeat is where it finally stops,
 // so one long-running subject cannot crowd out everything else a person knows.
 const (
 	maxTopicWeight = 4

@@ -37,7 +37,7 @@ func commitAt(t *testing.T, dir, area, who string, when time.Time) {
 }
 
 // TestUntilDaysStopsTheWindowShort checks history can be read as it stood at a
-// past date. Without that, peepwho can only be scored against the same history
+// past date. Without that, whotoask can only be scored against the same history
 // it was given, and cannot be asked the question that matters: would it have
 // named the right person before that person's later work made it obvious.
 func TestUntilDaysStopsTheWindowShort(t *testing.T) {

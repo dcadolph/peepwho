@@ -6,8 +6,8 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // Region is a connected body of work resting on one person: subjects tied to

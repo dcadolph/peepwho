@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/text"
+	"github.com/dcadolph/whotoask/internal/text"
 )
 
 // TestSubjectVocabulariesAreDisjoint guards the assumption the whole quality

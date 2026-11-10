@@ -9,10 +9,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/identity"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/identity"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // DefaultHalfLife is the age at which a dated record's weight halves.
@@ -20,7 +20,7 @@ import (
 // Measured, not chosen. Swept against home-assistant/core with everything else
 // held fixed, so all five runs answered the same 1,100 declared areas over the
 // same 68,142 subjects, scored on how often the declared owner of an area is
-// also the person peepwho names (see `peepwho eval` and CONTRIBUTING):
+// also the person whotoask names (see `whotoask eval` and CONTRIBUTING):
 //
 //	30 days   64.8%
 //	90 days   71.0%

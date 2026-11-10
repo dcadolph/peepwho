@@ -11,11 +11,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/dcadolph/peepwho/internal/engine"
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/policy"
-	"github.com/dcadolph/peepwho/internal/seal"
+	"github.com/dcadolph/whotoask/internal/engine"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/policy"
+	"github.com/dcadolph/whotoask/internal/seal"
 )
 
 // TestLoopbackAddr verifies which listen addresses count as loopback-only.
@@ -75,7 +75,7 @@ func TestLocalOnlyServe(t *testing.T) {
 }
 
 // TestAttestFnSeals verifies the web sealer serves a zip that unpacks into a
-// directory peepwho verify accepts, and a manifest matching the one inside it.
+// directory whotoask verify accepts, and a manifest matching the one inside it.
 func TestAttestFnSeals(t *testing.T) {
 	t.Parallel()
 	opts := &options{dataDir: t.TempDir()}

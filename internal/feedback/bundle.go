@@ -5,11 +5,11 @@ import (
 	"unicode"
 )
 
-// Bundle is the redacted report a user can choose to hand to peepwho's makers.
+// Bundle is the redacted report a user can choose to hand to whotoask's makers.
 //
 // Nothing composes it but an explicit request, nothing sends it but the user's
 // own hands, and nothing in it identifies the organization: a question asked of
-// peepwho is itself a fact about the company, so queries are reduced to their
+// whotoask is itself a fact about the company, so queries are reduced to their
 // shape and every name, address, and message stays home. The one free-text
 // field is the comments the user typed as feedback, carried verbatim because
 // they were written to be read by someone fixing the product, and because the
@@ -20,7 +20,7 @@ type Bundle struct {
 	Schema string `json:"schema"`
 	// Note says, inside the artifact itself, what was left out.
 	Note string `json:"note"`
-	// Version is the peepwho build that wrote the bundle.
+	// Version is the whotoask build that wrote the bundle.
 	Version string `json:"version"`
 	// Votes is what the feedback amounted to.
 	Votes VoteStats `json:"votes"`
@@ -69,7 +69,7 @@ const BundleNote = "Queries, names, addresses, and message text never appear in 
 // NewBundle reduces the feedback store to the report. It is a pure function of
 // the entries, so what it keeps and what it drops can be tested directly.
 func NewBundle(version string, entries []Entry) Bundle {
-	b := Bundle{Schema: "peepwho-feedback-bundle/1", Note: BundleNote, Version: version}
+	b := Bundle{Schema: "whotoask-feedback-bundle/1", Note: BundleNote, Version: version}
 	for _, e := range entries {
 		b.Votes.Total++
 		verdict := "not helpful"

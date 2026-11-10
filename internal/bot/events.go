@@ -121,7 +121,7 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// A retry means the first delivery was already handled or is still
 		// in flight; processing it again would double-reply.
 		if retry := r.Header.Get("X-Slack-Retry-Num"); retry != "" && retry != "0" {
-			fmt.Fprintf(h.log, "peepwho bot: skipping retry %s of an event\n", retry)
+			fmt.Fprintf(h.log, "whotoask bot: skipping retry %s of an event\n", retry)
 			return
 		}
 		ev := outer.Event
@@ -131,7 +131,7 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// Every slot is busy. Dropping the event is better than queueing
 			// work that outlives the question, and Slack has already been
 			// acknowledged so it will not retry.
-			fmt.Fprintln(h.log, "peepwho bot: busy, dropped an event")
+			fmt.Fprintln(h.log, "whotoask bot: busy, dropped an event")
 			return
 		}
 		go func() { //nolint:contextcheck // Reply outlives the request.

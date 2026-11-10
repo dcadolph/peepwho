@@ -12,12 +12,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/dcadolph/peepwho/internal/fact"
-	"github.com/dcadolph/peepwho/internal/feedback"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/simorg"
-	"github.com/dcadolph/peepwho/internal/state"
-	"github.com/dcadolph/peepwho/internal/vault"
+	"github.com/dcadolph/whotoask/internal/fact"
+	"github.com/dcadolph/whotoask/internal/feedback"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/simorg"
+	"github.com/dcadolph/whotoask/internal/state"
+	"github.com/dcadolph/whotoask/internal/vault"
 )
 
 // testKey is a fixed 32-byte raw key for sealing test stores.

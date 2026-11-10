@@ -9,9 +9,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/engine"
-	"github.com/dcadolph/peepwho/internal/feedback"
-	"github.com/dcadolph/peepwho/internal/render"
+	"github.com/dcadolph/whotoask/internal/engine"
+	"github.com/dcadolph/whotoask/internal/feedback"
+	"github.com/dcadolph/whotoask/internal/render"
 )
 
 // newFeedbackCmd builds the feedback command group: record a vote, review
@@ -25,9 +25,9 @@ its close variants, a not-helpful vote lowers it, capped so feedback tunes
 answers without burying the evidence. Votes live in feedback.json next to the
 index and survive re-indexing.
 
-  peepwho feedback record "billing retries" --person alice@example.com --helpful
-  peepwho feedback list
-  peepwho feedback clear --person alice@example.com`,
+  whotoask feedback record "billing retries" --person alice@example.com --helpful
+  whotoask feedback list
+  whotoask feedback clear --person alice@example.com`,
 	}
 	cmd.AddCommand(newFeedbackRecordCmd(opts), newFeedbackListCmd(opts), newFeedbackClearCmd(opts),
 		newFeedbackBundleCmd(opts), newFeedbackSummaryCmd(opts))
@@ -159,7 +159,7 @@ func applyFeedback(eng *engine.Engine, opts *options, errOut io.Writer) *feedbac
 }
 
 // newFeedbackBundleCmd builds the bundle subcommand, which composes the
-// redacted report a user can choose to hand to peepwho's makers.
+// redacted report a user can choose to hand to whotoask's makers.
 //
 // Composing and sending are deliberately two different acts. This command only
 // writes a file, so the claim that every byte can be read before it leaves is
@@ -173,7 +173,7 @@ func newFeedbackBundleCmd(opts *options) *cobra.Command {
 		Long: `Compose a file summarizing the feedback recorded on this machine: vote counts,
 the shape of the questions voted on, and the comments typed with the votes.
 Queries, names, addresses, and message text never appear in it; a question
-asked of peepwho is itself a fact about your organization, so only its word
+asked of whotoask is itself a fact about your organization, so only its word
 count leaves. The file is written to disk and nothing more: read it, then
 attach it to a GitHub issue or an email yourself, or do neither.
 
@@ -194,7 +194,7 @@ policy file.`,
 				return fmt.Errorf("%w: encode bundle: %w", ErrFeedback, err)
 			}
 			if out == "" {
-				out = "peepwho-feedback.json"
+				out = "whotoask-feedback.json"
 			}
 			if err := os.WriteFile(out, append(data, '\n'), 0o600); err != nil {
 				return fmt.Errorf("%w: write %s: %w", ErrFeedback, out, err)
@@ -208,7 +208,7 @@ policy file.`,
 			})
 		},
 	}
-	cmd.Flags().StringVarP(&out, "out", "o", "", "Where to write the bundle (default peepwho-feedback.json).")
+	cmd.Flags().StringVarP(&out, "out", "o", "", "Where to write the bundle (default whotoask-feedback.json).")
 	return cmd
 }
 

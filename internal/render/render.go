@@ -1,4 +1,4 @@
-// Package render writes the human-readable terminal form of peepwho answers to
+// Package render writes the human-readable terminal form of whotoask answers to
 // an io.Writer, coloring only when its Style says so.
 package render
 
@@ -11,13 +11,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/eval"
-	"github.com/dcadolph/peepwho/internal/feedback"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/recall"
-	"github.com/dcadolph/peepwho/internal/resolve"
-	"github.com/dcadolph/peepwho/internal/text"
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/eval"
+	"github.com/dcadolph/whotoask/internal/feedback"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/recall"
+	"github.com/dcadolph/whotoask/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/text"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // IdentityView is the audit of inferred identity merges, grouped by person.
@@ -51,7 +51,7 @@ type IdentityJoin struct {
 }
 
 // UnlinkedView is the worklist of declared owners with nothing recorded
-// against them: the people a source of record names but whose work peepwho
+// against them: the people a source of record names but whose work whotoask
 // cannot find, almost always because their handle was never tied to the address
 // they commit under.
 type UnlinkedView struct {
@@ -103,7 +103,7 @@ func RenderAsk(w io.Writer, query string, view resolve.JSONAnswer, s Style) {
 	}
 	if len(view.People) == 0 && len(view.Channels) == 0 {
 		fmt.Fprintf(w, "\n  %s\n\n", s.Dim(
-			"Nothing matched. Try the words your team would use, or `peepwho directory` to see what is indexed."))
+			"Nothing matched. Try the words your team would use, or `whotoask directory` to see what is indexed."))
 		return
 	}
 	if len(view.People) > 0 {
@@ -169,7 +169,7 @@ func RenderStatus(w io.Writer, v map[string]any, s Style) {
 	gets := func(k string) string { str, _ := v[k].(string); return str }
 	line := func(label, val string) { fmt.Fprintf(w, "  %s  %s\n", pad(s.Dim(label), label, 8), val) }
 
-	fmt.Fprintf(w, "\n%s\n\n", s.Bold("peepwho index"))
+	fmt.Fprintf(w, "\n%s\n\n", s.Bold("whotoask index"))
 	line("People", s.Bold(fmt.Sprintf("%d", geti("people")))+"  "+
 		s.Dim(fmt.Sprintf("%d teams · %d subjects · %d channels",
 			geti("teams"), geti("subjects"), geti("channels"))))
@@ -265,7 +265,7 @@ func RenderRecall(w io.Writer, ans recall.Answer, s Style) {
 			fmt.Fprintf(w, "  %s\n", s.Bold(place))
 		}
 		fmt.Fprintf(w, "  %s\n", s.Dim(EscapeControls(recallWith(ep.People))))
-		// Every other answer peepwho gives says why it surfaced, and a recalled
+		// Every other answer whotoask gives says why it surfaced, and a recalled
 		// conversation needs it most: without the matched words, a thread from
 		// an unrelated-looking channel reads as a random result rather than the
 		// one place the asked-about word was actually said.
@@ -412,7 +412,7 @@ func RenderDirectory(w io.Writer, dir resolve.Directory, section string, s Style
 		}
 	}
 	if !any {
-		fmt.Fprintf(w, "\n  %s\n", s.Dim("Nothing indexed yet. Run `peepwho index` against a source."))
+		fmt.Fprintf(w, "\n  %s\n", s.Dim("Nothing indexed yet. Run `whotoask index` against a source."))
 	}
 	fmt.Fprintln(w)
 }
@@ -537,7 +537,7 @@ func handleSource(id string) string {
 func RenderSearch(w io.Writer, query string, results []resolve.SearchResult, s Style) {
 	if len(results) == 0 {
 		fmt.Fprintln(w, s.Dim(
-			"No people or channels match “"+query+"”. Try `peepwho directory` to see what is indexed."))
+			"No people or channels match “"+query+"”. Try `whotoask directory` to see what is indexed."))
 		return
 	}
 	fmt.Fprintln(w, s.Bold(fmt.Sprintf("%d result%s for “%s”", len(results), Plural(len(results)), query)))

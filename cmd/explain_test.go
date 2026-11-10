@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/httputil"
+	"github.com/dcadolph/whotoask/internal/httputil"
 )
 
 // TestExplainSourceError verifies an auth or not-found status becomes a message
@@ -22,7 +22,7 @@ func TestExplainSourceError(t *testing.T) {
 		WantHas  []string
 	}{{ // Test 0: 401 names the token.
 		In:       fmt.Errorf("jira /rest/api/3/search: %w", &httputil.StatusError{Code: http.StatusUnauthorized}),
-		WantAuth: true, WantHas: []string{"Jira", "PEEPWHO_JIRA_TOKEN", "401"},
+		WantAuth: true, WantHas: []string{"Jira", "WHOTOASK_JIRA_TOKEN", "401"},
 	}, { // Test 1: 403 is also an auth fix.
 		In:       fmt.Errorf("wrap: %w", &httputil.StatusError{Code: http.StatusForbidden}),
 		WantAuth: true, WantHas: []string{"Jira"},
@@ -38,7 +38,7 @@ func TestExplainSourceError(t *testing.T) {
 	for testNum, test := range tests {
 		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
 			t.Parallel()
-			got := explainSourceError("Jira", "PEEPWHO_JIRA_TOKEN", test.In)
+			got := explainSourceError("Jira", "WHOTOASK_JIRA_TOKEN", test.In)
 			if errors.Is(got, ErrAuth) != test.WantAuth {
 				t.Errorf("ErrAuth = %v, want %v (got %v)", errors.Is(got, ErrAuth), test.WantAuth, got)
 			}

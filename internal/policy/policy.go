@@ -1,4 +1,4 @@
-// Package policy decides what peepwho may send to model providers. Strict keeps
+// Package policy decides what whotoask may send to model providers. Strict keeps
 // answers fully local, Redacted permits redacted payloads to known provider
 // hosts only, and Open permits any destination. Indexing calls made with the
 // user's own credentials against sources the user names are outside its scope.

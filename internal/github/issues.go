@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Issue is the subset of an issue peepwho reads. The GitHub issues endpoint also
+// Issue is the subset of an issue whotoask reads. The GitHub issues endpoint also
 // returns pull requests; IsPullRequest distinguishes them.
 type Issue struct {
 	// Title is the issue title.

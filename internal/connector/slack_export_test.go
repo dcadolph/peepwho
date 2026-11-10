@@ -13,7 +13,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/dcadolph/peepwho/internal/episode"
+	"github.com/dcadolph/whotoask/internal/episode"
 )
 
 // exportFixture is the captured real-format Slack export: nested top folder,

@@ -14,7 +14,7 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/dcadolph/peepwho/internal/fakeapi"
+	"github.com/dcadolph/whotoask/internal/fakeapi"
 )
 
 // main starts the fake site behind the bearer check and serves until killed.

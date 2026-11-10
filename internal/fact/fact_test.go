@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/vault"
+	"github.com/dcadolph/whotoask/internal/vault"
 )
 
 func TestFactValid(t *testing.T) {

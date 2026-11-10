@@ -10,10 +10,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/render"
-	"github.com/dcadolph/peepwho/internal/report"
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/render"
+	"github.com/dcadolph/whotoask/internal/report"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // newRiskCmd builds the risk command, a deterministic view of where knowledge is
@@ -33,8 +33,8 @@ hurts. Name a person for the offboarding view: what the record shows only them i
 Deterministic arithmetic over the graph, no model needed.
 
 Examples:
-  peepwho risk
-  peepwho risk "Angela Malone"`,
+  whotoask risk
+  whotoask risk "Angela Malone"`,
 		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ix, err := opts.loadIndex(cmd)
@@ -79,7 +79,7 @@ Examples:
 	}
 	cmd.Flags().IntVar(&limit, "limit", 20, "Maximum topics to report.")
 	cmd.Flags().StringVar(&htmlPath, "html", "",
-		"Write a self-contained HTML brief to this path, for sending to somebody without peepwho.")
+		"Write a self-contained HTML brief to this path, for sending to somebody without whotoask.")
 	return cmd
 }
 
@@ -207,6 +207,6 @@ func writeRiskHTML(cmd *cobra.Command, ix *index.Index, path string, limit int, 
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		return fmt.Errorf("risk: write %s: %w", path, err)
 	}
-	fmt.Fprintf(cmd.ErrOrStderr(), "peepwho: wrote the knowledge-risk brief to %s\n", path)
+	fmt.Fprintf(cmd.ErrOrStderr(), "whotoask: wrote the knowledge-risk brief to %s\n", path)
 	return nil
 }

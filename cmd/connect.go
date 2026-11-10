@@ -11,18 +11,18 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/engine"
-	"github.com/dcadolph/peepwho/internal/graph"
-	"github.com/dcadolph/peepwho/internal/httputil"
-	"github.com/dcadolph/peepwho/internal/prompt"
-	"github.com/dcadolph/peepwho/internal/secret"
-	"github.com/dcadolph/peepwho/internal/slack"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/engine"
+	"github.com/dcadolph/whotoask/internal/graph"
+	"github.com/dcadolph/whotoask/internal/httputil"
+	"github.com/dcadolph/whotoask/internal/prompt"
+	"github.com/dcadolph/whotoask/internal/secret"
+	"github.com/dcadolph/whotoask/internal/slack"
 )
 
 // credField describes one credential or config value connect collects.
 type credField struct {
-	// env is the environment variable the value belongs in, e.g. PEEPWHO_SLACK_TOKEN.
+	// env is the environment variable the value belongs in, e.g. WHOTOASK_SLACK_TOKEN.
 	env string
 	// label is the human prompt, e.g. "Slack bot token".
 	label string
@@ -244,7 +244,7 @@ and shows how to ask.
 Run with no argument for a menu of every source and whether it is configured.
 Run with a source to set up just that one. Use --status for a non-interactive
 report. Credentials are validated in memory and never logged or written to any
-peepwho file. Connect then offers to save them to your OS keychain so future
+whotoask file. Connect then offers to save them to your OS keychain so future
 runs stay connected; decline and it prints export lines to save yourself.
 --forget removes a source's saved credentials from the keychain again.
 
@@ -256,7 +256,7 @@ Sources: org-csv, matters, codeowners, git, slack, github, jira, confluence, pag
 			}
 			if forget {
 				if len(args) != 1 {
-					return fmt.Errorf("%w: name the source to forget, e.g. peepwho connect slack --forget", ErrBadArgs)
+					return fmt.Errorf("%w: name the source to forget, e.g. whotoask connect slack --forget", ErrBadArgs)
 				}
 				spec, ok := specByID(args[0])
 				if !ok {
@@ -275,7 +275,7 @@ Sources: org-csv, matters, codeowners, git, slack, github, jira, confluence, pag
 			ui := prompt.New(cmd.InOrStdin(), cmd.ErrOrStderr(), cmd.ErrOrStderr())
 			if !ui.Interactive() {
 				return fmt.Errorf(
-					"%w: connect needs an interactive terminal; use 'peepwho index' for scripts (see docs/CONNECT.md)",
+					"%w: connect needs an interactive terminal; use 'whotoask index' for scripts (see docs/CONNECT.md)",
 					ErrBadArgs)
 			}
 			if chosen != nil {
@@ -347,7 +347,7 @@ func runConnect(cmd *cobra.Command, opts *options, ui *prompt.IO, spec sourceSpe
 		return err
 	}
 	if !run {
-		ui.Hint("Index later with:  peepwho index --source %s%s", spec.id, mergeSuffix(opts))
+		ui.Hint("Index later with:  whotoask index --source %s%s", spec.id, mergeSuffix(opts))
 	} else {
 		ui.Blank()
 		ui.Step("Indexing %s", spec.title)
@@ -362,9 +362,9 @@ func runConnect(cmd *cobra.Command, opts *options, ui *prompt.IO, spec sourceSpe
 	ui.Blank()
 	ui.Step("Next")
 	ui.Detail("Ask a question:")
-	ui.Command(`peepwho ask "who owns billing retries"`)
+	ui.Command(`whotoask ask "who owns billing retries"`)
 	ui.Detail("Open the web UI:")
-	ui.Command("peepwho serve")
+	ui.Command("whotoask serve")
 	ui.Blank()
 	return nil
 }
@@ -547,7 +547,7 @@ func firstIndexOptions(opts *options, ui *prompt.IO, id string) (engine.SourceOp
 			}
 		}
 		remember, err := ui.Confirm(
-			"Remember conversations, so peepwho recall can find who helped you and when?", true)
+			"Remember conversations, so whotoask recall can find who helped you and when?", true)
 		if err != nil {
 			return o, err
 		}
@@ -703,7 +703,7 @@ func runStatus(cmd *cobra.Command, opts *options) error {
 	}
 	return opts.render(cmd.OutOrStdout(), view, func(w io.Writer, _ style) {
 		ui := prompt.New(cmd.InOrStdin(), w, cmd.ErrOrStderr())
-		ui.Step("peepwho sources")
+		ui.Step("whotoask sources")
 		for _, s := range view.Sources {
 			ui.Detail("%-11s %s", s.ID, s.Status)
 		}
@@ -790,13 +790,13 @@ func explainAuthError(spec sourceSpec, err error) string {
 }
 
 // printPrivacy states, up front, where credentials go and that the index stays
-// local, so a work user can wire in peepwho and keep people data private. It
+// local, so a work user can wire in whotoask and keep people data private. It
 // must match what the command does: it offers the OS keychain later, so
 // promising "never written to disk" here would be a lie the next prompt
 // exposes.
 func printPrivacy(ui *prompt.IO, opts *options) {
 	ui.Hint("Privacy: credentials you enter are held in memory and never logged or")
-	ui.Hint("written to any peepwho file. You will be offered your OS keychain to keep")
+	ui.Hint("written to any whotoask file. You will be offered your OS keychain to keep")
 	ui.Hint("them; decline it and nothing is stored. Your index stays local at")
 	ui.Hint("%s, readable only by you, and is never uploaded.", opts.indexPath())
 }

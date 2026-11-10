@@ -13,11 +13,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/dcadolph/peepwho/internal/eval"
-	"github.com/dcadolph/peepwho/internal/feedback"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/recall"
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/eval"
+	"github.com/dcadolph/whotoask/internal/feedback"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/recall"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // update rewrites the golden files from the current output when set.
@@ -68,7 +68,7 @@ func goldenCases() []goldenCase {
 		"sources":                   map[string]int{"slack": 4, "github": 8},
 		"encryption_key_configured": true,
 		"embeddings":                false,
-		"index":                     "/var/lib/peepwho/index.db",
+		"index":                     "/var/lib/whotoask/index.db",
 	}
 	recallAnswer := recall.Answer{
 		Query: "vacation policy",

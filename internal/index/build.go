@@ -9,10 +9,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/model"
-	"github.com/dcadolph/peepwho/internal/text"
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/text"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // Build replaces the index contents with data derived from records, forgetting

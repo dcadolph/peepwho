@@ -10,19 +10,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/confluence"
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/github"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/jira"
-	"github.com/dcadolph/peepwho/internal/pagerduty"
-	"github.com/dcadolph/peepwho/internal/slack"
+	"github.com/dcadolph/whotoask/internal/confluence"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/github"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/jira"
+	"github.com/dcadolph/whotoask/internal/pagerduty"
+	"github.com/dcadolph/whotoask/internal/slack"
 )
 
 // BigSpec is the demo company's default shape: a few hundred people across many
 // teams, cast from the show name pools, with enough history that recall, risk,
-// and ownership all have something to find. It is the corpus `peepwho demo` serves.
+// and ownership all have something to find. It is the corpus `whotoask demo` serves.
 func BigSpec() Spec {
 	return Spec{
 		People:            220,
@@ -277,7 +277,7 @@ func buildBigOwners(people []person) []owner {
 		// how a real company looks: somebody ends up holding a whole corner of
 		// it. Combined with the work that crosses between them, that corner is
 		// a joined body of work resting on one person, which is the heaviest
-		// finding peepwho makes and had nothing to find in the sample company.
+		// finding whotoask makes and had nothing to find in the sample company.
 		if held, ok := heldTogether[s]; ok && len(owners) > held {
 			idx = indexOf(people, owners[held].who)
 		}
@@ -322,7 +322,7 @@ func (c *company) orgCSV() string {
 
 // codeOwners maps a path per subject to a declared owner. Most declare the real
 // expert; a planted fraction declare someone who no longer does the work, which
-// is the ownership drift `peepwho ownership` surfaces.
+// is the ownership drift `whotoask ownership` surfaces.
 func (c *company) codeOwners() string {
 	var b strings.Builder
 	for s := range subjects {

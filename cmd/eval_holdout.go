@@ -5,9 +5,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/ownersbench"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/ownersbench"
 )
 
 // newEvalHoldoutCmd builds the eval holdout subcommand, which measures
@@ -30,7 +30,7 @@ func newEvalHoldoutCmd(_ *options) *cobra.Command {
 knowing only that, then read the work that came afterwards and see who was
 right.
 
-Every other measurement here describes a history peepwho has already read.
+Every other measurement here describes a history whotoask has already read.
 This one hides the answer: nothing after the cutoff reaches the index, and a
 departure risk is a claim about the future, so this is the shape of
 measurement that claim deserves.
@@ -40,8 +40,8 @@ directories from the same evidence. Where the two agree the run says nothing
 about either, so the disagreements are reported separately.
 
 Examples:
-  peepwho eval holdout --repo ~/src/kubernetes
-  peepwho eval holdout --repo ~/src/prometheus --cutoff-days 540`,
+  whotoask eval holdout --repo ~/src/kubernetes
+  whotoask eval holdout --repo ~/src/prometheus --cutoff-days 540`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if repo == "" {
@@ -52,7 +52,7 @@ Examples:
 			}
 			log := cmd.ErrOrStderr()
 			// UntilDays is what keeps the future out of the index: the walk
-			// stops at the cutoff, so nothing peepwho answers with could have
+			// stops at the cutoff, so nothing whotoask answers with could have
 			// been learned from the window it is being judged on.
 			git := connector.NewGitHistory(connector.GitOptions{
 				Paths: []string{repo}, SinceDays: sinceDays, UntilDays: cutoffDays,

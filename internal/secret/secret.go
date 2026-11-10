@@ -1,6 +1,6 @@
-// Package secret resolves peepwho's connector credentials from the OS keychain,
+// Package secret resolves whotoask's connector credentials from the OS keychain,
 // falling back to the environment. A credential is named by its environment
-// variable, such as PEEPWHO_SLACK_TOKEN, so the same name addresses it whether it
+// variable, such as WHOTOASK_SLACK_TOKEN, so the same name addresses it whether it
 // lives in the keychain or the environment, and existing env-based setups keep
 // working unchanged. An explicit environment variable always wins, so a one-off
 // run can override a stored value without touching the keychain.
@@ -12,9 +12,9 @@ import (
 	"github.com/zalando/go-keyring"
 )
 
-// service is the keychain service every peepwho credential is stored under, so
+// service is the keychain service every whotoask credential is stored under, so
 // they group together and never collide with another program's entries.
-const service = "peepwho"
+const service = "whotoask"
 
 // Keychain is the OS secret store a Store reads and writes. The default is
 // backed by the login keychain on macOS, the Credential Manager on Windows, and

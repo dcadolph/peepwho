@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/episode"
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // recordingSummarizer captures the prompt it was given and returns a canned
@@ -82,7 +82,7 @@ func TestSolutionShowsTheConversation(t *testing.T) {
 	}
 }
 
-// TestSolutionOmittedWithoutArchive verifies a conversation peepwho holds only
+// TestSolutionOmittedWithoutArchive verifies a conversation whotoask holds only
 // a pointer to reports no content, rather than an empty shell.
 func TestSolutionOmittedWithoutArchive(t *testing.T) {
 	t.Parallel()

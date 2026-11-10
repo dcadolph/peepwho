@@ -3,7 +3,7 @@ package index
 import (
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
+	"github.com/dcadolph/whotoask/internal/connector"
 )
 
 // TestGitHubLoginAsDisplayNameIsOnePerson covers a split the handle pass

@@ -7,8 +7,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/index"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/index"
 )
 
 // owns declares an area for someone on paper, the way a CODEOWNERS file does.
@@ -33,7 +33,7 @@ func works(name, email, topic string, times int) connector.Record {
 }
 
 // TestMeasureSplitsDisagreementByCause is the test that matters. Agreement on
-// its own is not actionable: the same score can mean peepwho ranks badly, that
+// its own is not actionable: the same score can mean whotoask ranks badly, that
 // the declared owner has left, or that their work was never linked to their
 // handle. Each is a different fix, so each has to land in its own bucket.
 func TestMeasureSplitsDisagreementByCause(t *testing.T) {

@@ -6,10 +6,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/index"
+	"github.com/dcadolph/whotoask/internal/index"
 )
 
-// HoldoutConfig bounds a temporal holdout: peepwho is shown only the history
+// HoldoutConfig bounds a temporal holdout: whotoask is shown only the history
 // before a cutoff and judged on who actually did the work after it.
 type HoldoutConfig struct {
 	// Repo is the repository root.
@@ -63,22 +63,22 @@ func (c HoldoutConfig) withDefaults() HoldoutConfig {
 type HoldoutDir struct {
 	// Dir is the directory relative to the repository root.
 	Dir string `json:"dir"`
-	// Peepwho is who peepwho said the place rested on, knowing only the past.
-	Peepwho []string `json:"peepwho"`
+	// WhoToAsk is who whotoask said the place rested on, knowing only the past.
+	WhoToAsk []string `json:"whotoask"`
 	// Baseline is the past window's top committers, the naive prediction.
 	Baseline []string `json:"baseline"`
 	// Actual is who did the most work there after the cutoff.
 	Actual []string `json:"actual"`
-	// PeepwhoHit reports whether peepwho named somebody who went on to do the
+	// WhoToAskHit reports whether whotoask named somebody who went on to do the
 	// work.
-	PeepwhoHit bool `json:"peepwhoHit"`
+	WhoToAskHit bool `json:"whotoaskHit"`
 	// BaselineHit reports the same for the naive prediction.
 	BaselineHit bool `json:"baselineHit"`
-	// PeepwhoStayed reports whether the first person peepwho named was still
+	// WhoToAskStayed reports whether the first person whotoask named was still
 	// working in the place a year later, at all. It is a different question
 	// from out-committing everybody, and it is the one the product actually
 	// answers: whether the person it would send you to is still here.
-	PeepwhoStayed bool `json:"peepwhoStayed"`
+	WhoToAskStayed bool `json:"whotoaskStayed"`
 	// BaselineStayed reports the same for the naive prediction's first name.
 	BaselineStayed bool `json:"baselineStayed"`
 }
@@ -94,17 +94,17 @@ type HoldoutResult struct {
 }
 
 // Score tallies both predictors.
-func (r *HoldoutResult) Score() (peepwho, baseline, of int) {
+func (r *HoldoutResult) Score() (whotoask, baseline, of int) {
 	for _, d := range r.Dirs {
 		of++
-		if d.PeepwhoHit {
-			peepwho++
+		if d.WhoToAskHit {
+			whotoask++
 		}
 		if d.BaselineHit {
 			baseline++
 		}
 	}
-	return peepwho, baseline, of
+	return whotoask, baseline, of
 }
 
 // Disagreements returns the directories where the two predictors named
@@ -113,7 +113,7 @@ func (r *HoldoutResult) Score() (peepwho, baseline, of int) {
 func (r *HoldoutResult) Disagreements() []HoldoutDir {
 	var out []HoldoutDir
 	for _, d := range r.Dirs {
-		if d.PeepwhoHit != d.BaselineHit {
+		if d.WhoToAskHit != d.BaselineHit {
 			out = append(out, d)
 		}
 	}
@@ -159,7 +159,7 @@ func RunHoldout(ix *index.Index, cfg HoldoutConfig) (*HoldoutResult, error) {
 		for _, n := range actual {
 			actualKeys[nameKey(n)] = true
 		}
-		peepwho := dirRanked(ix, Config{
+		whotoask := dirRanked(ix, Config{
 			DirWork: cfg.DirWork, WorkTotals: cfg.WorkTotals, TopK: cfg.TopK,
 		}, dir)
 		baseline := p.top(cfg.TopK)
@@ -168,10 +168,10 @@ func RunHoldout(ix *index.Index, cfg HoldoutConfig) (*HoldoutResult, error) {
 			return len(names) > 0 && present[nameKey(names[0])]
 		}
 		res.Dirs = append(res.Dirs, HoldoutDir{
-			Dir: dir, Peepwho: peepwho, Baseline: baseline, Actual: actual,
-			PeepwhoHit:     anyKeyed(peepwho, actualKeys),
+			Dir: dir, WhoToAsk: whotoask, Baseline: baseline, Actual: actual,
+			WhoToAskHit:    anyKeyed(whotoask, actualKeys),
 			BaselineHit:    anyKeyed(baseline, actualKeys),
-			PeepwhoStayed:  stayed(peepwho),
+			WhoToAskStayed: stayed(whotoask),
 			BaselineStayed: stayed(baseline),
 		})
 	}
@@ -201,15 +201,15 @@ func HoldoutPlaces(ix *index.Index, cfg HoldoutConfig, dir string) []string {
 
 // Report renders a holdout for a terminal.
 func (r *HoldoutResult) Report(w io.Writer, k int) {
-	peepwho, baseline, of := r.Score()
+	whotoask, baseline, of := r.Score()
 	fmt.Fprintf(w, "judged %d directories busy on both sides of the cutoff\n", of)
-	fmt.Fprintf(w, "peepwho predicted a future worker in its top %d: %d/%d (%.0f%%)\n",
-		k, peepwho, of, 100*float64(peepwho)/float64(of))
+	fmt.Fprintf(w, "whotoask predicted a future worker in its top %d: %d/%d (%.0f%%)\n",
+		k, whotoask, of, 100*float64(whotoask)/float64(of))
 	fmt.Fprintf(w, "past top-%d committers, the naive prediction:  %d/%d (%.0f%%)\n",
 		k, baseline, of, 100*float64(baseline)/float64(of))
 	ws, bs := 0, 0
 	for _, d := range r.Dirs {
-		if d.PeepwhoStayed {
+		if d.WhoToAskStayed {
 			ws++
 		}
 		if d.BaselineStayed {
@@ -217,7 +217,7 @@ func (r *HoldoutResult) Report(w io.Writer, k int) {
 		}
 	}
 	fmt.Fprintf(w, "\nthe person each names first was still working there a year on:\n")
-	fmt.Fprintf(w, "  peepwho:   %d/%d (%.0f%%)\n", ws, of, 100*float64(ws)/float64(of))
+	fmt.Fprintf(w, "  whotoask:   %d/%d (%.0f%%)\n", ws, of, 100*float64(ws)/float64(of))
 	fmt.Fprintf(w, "  baseline: %d/%d (%.0f%%)\n", bs, of, 100*float64(bs)/float64(of))
 
 	dis := r.Disagreements()
@@ -227,11 +227,11 @@ func (r *HoldoutResult) Report(w io.Writer, k int) {
 	}
 	won := 0
 	for _, d := range dis {
-		if d.PeepwhoHit {
+		if d.WhoToAskHit {
 			won++
 		}
 	}
-	fmt.Fprintf(w, "where they disagreed (%d): peepwho right %d, baseline right %d\n",
+	fmt.Fprintf(w, "where they disagreed (%d): whotoask right %d, baseline right %d\n",
 		len(dis), won, len(dis)-won)
 	for i, d := range dis {
 		if i == 10 {
@@ -239,8 +239,8 @@ func (r *HoldoutResult) Report(w io.Writer, k int) {
 			break
 		}
 		mark := "baseline"
-		if d.PeepwhoHit {
-			mark = "peepwho  "
+		if d.WhoToAskHit {
+			mark = "whotoask  "
 		}
 		fmt.Fprintf(w, "  %s %-40s actual=%s\n", mark, trim(d.Dir, 40),
 			strings.Join(d.Actual, ", "))

@@ -1,4 +1,4 @@
-// Package pagerduty is a minimal PagerDuty client scoped to what peepwho
+// Package pagerduty is a minimal PagerDuty client scoped to what whotoask
 // ingests: services and who is on call for them. The token is held only in
 // memory, never serialized, and never logged.
 package pagerduty
@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/httputil"
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/httputil"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // defaultBaseURL is the PagerDuty REST API root.
@@ -85,7 +85,7 @@ type Service struct {
 	EscalationPolicy EscalationPolicyRef `json:"escalation_policy"`
 }
 
-// User is the subset of a PagerDuty user peepwho reads.
+// User is the subset of a PagerDuty user whotoask reads.
 type User struct {
 	// ID is the user id.
 	ID string `json:"id"`

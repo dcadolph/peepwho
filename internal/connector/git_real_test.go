@@ -182,7 +182,7 @@ func checkGolden(t *testing.T, name, got string) {
 	}
 }
 
-// TestRealMailmapMatchesGit holds peepwho's mailmap resolution to git
+// TestRealMailmapMatchesGit holds whotoask's mailmap resolution to git
 // check-mailmap over the identities a real history contains: case-varied
 // emails and names, an email-only rule, a name-specific rule, a would-be
 // trailing comment, and identities no rule touches.
@@ -262,7 +262,7 @@ func TestRealAuthorsMatchShortlog(t *testing.T) {
 		}
 	}
 	if diff := cmp.Diff(wantAuthors, gotAuthors); diff != "" {
-		t.Errorf("authors disagree with git shortlog (-shortlog +peepwho):\n%s", diff)
+		t.Errorf("authors disagree with git shortlog (-shortlog +whotoask):\n%s", diff)
 	}
 
 	for _, want := range []string{
@@ -277,7 +277,7 @@ func TestRealAuthorsMatchShortlog(t *testing.T) {
 }
 
 // TestRealRenameCommitPaths holds changedPaths to git's own listing of a git
-// mv commit, with rename detection off the way peepwho reads it: the old and
+// mv commit, with rename detection off the way whotoask reads it: the old and
 // the new path both count as touched.
 func TestRealRenameCommitPaths(t *testing.T) {
 	t.Parallel()
@@ -302,7 +302,7 @@ func TestRealRenameCommitPaths(t *testing.T) {
 	}
 	slices.Sort(got)
 	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("rename commit paths (-git +peepwho):\n%s", diff)
+		t.Errorf("rename commit paths (-git +whotoask):\n%s", diff)
 	}
 }
 

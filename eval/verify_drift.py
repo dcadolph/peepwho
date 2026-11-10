@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Check ownership-drift findings against the history, not against peepwho.
+"""Check ownership-drift findings against the history, not against whotoask.
 
-peepwho eval scores ranking against declared ownership, but it reads the same
+whotoask eval scores ranking against declared ownership, but it reads the same
 index the finding came from, so it cannot say whether a finding is TRUE. This
 reads raw git and nothing else, and asks one question of each reported area: is
-the person peepwho names also the one who has worked in that area most?
+the person whotoask names also the one who has worked in that area most?
 
 Two exclusions, both learned the hard way. Bots are not people. And a commit
 touching a large part of the tree is a codemod rather than ownership: counting
@@ -61,9 +61,9 @@ def person_key(email):
     """One key per human, from their commit email.
 
     Keying by display name split one person into "Paulus Schoutsen" and
-    "Balloob Bot" and then scored peepwho wrong for joining them. GitHub's
+    "Balloob Bot" and then scored whotoask wrong for joining them. GitHub's
     private address keeps its login and drops the account number, matching how
-    peepwho normalizes the same address.
+    whotoask normalizes the same address.
     """
     e = email.strip().lower()
     local, _, domain = e.partition("@")
@@ -153,7 +153,7 @@ def main():
             skipped += 1
             continue
         # A tie for the top is not a contradiction. If git says two people have
-        # done the most work and peepwho named one of them, the history has not
+        # done the most work and whotoask named one of them, the history has not
         # disagreed with the finding. Comparing against most_common(1) was also
         # non-deterministic: Counter breaks ties by insertion order, insertion
         # order flows from set iteration, and set order is salted per process,
@@ -181,7 +181,7 @@ def main():
     pct = (100 * right // total) if total else 0
     print(f"  correct {right} / {total} = {pct}%   (skipped {skipped}: no matching directory)")
     for topic, who, mine, top, n in misses[:8]:
-        print(f"    MISS {topic:24} peepwho={who} ({mine})  git-top={top} ({n})")
+        print(f"    MISS {topic:24} whotoask={who} ({mine})  git-top={top} ({n})")
 
 
 if __name__ == "__main__":

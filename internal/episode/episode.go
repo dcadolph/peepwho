@@ -1,5 +1,5 @@
 // Package episode records the bounded conversations a person took part in, so
-// peepwho can answer which past discussion solved a problem and who was in it.
+// whotoask can answer which past discussion solved a problem and who was in it.
 // An episode holds who, where, and when, plus a link back to the source. The
 // conversation itself stays in the tool it happened in unless the archive is
 // enabled.
@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // Kind classifies what shape of conversation an episode came from, so an
@@ -32,7 +32,7 @@ const (
 	KindChange Kind = "change"
 )
 
-// Episode is one bounded conversation peepwho can point back to.
+// Episode is one bounded conversation whotoask can point back to.
 type Episode struct {
 	// ID uniquely identifies the episode across runs, so re-indexing updates
 	// an episode rather than duplicating it.

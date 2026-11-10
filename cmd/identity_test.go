@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/render"
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/render"
 )
 
 // joinFixture builds an index whose AutoJoin infers a unique-name join and a
@@ -87,7 +87,7 @@ func TestUnlinkedOwnersAreAWorklist(t *testing.T) {
 	t.Parallel()
 	ix := index.New()
 	ix.Build([]connector.Record{
-		// Declared, and nothing else: their work is under an address peepwho
+		// Declared, and nothing else: their work is under an address whotoask
 		// has not tied to this handle.
 		{Kind: connector.KindPerson, PersonID: "codeowners:big", Name: "big",
 			Topics: []string{"alpha", "beta", "gamma"}, Source: "codeowners"},

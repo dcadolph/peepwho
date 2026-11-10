@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/fakeapi"
+	"github.com/dcadolph/whotoask/internal/fakeapi"
 )
 
 // TestJiraServerEndToEnd runs the whole index-then-ask flow against a fake

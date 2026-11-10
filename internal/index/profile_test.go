@@ -3,7 +3,7 @@ package index
 import (
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
+	"github.com/dcadolph/whotoask/internal/connector"
 )
 
 // TestProfileMinimal verifies a person with no team, org, manager, or channels

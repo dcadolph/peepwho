@@ -9,8 +9,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/dcadolph/peepwho/internal/recall"
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/recall"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // publicOnlyReplier records channel replies and cannot reply privately.
@@ -161,7 +161,7 @@ func TestFormatRecall(t *testing.T) {
 }
 
 // TestFormatRecallEscapes verifies values from the graph cannot inject Slack
-// markup, and that a link peepwho did not build is dropped rather than rendered.
+// markup, and that a link whotoask did not build is dropped rather than rendered.
 func TestFormatRecallEscapes(t *testing.T) {
 	t.Parallel()
 	got := FormatRecall("q", recall.Answer{

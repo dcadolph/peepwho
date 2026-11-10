@@ -5,8 +5,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/render"
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/render"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // newOwnershipCmd builds the ownership command, which compares declared
@@ -22,7 +22,7 @@ team or person owns an area, but the work and the knowledge sit somewhere else.
 Deterministic over the graph, no model needed.
 
 Examples:
-  peepwho ownership`,
+  whotoask ownership`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ix, err := opts.loadIndex(cmd)

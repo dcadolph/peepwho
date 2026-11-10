@@ -6,8 +6,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dcadolph/peepwho/internal/render"
-	"github.com/dcadolph/peepwho/internal/seal"
+	"github.com/dcadolph/whotoask/internal/render"
+	"github.com/dcadolph/whotoask/internal/seal"
 )
 
 // newVerifyCmd builds the verify command, which checks a sealed finding or
@@ -24,7 +24,7 @@ that are gone as missing. Nothing is sent anywhere.
 
 The signature proves the manifest is unchanged since it was signed, by the key
 it names. To know whose key that is, get the producer's public key out of band,
-from peepwho attest key on their install, and pass it with --key.
+from whotoask attest key on their install, and pass it with --key.
 
 A failed check exits non-zero, so this can be chained in a script.`,
 		Args: cobra.ExactArgs(1),

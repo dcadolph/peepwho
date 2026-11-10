@@ -4,8 +4,8 @@ import (
 	"math"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/feedback"
-	"github.com/dcadolph/peepwho/internal/model"
+	"github.com/dcadolph/whotoask/internal/feedback"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // Feedback application defaults. A few votes adjust ranking; they never bury

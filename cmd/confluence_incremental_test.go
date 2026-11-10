@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/fakeapi"
-	"github.com/dcadolph/peepwho/internal/state"
+	"github.com/dcadolph/whotoask/internal/fakeapi"
+	"github.com/dcadolph/whotoask/internal/state"
 )
 
 // TestConfluenceIncrementalReindex runs a full index then a --merge re-index
@@ -28,7 +28,7 @@ func TestConfluenceIncrementalReindex(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	dir := t.TempDir()
-	t.Setenv("PEEPWHO_CONFLUENCE_URL", srv.URL)
+	t.Setenv("WHOTOASK_CONFLUENCE_URL", srv.URL)
 
 	// First run: a full index writes the watermark.
 	if _, stderr, err := runCmd(t, "index", "--source", "confluence", "--confluence-server",

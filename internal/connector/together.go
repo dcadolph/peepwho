@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dcadolph/peepwho/internal/util"
+	"github.com/dcadolph/whotoask/internal/util"
 )
 
 // Bounds on what counts as two subjects being worked on together. They are

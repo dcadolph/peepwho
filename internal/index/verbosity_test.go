@@ -5,14 +5,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dcadolph/peepwho/internal/connector"
+	"github.com/dcadolph/whotoask/internal/connector"
 )
 
 // TestBusyOwnerOutranksPassingMention verifies the person who owns a topic wins
 // no matter how much else they say. A term's weight is capped, so an uncapped
 // length normalizer would eventually divide an explicit topic tag below a
 // single passing mention, which would mean the more work someone does, the
-// worse they rank on the thing they own. That is the opposite of what peepwho
+// worse they rank on the thing they own. That is the opposite of what whotoask
 // is for, so it is pinned here at volumes far past anything realistic.
 func TestBusyOwnerOutranksPassingMention(t *testing.T) {
 	t.Parallel()

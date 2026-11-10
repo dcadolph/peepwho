@@ -6,20 +6,20 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/dcadolph/peepwho/internal/index"
-	"github.com/dcadolph/peepwho/internal/llm"
-	"github.com/dcadolph/peepwho/internal/policy"
-	"github.com/dcadolph/peepwho/internal/resolve"
+	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/llm"
+	"github.com/dcadolph/whotoask/internal/policy"
+	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
 // Cloud provider credentials come only from the environment, never flags.
 const (
 	// AnthropicKeyEnv holds the Claude API key.
-	AnthropicKeyEnv = "PEEPWHO_ANTHROPIC_KEY"
+	AnthropicKeyEnv = "WHOTOASK_ANTHROPIC_KEY"
 	// OpenAIKeyEnv holds the OpenAI-compatible API key.
-	OpenAIKeyEnv = "PEEPWHO_OPENAI_KEY"
+	OpenAIKeyEnv = "WHOTOASK_OPENAI_KEY"
 	// GeminiKeyEnv holds the Gemini API key.
-	GeminiKeyEnv = "PEEPWHO_GEMINI_KEY"
+	GeminiKeyEnv = "WHOTOASK_GEMINI_KEY"
 )
 
 // Gemini speaks the OpenAI-compatible protocol at Google's endpoint, so the

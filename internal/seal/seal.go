@@ -22,7 +22,7 @@ import (
 
 const (
 	// Format names this version of the seal layout.
-	Format = "peepwho-seal/1"
+	Format = "whotoask-seal/1"
 	// ManifestName is the file the manifest is written to.
 	ManifestName = "manifest.json"
 	// SignatureName is the file the signature is written to.
@@ -41,7 +41,7 @@ type Subject struct {
 
 // Claim is the signed statement the seal carries.
 type Claim struct {
-	// Type names the claim's schema, such as peepwho.knowledge-risk/1.
+	// Type names the claim's schema, such as whotoask.knowledge-risk/1.
 	Type string `json:"type"`
 	// Payload is the claim body, sealed as written.
 	Payload json.RawMessage `json:"payload"`
