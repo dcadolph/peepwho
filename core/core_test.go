@@ -517,6 +517,9 @@ func TestHandleIndexAndRefresh(t *testing.T) {
 	if iv.Source != "git" || iv.Scope != "repo:"+repo {
 		t.Errorf("index view = %+v, want git under repo:%s", iv, repo)
 	}
+	if iv.Repos != 1 || iv.People == 0 {
+		t.Errorf("index view read %d repositories and holds %d people, want 1 and some", iv.Repos, iv.People)
+	}
 	if !engine.NeedsKey(engine.Dir(dir).Index()) {
 		t.Error("the first index of a keyed handle was not sealed under the key")
 	}

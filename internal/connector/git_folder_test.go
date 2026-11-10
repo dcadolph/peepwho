@@ -122,3 +122,27 @@ func TestGitHistoryReadsAFolderOfRepos(t *testing.T) {
 		t.Errorf("authors mismatch (-want +got):\n%s", diff)
 	}
 }
+
+// TestGitHistoryCountsReposRead verifies Repos counts only the repositories a
+// Fetch read, and that the closing line says how many of the paths that was.
+func TestGitHistoryCountsReposRead(t *testing.T) {
+	t.Parallel()
+	parent := t.TempDir()
+	for name, author := range map[string]string{"one": "ann@corp.com", "two": "ben@corp.com"} {
+		if err := os.Rename(newInternalRepo(t, "", author), filepath.Join(parent, name)); err != nil {
+			t.Fatalf("move repo: %v", err)
+		}
+	}
+	missing := filepath.Join(t.TempDir(), "gone")
+	log := &strings.Builder{}
+	g := NewGitHistory(GitOptions{Paths: []string{parent, missing}, Log: log})
+	if _, err := g.Fetch(context.Background()); err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if diff := cmp.Diff(2, g.Repos()); diff != "" {
+		t.Errorf("repos mismatch (-want +got):\n%s", diff)
+	}
+	if !strings.Contains(log.String(), "git: read 2 of 3 repositories\n") {
+		t.Errorf("log lacks the closing count:\n%s", log)
+	}
+}

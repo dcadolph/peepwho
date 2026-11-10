@@ -95,6 +95,19 @@ struct DecodeTests {
         let got: IndexResult = try Core.decode(fixture("index"))
         #expect(got.source == "git")
         #expect(got.scope.hasPrefix("repo:"))
+        #expect(got.repos == 1)
+        #expect(got.people == 2)
+        #expect(got.finishLine == "Git: read 1 repository. The index holds 2 people.")
+    }
+
+    // finishLine says one or many in plain words, and names a source other than git.
+    @Test func finishLine() {
+        let one = IndexResult(source: "git", scope: "repo:/a", repos: 1, people: 1, log: "")
+        #expect(one.finishLine == "Git: read 1 repository. The index holds 1 person.")
+        let many = IndexResult(source: "git", scope: "repo:/src", repos: 58, people: 3, log: "")
+        #expect(many.finishLine == "Git: read 58 repositories. The index holds 3 people.")
+        let csv = IndexResult(source: "org-csv", scope: "file:/a.csv", repos: 0, people: 40, log: "")
+        #expect(csv.finishLine == "Org chart CSV: indexed. The index holds 40 people.")
     }
 
     // refresh decodes each scope's outcome.

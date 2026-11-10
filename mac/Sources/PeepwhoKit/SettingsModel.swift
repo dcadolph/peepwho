@@ -599,13 +599,13 @@ public final class SettingsModel: ObservableObject {
     }
 
     // index runs job, stops refreshing what the source read before if that changed, such as a
-    // project taken out of Settings, and says what it read.
+    // project taken out of Settings, and says in plain words what it read.
     private func index(_ core: Core, _ job: IndexJob) async throws -> String {
         let result = try await core.index(job.source, flags: job.flags)
         if !result.scope.isEmpty {
             try await core.forgetScopes(job.source, keep: result.scope)
         }
-        return "\(result.source): indexed \(result.scope)."
+        return result.finishLine
     }
 
     // resolveAll starts access to every picked place, keyed by slot. The caller releases them.

@@ -646,6 +646,10 @@ type indexView struct {
 	Source string `json:"source"`
 	// Scope is the refresh key the run was recorded under.
 	Scope string `json:"scope"`
+	// Repos is how many repositories the run read, zero for a source other than git.
+	Repos int `json:"repos"`
+	// People is how many people the index holds after the run.
+	People int `json:"people"`
 	// Log is the end of the run's progress output.
 	Log string `json:"log"`
 }
@@ -692,6 +696,8 @@ func (h *Handle) Index(source, flags string, nowUnix int64) (out string, err err
 		scope = sc
 		return h.store.RecordInvocation(src, sc, run.Replay, now)
 	}
+	var read engine.Outcome
+	x.Outcome = func(o engine.Outcome) { read = o }
 	if err := x.Index(ctx, run.Request); err != nil {
 		if ctx.Err() != nil {
 			return "", engine.ErrCanceled
@@ -702,7 +708,11 @@ func (h *Handle) Index(source, flags string, nowUnix int64) (out string, err err
 		return "", fmt.Errorf("core: index %s saved, but it would not load: "+
 			"open the data directory again: %w", source, err)
 	}
-	return toJSON(indexView{Source: source, Scope: scope, Log: log.String()})
+	v := indexView{Source: source, Scope: scope, Repos: read.Repos, Log: log.String()}
+	if l := h.current(); l != nil {
+		v.People = l.eng.Status(now).People
+	}
+	return toJSON(v)
 }
 
 // refreshResult is one replayed scope in the JSON Refresh returns.

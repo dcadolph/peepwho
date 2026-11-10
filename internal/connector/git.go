@@ -130,6 +130,8 @@ type GitHistory struct {
 	// clones: with no repository identity on either side, joining the number
 	// would guess, and a guessed review credit is the bug this map closes.
 	ambiguousPulls map[PullRef]bool
+	// repos counts the repositories the last Fetch read without error.
+	repos int
 	// now returns the current time, read once per walk so a window boundary
 	// never drifts inside one run. Tests fix it.
 	now func() time.Time
@@ -191,6 +193,10 @@ func (g *GitHistory) DirWork() map[string]map[string]float64 { return g.dirWork 
 // breadth a directory score is discounted by.
 func (g *GitHistory) WorkTotals() map[string]float64 { return g.workTotals }
 
+// Repos returns how many repositories the last Fetch read without error, so a
+// folder of repositories can report how many it held.
+func (g *GitHistory) Repos() int { return g.repos }
+
 // Marks returns where reading stopped in each repository, so a later run can
 // resume from there rather than reading the same history again.
 func (g *GitHistory) Marks() map[string]string { return g.marks }
@@ -235,6 +241,7 @@ func (g *GitHistory) Fetch(ctx context.Context) ([]Record, error) {
 	// each pairing.
 	ties := newTogether()
 	unreadable := 0
+	g.repos = 0
 	for _, path := range g.opts.Paths {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -248,6 +255,7 @@ func (g *GitHistory) Fetch(ctx context.Context) ([]Record, error) {
 			unreadable++
 			continue
 		}
+		g.repos++
 		fmt.Fprintf(g.opts.Log, "git: %s: %d commits\n", path, read)
 		if isShallow(path) {
 			fmt.Fprintf(g.opts.Log,
@@ -288,6 +296,7 @@ func (g *GitHistory) Fetch(ctx context.Context) ([]Record, error) {
 		return nil, fmt.Errorf("%w: see the skip lines above (a moved folder, a lost "+
 			"permission, or a folder with no repository in it looks like this)", ErrNoReadableRepo)
 	}
+	fmt.Fprintf(g.opts.Log, "git: read %d of %d repositories\n", g.repos, len(g.opts.Paths))
 
 	names := pickNames(nameCounts)
 	// One record per author, carrying everything they touched in the window and

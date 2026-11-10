@@ -60,6 +60,9 @@ type Indexer struct {
 	// scope. Nil records nothing, which is what a refresh replaying a record
 	// wants.
 	Record func(source, scope string) error
+	// Outcome receives what a successful index read, once, after the fold is
+	// saved. Nil reports nothing.
+	Outcome func(Outcome)
 	// Log receives progress, warnings, and the change report.
 	Log io.Writer
 	// Stdin is what a source reading standard input reads.
@@ -70,6 +73,13 @@ type Indexer struct {
 	// unlocked is the codec an Unlock returned. It serves every later read and
 	// write, so one passphrase covers the rest of the run.
 	unlocked vault.Codec
+}
+
+// Outcome is what one successful index read, for a caller that reports it in
+// plain words rather than as a refresh scope key.
+type Outcome struct {
+	// Repos is how many repositories the git source read, zero for other sources.
+	Repos int
 }
 
 // IndexRequest names one source and the flags to read it with.
@@ -156,8 +166,10 @@ func (x *Indexer) Index(ctx context.Context, req IndexRequest) error {
 	// Git resumes from a commit rather than a time, so it carries its own
 	// marks: where this run stopped, saved below.
 	var gitAfter map[string]string
+	var out Outcome
 	if g, isGit := src.(*connector.GitHistory); isGit {
 		gitAfter = g.Marks()
+		out.Repos = g.Repos()
 	}
 	if err != nil {
 		return err
@@ -174,7 +186,13 @@ func (x *Indexer) Index(ctx context.Context, req IndexRequest) error {
 	}); err != nil {
 		return err
 	}
-	return x.saveProgress(&req, scope, canInc, gitAfter, recs)
+	if err := x.saveProgress(&req, scope, canInc, gitAfter, recs); err != nil {
+		return err
+	}
+	if x.Outcome != nil {
+		x.Outcome(out)
+	}
+	return nil
 }
 
 // saveProgress runs after a successful index. It records the flags this

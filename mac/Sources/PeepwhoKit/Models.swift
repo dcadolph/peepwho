@@ -298,8 +298,41 @@ public struct IndexResult: Codable, Sendable {
     public let source: String
     // scope is what was read, such as repo:/path.
     public let scope: String
+    // repos is how many repositories the run read, zero for a source other than git.
+    public let repos: Int
+    // people is how many people the index holds after the run.
+    public let people: Int
     // log is the run's progress text.
     public let log: String
+
+    // finishLine says in plain words what the run read and what the index now holds.
+    public var finishLine: String {
+        let held = "The index holds \(Self.count(people, "person", "people"))."
+        if source == "git" {
+            return "Git: read \(Self.count(repos, "repository", "repositories")). \(held)"
+        }
+        return "\(Self.label(source)): indexed. \(held)"
+    }
+
+    // count writes n with the singular or plural noun.
+    static func count(_ n: Int, _ one: String, _ many: String) -> String {
+        "\(n) \(n == 1 ? one : many)"
+    }
+
+    // label is the name a person knows source by.
+    static func label(_ source: String) -> String {
+        switch source {
+        case "git": "Git"
+        case "org-csv": "Org chart CSV"
+        case "codeowners": "CODEOWNERS"
+        case "slack": "Slack"
+        case "github": "GitHub"
+        case "jira": "Jira"
+        case "confluence": "Confluence"
+        case "pagerduty": "PagerDuty"
+        default: source
+        }
+    }
 }
 
 // RefreshScope is the outcome of replaying one recorded scope.

@@ -324,7 +324,7 @@ struct SettingsTests {
         model.onCore = { handed.append($0) }
 
         await model.pick(repo, as: .git)
-        #expect(model.lines == ["git: indexed repo:\(repo.path)."])
+        #expect(model.lines == [readOneRepo(model)])
         #expect(model.placeNames[.git] == repo.lastPathComponent)
         #expect((model.status?.people ?? 0) > 0)
         #expect(model.status?.sources["git"] != nil)
@@ -333,7 +333,7 @@ struct SettingsTests {
         #expect(model.lines == ["git: refreshed repo:\(repo.path)."])
 
         await model.indexAll()
-        #expect(model.lines == ["git: indexed repo:\(repo.path)."])
+        #expect(model.lines == [readOneRepo(model)])
         #expect(places.open == 0)
         #expect(places.resolves > 3)
 
@@ -507,7 +507,7 @@ struct SettingsTests {
         model.cancel()
         #expect(model.progress == nil)
         await model.pick(repo, as: .git)
-        #expect(model.lines == ["git: indexed repo:\(repo.path)."])
+        #expect(model.lines == [readOneRepo(model)])
     }
 
     // Test 11: Picking a new place into a slot stops refreshing the old one, and a place that went
@@ -592,7 +592,7 @@ struct SettingsTests {
         await model.pick(first, as: .git)
         #expect(model.status?.scopes.count == 1)
         await model.pick(tempDir("peepwho-missing"), as: .git)
-        #expect(model.lines.first?.hasPrefix("git: indexed") == false)
+        #expect(model.lines.first?.hasPrefix("Git: read") == false)
         #expect(model.status?.scopes.isEmpty == true)
     }
 
@@ -696,4 +696,12 @@ struct SettingsTests {
         model.reopenIfClosed()
         #expect(handed.isEmpty)
     }
+}
+
+// readOneRepo is the finish line a pick of one test repository shows, with the people model's
+// status counts.
+@MainActor
+func readOneRepo(_ model: SettingsModel) -> String {
+    let people = model.status?.people ?? 0
+    return "Git: read 1 repository. The index holds \(IndexResult.count(people, "person", "people"))."
 }
