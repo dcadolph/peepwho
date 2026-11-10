@@ -58,6 +58,8 @@ Builds or extends the index from one source per run.
 
     peepwho index --source SOURCE [scope flags] [--merge]
 
+The index keeps one record set per source, so a full read of a second scope of the same source replaces what the first scope contributed; only an incremental merge folds into it.
+
 | Flag                | Default   | Applies to | What it does                                     |
 | ------------------- | --------- | ---------- | ------------------------------------------------ |
 | `--source`          | `org-csv` | all        | Which source to ingest.                          |

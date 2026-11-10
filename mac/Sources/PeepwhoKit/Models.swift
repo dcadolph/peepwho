@@ -45,9 +45,6 @@ public struct Found: Codable, Equatable, Sendable {
     // channels is how many channels the source holds after the run.
     public let channels: Int
 
-    // zero is nothing found, the start of a sum.
-    static let zero = Found(repos: 0, people: 0, channels: 0)
-
     // who says whom the run found: "found 5 people in 1 channel", "found 1 person", or
     // "found no one".
     var who: String {
@@ -62,11 +59,6 @@ public struct Found: Codable, Equatable, Sendable {
             return "Read \(Count.words(repos, "repository", "repositories")) and \(who)."
         }
         return who.prefix(1).uppercased() + who.dropFirst() + "."
-    }
-
-    // + sums what two runs found.
-    static func + (a: Found, b: Found) -> Found {
-        Found(repos: a.repos + b.repos, people: a.people + b.people, channels: a.channels + b.channels)
     }
 }
 

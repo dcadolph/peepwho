@@ -231,13 +231,18 @@ struct SettingsTests {
         #expect(got == [
             SourceAge(source: "codeowners", detail: "Found 3 people. 3 hours ago. Last try failed 3 hours ago: gone."),
             SourceAge(source: "git", detail: "Read 58 repositories and found 1 person. 2 minutes ago."),
-            SourceAge(source: "github", detail: "Found 3 people. 1 hour ago."),
+            SourceAge(source: "github", detail: "Found 1 person. 1 hour ago."),
             SourceAge(source: "jira", detail: "Indexed 2 minutes ago."),
             SourceAge(source: "org-csv", detail: "Indexed 2 minutes ago."),
             SourceAge(source: "pagerduty", detail: "Found 3 people. Just now."),
             SourceAge(source: "slack", detail: "Found 5 people in 1 channel. 2 minutes ago."),
         ])
         #expect(got.map(\.label) == ["CODEOWNERS", "Git", "GitHub", "Jira", "Org chart CSV", "PagerDuty", "Slack"])
+        let same = SourceAge.rows([
+            scope("github", "org:a", age: 3600, found: Found(repos: 0, people: 7, channels: 0)),
+            scope("github", "org:b", age: 60, found: Found(repos: 0, people: 7, channels: 0)),
+        ], now: now)
+        #expect(same == [SourceAge(source: "github", detail: "Found 7 people. 1 hour ago.")])
         let sample = SourceAge.rows([scope("slack", "sample", age: 0, found: Found(repos: 0, people: 5, channels: 1))],
                                     sample: true, now: now)
         #expect(sample == [SourceAge(source: "slack", detail: "Loaded just now.")])

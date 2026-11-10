@@ -83,10 +83,10 @@ type Indexer struct {
 type Outcome struct {
 	// Repos is how many repositories the git source read, zero for other sources.
 	Repos int `json:"repos"`
-	// People is how many distinct people the records named, by source id, else
+	// People is how many distinct people the source holds after the run, by source id, else
 	// by email.
 	People int `json:"people"`
-	// Channels is how many distinct channels the records named.
+	// Channels is how many distinct channels the source holds after the run.
 	Channels int `json:"channels"`
 }
 
