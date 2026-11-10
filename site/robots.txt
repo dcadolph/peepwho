@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://peepwho.app/sitemap.xml
+Sitemap: https://whotoask.app/sitemap.xml

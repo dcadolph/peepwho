@@ -3,21 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Privacy - peepwho</title>
-<meta name="description" content="Privacy statement for the peepwho website and a summary of how the peepwho tool handles data.">
-<link rel="canonical" href="https://peepwho.app/privacy">
+<title>Privacy - WhoToAsk</title>
+<meta name="description" content="Privacy statement for the WhoToAsk website and a summary of how the WhoToAsk tool handles data.">
+<link rel="canonical" href="https://whotoask.app/privacy">
 <link rel="icon" href="/favicon.svg?v=3" type="image/svg+xml">
 <link rel="stylesheet" href="/style.css?v=3">
-<meta property="og:title" content="Privacy - peepwho">
-<meta property="og:description" content="Privacy statement for the peepwho website and a summary of how the peepwho tool handles data.">
-<meta property="og:url" content="https://peepwho.app/privacy">
+<meta property="og:title" content="Privacy - WhoToAsk">
+<meta property="og:description" content="Privacy statement for the WhoToAsk website and a summary of how the WhoToAsk tool handles data.">
+<meta property="og:url" content="https://whotoask.app/privacy">
 <meta property="og:type" content="website">
 </head>
 <body>
 <div class="band">
 <div class="wrap bar">
-<a class="brand" href="/"><img src="/logo.svg?v=3" alt="" width="34" height="44"><span class="word">peep<span class="who">who</span></span></a>
-<nav><a href="https://github.com/dcadolph/peepwho">GitHub</a></nav>
+<a class="brand" href="/"><img src="/logo.svg?v=3" alt="" width="34" height="44"><span class="word"><span class="who">Who</span>ToAsk</span></a>
+<nav><a href="https://github.com/dcadolph/whotoask">GitHub</a></nav>
 </div>
 </div>
 <main class="wrap">
@@ -26,19 +26,19 @@
 <p>This site sets no cookies, runs no analytics, and does no tracking. It has no forms and loads no third-party scripts or fonts. Cloudflare serves the site and may keep standard request logs under its own policy, which you can read at <a href="https://www.cloudflare.com/privacypolicy/">cloudflare.com/privacypolicy</a>.</p>
 
 <h2>The tool</h2>
-<p>peepwho runs on your machine. The summary below comes from the full text in <a href="https://github.com/dcadolph/peepwho/blob/main/docs/PRIVACY.md">docs/PRIVACY.md</a>.</p>
+<p>WhoToAsk runs on your machine. The summary below comes from the full text in <a href="https://github.com/dcadolph/whotoask/blob/main/docs/PRIVACY.md">docs/PRIVACY.md</a>.</p>
 <ul>
-<li>The index lives at <code>~/.peepwho/index.json</code> on your machine, readable only by you, and is never uploaded.</li>
+<li>The index lives at <code>~/.whotoask/index.json</code> on your machine, readable only by you, and is never uploaded.</li>
 <li>The index holds each person's name, email, title, team, and linked identities, topic weights, channel names with member lists, and a stemmed term index. Message bodies are not kept.</li>
 <li>With no AI model configured, <code>index</code>, <code>ask</code>, and <code>serve</code> make no network requests at all.</li>
-<li>The index can be encrypted at rest with AES-256-GCM. Set a key or passphrase and peepwho encrypts on every write.</li>
+<li>The index can be encrypted at rest with AES-256-GCM. Set a key or passphrase and WhoToAsk encrypts on every write.</li>
 <li>The optional archive, enabled with <code>--archive</code>, keeps message text from Slack conversations on your disk. It refuses to run without an encryption key.</li>
-<li><code>peepwho forget</code> removes one person from everything peepwho stores.</li>
-<li><code>peepwho wipe</code> deletes every file peepwho writes under the data directory and every credential it saved in the OS keychain.</li>
+<li><code>whotoask forget</code> removes one person from everything WhoToAsk stores.</li>
+<li><code>whotoask wipe</code> deletes every file WhoToAsk writes under the data directory and every credential it saved in the OS keychain.</li>
 </ul>
 
 <h2>Contact</h2>
-<p>Open an issue at <a href="https://github.com/dcadolph/peepwho/issues">github.com/dcadolph/peepwho/issues</a>.</p>
+<p>Open an issue at <a href="https://github.com/dcadolph/whotoask/issues">github.com/dcadolph/whotoask/issues</a>.</p>
 </main>
 <footer class="wrap">
 <p>MIT License. Copyright (c) 2026 dcadolph. <a href="/privacy">Privacy</a></p>
