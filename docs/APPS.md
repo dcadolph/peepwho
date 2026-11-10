@@ -1,16 +1,16 @@
 # Apps
 
 The Mac and iPhone apps call the Go core in `core/` through gomobile, bound as the
-`PeepwhoCore` framework. The core takes every secret from the host: the index key is an
+`WhoToAskCore` framework. The core takes every secret from the host: the index key is an
 argument to `CoreOpen`, and source tokens come through a `CoreSecrets` the host sets on the
 handle. `make core-deps` fails if the core ever links the command line or a keychain.
 
 ## Layout
 
-`mac/` is one Swift package. `PeepwhoKit` is the library both apps share: the Keychain,
+`mac/` is one Swift package. `WhoToAskKit` is the library both apps share: the Keychain,
 security-scoped bookmarks, the `CoreSecrets` that reads the Keychain, and `Core`, which
 runs every core call off the main thread and decodes its JSON into Swift types. `Host` is
-the test host below. `Peepwho` is the menu bar app. The `PeepwhoKitTests` decode one saved
+the test host below. `WhoToAsk` is the menu bar app. The `WhoToAskKitTests` decode one saved
 answer per core call from `core/testdata/swift`, which the Go test `TestSwiftFixtures`
 writes and checks, so a field renamed in Go fails in Go first and then in Swift:
 
@@ -21,16 +21,16 @@ make -C mac test
 
 The two apps share nothing at run time. Each keeps its Keychain items under its own bundle
 id and its index in its own container, and neither can read the command line's
-`~/.peepwho`.
+`~/.whotoask`.
 
 ## The menu bar app
 
-`mac/Sources/Peepwho` is the Mac app, an owl in the menu bar with no Dock icon. The owl is a
-template image drawn from the site's mark, so macOS paints it to suit the menu bar. Typing in its
-search field asks who to talk to, and Enter opens a Slack DM with the first person, or shows them
-when the index has no Slack link for them. Clicking a person shows what the index knows
-about them. Above the results it lists who and what
-joined or left since the menu last closed.
+`mac/Sources/WhoToAsk` is the Mac app, an owl in the menu bar with no Dock icon. The owl is
+Socrates. It is a template image drawn from the site's mark, so macOS paints it to suit the menu
+bar. Typing in its search field asks who to talk to, and Enter opens a Slack DM with the first
+person, or shows them when the index has no Slack link for them. Clicking a person shows what the
+index knows about them. Above the results it lists who and what joined or left since the menu last
+closed.
 
 Settings holds the tokens, Jira and Confluence sites, and scopes for each source, and the
 git folder, org chart CSV, and CODEOWNERS file it reads. Tokens go to the app's Keychain
@@ -50,7 +50,7 @@ Settings also shows, per source, when it last indexed and why its last try faile
 
 With an empty index, Settings offers Load Sample Company: a simulated company of 223 people
 across eight sources, so every part of the app can be tried without a token. `make mac` builds
-it with `peepwho demo --big --save-index` and bundles only `index.json` and `episodes.json` in
+it with `whotoask demo --big --save-index` and bundles only `index.json` and `episodes.json` in
 the app as data, so the core links none of the simulator, which `make core-deps` enforces.
 Loading seals it under the app's key and writes a `sample.json` marker. Settings and the menu
 both say it is sample data. Index and Refresh refuse while it is there, automatic refresh skips
@@ -62,23 +62,23 @@ try until one works again, leaving out a source whose token was forgotten. A fai
 before it runs again. The interval is a default in seconds:
 
 ```sh
-defaults write com.dcadolph.peepwho PeepwhoRefreshIntervalSeconds -int 3600
+defaults write com.dcadolph.whotoask WhoToAskRefreshIntervalSeconds -int 3600
 ```
 
 Settings has an Open at login switch, off until a person turns it on, which adds the app to the
 system's Login Items. A person who turned the app off in System Settings has to approve it there,
-and the switch says so. About peepwho shows the version and copyright.
+and the switch says so. About WhoToAsk shows the version and copyright.
 
 The index lives in
-`~/Library/Containers/com.dcadolph.peepwho/Data/Library/Application Support/peepwho`, sealed
+`~/Library/Containers/com.dcadolph.whotoask/Data/Library/Application Support/whotoask`, sealed
 with a key the app makes on first launch and keeps in its Keychain. It is the app's own
-index, and the sandbox keeps it from reading the command line's `~/.peepwho`.
+index, and the sandbox keeps it from reading the command line's `~/.whotoask`.
 
 ## Release the app
 
 The app's version is stamped from the newest `v*` tag when it is built, so cut the release
 first and build from its tag: `make -C mac dmg` refuses a tree that is not clean on the tag the
-app says it is. `CFBundleVersion` in `mac/Sources/Peepwho/Info.plist` is an integer that goes up
+app says it is. `CFBundleVersion` in `mac/Sources/WhoToAsk/Info.plist` is an integer that goes up
 with every build shipped. The notarized disk image is attached to that release.
 `NOTARY_PROFILE` names a `notarytool store-credentials` profile for the signing team.
 
@@ -88,15 +88,15 @@ missing slice, a wrong version or macOS floor, or a missing category or copyrigh
 
 ```sh
 make mac
-ditto -c -k --keepParent mac/.build/Peepwho.app mac/.build/Peepwho.zip
-xcrun notarytool submit mac/.build/Peepwho.zip --keychain-profile "$NOTARY_PROFILE" --wait
-xcrun stapler staple mac/.build/Peepwho.app
+ditto -c -k --keepParent mac/.build/WhoToAsk.app mac/.build/WhoToAsk.zip
+xcrun notarytool submit mac/.build/WhoToAsk.zip --keychain-profile "$NOTARY_PROFILE" --wait
+xcrun stapler staple mac/.build/WhoToAsk.app
 make -C mac dmg
-xcrun notarytool submit mac/.build/Peepwho.dmg --keychain-profile "$NOTARY_PROFILE" --wait
-xcrun stapler staple mac/.build/Peepwho.dmg
-xcrun stapler validate mac/.build/Peepwho.app
-xcrun stapler validate mac/.build/Peepwho.dmg
-spctl --assess --type open --context context:primary-signature -v mac/.build/Peepwho.dmg
+xcrun notarytool submit mac/.build/WhoToAsk.dmg --keychain-profile "$NOTARY_PROFILE" --wait
+xcrun stapler staple mac/.build/WhoToAsk.dmg
+xcrun stapler validate mac/.build/WhoToAsk.app
+xcrun stapler validate mac/.build/WhoToAsk.dmg
+spctl --assess --type open --context context:primary-signature -v mac/.build/WhoToAsk.dmg
 ```
 
 `make -C mac dmg` packs the app already built and never rebuilds it, so the stapled app
@@ -115,8 +115,8 @@ things a sandboxed app needs before it can ship:
 
 It runs with four entitlements: `app-sandbox`, `files.user-selected.read-only`,
 `files.bookmarks.app-scope`, and `network.client`. The data directory is
-`~/Library/Containers/com.dcadolph.peepwho.host/Data/Library/Application Support/peepwho`,
-separate from the command line's `~/.peepwho`.
+`~/Library/Containers/com.dcadolph.whotoask.host/Data/Library/Application Support/whotoask`,
+separate from the command line's `~/.whotoask`.
 
 ## Build
 
@@ -125,18 +125,18 @@ make mac
 ```
 
 This binds the core into `mac/Frameworks/` and builds `mac/.build/Host.app` and
-`mac/.build/Peepwho.app`, signed with the personal Developer ID so Keychain items keep their
+`mac/.build/WhoToAsk.app`, signed with the personal Developer ID so Keychain items keep their
 access across rebuilds. `make host` is the same target. Pass `SIGN_ID=-` to `make -C mac host
 app` for an ad hoc build; Keychain checks need the Developer ID build.
 
 ## Run the checks
 
 The host logs every step to the unified log under the subsystem
-`com.dcadolph.peepwho.host`. Tokens and keys are never logged, and person names stay in the
+`com.dcadolph.whotoask.host`. Tokens and keys are never logged, and person names stay in the
 window.
 
 ```sh
-log show --last 2m --style compact --predicate 'subsystem == "com.dcadolph.peepwho.host"'
+log show --last 2m --style compact --predicate 'subsystem == "com.dcadolph.whotoask.host"'
 ```
 
 Grant a repository folder and a CSV once, through the window's buttons or by opening them

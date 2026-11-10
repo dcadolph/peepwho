@@ -1,6 +1,6 @@
 # Accuracy: how the named people are checked
 
-Peepwho names individuals. An assessment that names the wrong person is worse
+WhoToAsk names individuals. An assessment that names the wrong person is worse
 than no assessment, so this page says how the naming is measured, on what, and
 what the numbers were. Everything here is reproducible from a public
 repository with the commands given.
@@ -31,10 +31,10 @@ guards mutation-fail without it.
 
 ## The problem with measuring yourself
 
-Two earlier ways of judging peepwho were not good enough to publish.
+Two earlier ways of judging WhoToAsk were not good enough to publish.
 
 The simulation gauntlet scores against a synthetic company whose answers
-peepwho's own generator planted. It is useful for catching regressions, which is
+WhoToAsk's own generator planted. It is useful for catching regressions, which is
 why it runs in CI, and it is worthless as evidence to somebody outside: the
 answer key and the thing being tested come from the same code.
 
@@ -42,7 +42,7 @@ Tuning on the target is worse. A threshold chosen until it agreed with a
 repository, and then reported as agreement with that repository, is a
 measurement of nothing.
 
-So the checks below use targets peepwho was never tuned against and judges
+So the checks below use targets WhoToAsk was never tuned against and judges
 written independently of it: git itself for the sanity check, and the
 ownership files project maintainers wrote for their own governance for the
 real one. There is no single public ground truth for organizational
@@ -52,19 +52,19 @@ than pretending one benchmark proves the whole system.
 ## The method
 
 Pick a public repository. Run an assessment. For each of the heaviest subjects,
-ask peepwho who holds it, then ask `git log` who touched that directory most,
-and see whether peepwho's name is among git's top three.
+ask WhoToAsk who holds it, then ask `git log` who touched that directory most,
+and see whether WhoToAsk's name is among git's top three.
 
-The two measures are deliberately different. Peepwho counts a subject once per
+The two measures are deliberately different. WhoToAsk counts a subject once per
 commit, saturates repetition, decays by recency, and joins one human's several
 identities. Git's file-touch count does none of that. They should broadly
-agree and should not agree exactly: perfect agreement would mean peepwho is a
+agree and should not agree exactly: perfect agreement would mean WhoToAsk is a
 slower `git shortlog`.
 
 Run it yourself:
 
     git clone https://github.com/prometheus/prometheus.git
-    peepwho assess --repo-path ./prometheus --codeowners ./prometheus \
+    whotoask assess --repo-path ./prometheus --codeowners ./prometheus \
       --out prometheus-assessment
 
     git -C prometheus log --since="2 years ago" --no-merges \
@@ -88,7 +88,7 @@ One correction was applied to git's side, and it matters. Prometheus has no
 `.mailmap`, so its history holds one maintainer under two spellings of a given
 name and another under a full and a shortened given name, as four people where
 there are two. Without folding those, git's own ranking disagrees with itself,
-and peepwho scores 3 of 19 rather than 17. The identity join is not a
+and WhoToAsk scores 3 of 19 rather than 17. The identity join is not a
 detail on top of the ranking; on a repository without a mailmap it is most of
 what makes the ranking mean anything.
 
@@ -97,7 +97,7 @@ what makes the ranking mean anything.
 The stronger test uses ground truth humans wrote for their own reasons: the
 per-directory OWNERS files projects in the Kubernetes ecosystem maintain for
 real governance, aliases expanded to individuals. The harness ships in the
-repository as `peepwho eval owners`; the index is built from git history alone,
+repository as `whotoask eval owners`; the index is built from git history alone,
 with the CODEOWNERS connector off, so declared ownership never leaks into the
 input. The naive baseline is git's top three committers per directory, and
 the directories where that baseline misses are scored as their own cohort,
@@ -106,7 +106,7 @@ committers is a slower `git shortlog`.
 
 Measured 2026-09-02, two-year windows, place-scoped ownership model:
 
-| Index                       | Repository            | peepwho top 3 | git baseline | Cohort C |
+| Index                       | Repository            | WhoToAsk top 3 | git baseline | Cohort C |
 | --------------------------- | --------------------- | ------------ | ------------ | -------- |
 | git history only            | kubernetes/test-infra | 56% (44/79)  | 43% (34/79)  | 24% (11/45) |
 | git plus placed review data | kubernetes/test-infra | 60% (70/117) | 29% (34/117) | 48% (40/83) |
@@ -116,7 +116,7 @@ Measured 2026-09-02, two-year windows, place-scoped ownership model:
 Three readings.
 
 **Ownership is asked about places, and scoring it by place is what wins.**
-peepwho's subjects pool every path sharing a name; the place model reads the
+WhoToAsk's subjects pool every path sharing a name; the place model reads the
 same walk by directory, with the identity join, bot filtering, trailer
 credit, and a breadth discount layered on. From git history alone that beats
 commit counting by thirteen points on test-infra.
@@ -134,7 +134,7 @@ touched which places.
 
 **Both repositories now beat the baseline, kubernetes included.** Kubernetes
 is the harder case, because its approvers approve through review rather than
-authorship, and with git history alone peepwho trailed commit counting there.
+authorship, and with git history alone WhoToAsk trailed commit counting there.
 With review placed properly it leads by ten points. The absolute numbers stay
 lower than test-infra's because two thousand pull requests is a few months of
 kubernetes velocity; the gap to close now is depth of read, not method.
@@ -153,12 +153,12 @@ trailers and trailer-heavy ecosystems will see more.
 A temporal holdout builds the index from history up to a cutoff, asks who each
 place rests on knowing only that, and then reads the work that came after.
 Nothing past the cutoff reaches the index, so the answer cannot leak into the
-prediction. It ships as `peepwho eval holdout`.
+prediction. It ships as `whotoask eval holdout`.
 
 It does not favor us, and that changed the product rather than the page.
 Measured on prometheus and on kubernetes/test-infra, the naive prediction, the
-past window's top committers, forecasts future activity better than peepwho
-does. The reason is coherent: the breadth discount that makes peepwho good at
+past window's top committers, forecasts future activity better than WhoToAsk
+does. The reason is coherent: the breadth discount that makes WhoToAsk good at
 finding designated owners deliberately down-weights the people who touch
 everything, and those are exactly the people who go on committing most.
 Finding who owns an area and forecasting who will be busy in it are different
@@ -171,10 +171,10 @@ which is a forecast this measurement does not support.
 
 ## Measurement four: does concentration predict fragility
 
-The holdout above asks who will be busy, which peepwho does not claim to know.
+The holdout above asks who will be busy, which WhoToAsk does not claim to know.
 The claim it does make is narrower: that an area resting on one person is
 fragile. That is testable in the same windows. Take every area busy before the
-cutoff, note whether peepwho called it single-held, then read the future for
+cutoff, note whether WhoToAsk called it single-held, then read the future for
 the areas whose leading person stopped working there, and see which ones fell
 silent.
 
@@ -190,7 +190,7 @@ one-year cutoff, quiet meaning activity fell by ninety percent:
 | tektoncd/pipeline     | 40% (24/60)                     | 2% (1/41)               |
 | **pooled**            | **52% (136/264)**               | **13% (96/738)**        |
 
-When peepwho says an area rests on one person and that person stops working
+When WhoToAsk says an area rests on one person and that person stops working
 there, the area goes quiet about four times as often as an area it did not
 flag whose leading person also left. Every repository separates in the same
 direction, and none of them now rests on a single flagged area.
@@ -216,7 +216,7 @@ its leading person goes and mostly does not.
 
 This is the forward-looking measurement the concentration finding rests on,
 and unlike the activity holdout it supports the claim. It ships as part of
-`peepwho eval holdout`.
+`whotoask eval holdout`.
 
 ## Measurement five: does crediting the answerer help
 
@@ -231,7 +231,7 @@ Measured 2026-09-15 on kubernetes/test-infra and kubernetes/kubernetes, the two
 repositories in the corpus that carry enough OWNERS files to judge. Pooled over
 198 judged directories, 143 in cohort C:
 
-| Arm                                  | peepwho top 3     | Cohort C       |
+| Arm                                  | WhoToAsk top 3   | Cohort C       |
 | ------------------------------------ | ---------------- | -------------- |
 | credit everyone who took part        | 78/198 (39%)     | 28/143 (20%)   |
 | credit only the people who answered&nbsp; | 77/198 (39%) | 27/143 (19%)   |
@@ -266,9 +266,9 @@ words and ownership is asked about places.
 No sample assessment is hosted. Regenerate the one this page measured from the
 same prometheus checkout, then check its seal:
 
-    peepwho assess --repo-path ./prometheus --codeowners ./prometheus \
+    whotoask assess --repo-path ./prometheus --codeowners ./prometheus \
       --out prometheus-assessment
-    cd prometheus-assessment && peepwho verify .
+    cd prometheus-assessment && whotoask verify .
 
 No account, and nothing sent anywhere. The output is the brief, the JSON
 behind every number in it, and the seal over all of them. If you pass an
@@ -278,13 +278,13 @@ a file makes it verify as missing.
 
 ## What this does and does not show
 
-It shows that on a large repository nobody tuned against, peepwho's heaviest
+It shows that on a large repository nobody tuned against, WhoToAsk's heaviest
 subjects name people git agrees are doing that work.
 
 It does not show the ranking is right where git is a poor judge, which is most
 of what the product claims. Commit counts say nothing about the person who
 reviews every change, answers every question in Slack, and commits rarely.
-Peepwho reads those sources precisely because the commit log does not hold
+WhoToAsk reads those sources precisely because the commit log does not hold
 them, and this check cannot reach that.
 
 It also does not measure concentration findings, only who is named. On

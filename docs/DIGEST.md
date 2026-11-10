@@ -1,6 +1,6 @@
 # Personal digest (planned)
 
-A second way to ask peepwho a question. Today peepwho answers "who do I talk to
+A second way to ask WhoToAsk a question. Today WhoToAsk answers "who do I talk to
 about X." The digest answers "what did I miss that matters to me." It scans the
 channels the running user can see, scores each message for personal relevance,
 and returns a ranked, actionable roll-up on demand, on a schedule, or live.
@@ -59,7 +59,7 @@ roll-up as a direct message through the existing messaging client. Live alerts
 reuse the Socket Mode bot to react to messages as they arrive and ping the user
 when one clears the alert threshold.
 
-## Extras peepwho needs
+## Extras WhoToAsk needs
 
 These are the additive changes. None alter the existing query pipeline.
 

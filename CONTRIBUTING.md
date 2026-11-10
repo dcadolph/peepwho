@@ -33,22 +33,22 @@ Nothing about ranking or identity is obvious enough to change on judgment.
 Several plausible improvements to this codebase were measured and turned out to
 make things worse, and without a number every one of them would have shipped.
 
-`peepwho eval` scores the current index and compares it against a measurement
+`whotoask eval` scores the current index and compares it against a measurement
 saved earlier:
 
 ```sh
-peepwho index --source git --repo-path ~/src/some-repo
-peepwho eval --save before.json
+whotoask index --source git --repo-path ~/src/some-repo
+whotoask eval --save before.json
 # make the change, rebuild the index
-peepwho eval --baseline before.json
+whotoask eval --baseline before.json
 ```
 
 The score is agreement: how often the owner an organization declared for an area
-is also the person peepwho says leads it. It is reported with the reasons it could
+is also the person WhoToAsk says leads it. It is reported with the reasons it could
 be wrong, because the same score can mean three different things. An owner with
 no recorded work anywhere is usually an identity that was never joined to their
 commits. An owner who works elsewhere but never in the area they own is paper
-ownership, and peepwho is probably right to disagree. An owner merely out-worked
+ownership, and WhoToAsk is probably right to disagree. An owner merely out-worked
 in their own area is the arguable case, and the only one that is really about
 ranking.
 
@@ -68,24 +68,24 @@ Two runs are only compared when they cover the same sources. Adding one moves
 nearly every number for reasons that have nothing to do with quality.
 
 Any public repository with a CODEOWNERS file works as a test set, so a change
-can be measured against real data without pointing peepwho at anything private.
+can be measured against real data without pointing WhoToAsk at anything private.
 
-## Checking a finding against the source, not against peepwho
+## Checking a finding against the source, not against WhoToAsk
 
-`peepwho eval` scores ranking against declared ownership. It cannot tell you
+`whotoask eval` scores ranking against declared ownership. It cannot tell you
 whether a knowledge-risk finding is *true*, because it reads the same index the
 finding came from. For that, check against the history directly.
 
 `eval/verify_drift.py <repo> <ownership.json>` does it for ownership drift: for
-every reported area it asks whether the person peepwho names is also the top
+every reported area it asks whether the person WhoToAsk names is also the top
 focused committer of that area in the same window, reading raw git and nothing
 else. Bots are excluded, and so is any commit touching more than eighteen
 components, because a codemod is not ownership.
 
 ```sh
-peepwho index --source git --repo-path ~/src/some-repo
-peepwho index --source codeowners --file ~/src/some-repo/CODEOWNERS --merge
-peepwho ownership > drift.json
+whotoask index --source git --repo-path ~/src/some-repo
+whotoask index --source codeowners --file ~/src/some-repo/CODEOWNERS --merge
+whotoask ownership > drift.json
 python3 eval/verify_drift.py ~/src/some-repo drift.json
 ```
 

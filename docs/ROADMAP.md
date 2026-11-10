@@ -1,6 +1,6 @@
 # Roadmap
 
-peepwho answers "who do I talk to about X" from the data it has indexed. The next
+WhoToAsk answers "who do I talk to about X" from the data it has indexed. The next
 versions widen what it can see. Because every source is one connector against a
 single interface, each item below is additive and changes nothing downstream.
 

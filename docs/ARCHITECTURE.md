@@ -1,6 +1,6 @@
 # Architecture
 
-peepwho turns scattered work data into a queryable map of who knows what and which
+WhoToAsk turns scattered work data into a queryable map of who knows what and which
 channel to ask in. It is built in layers, each with one job, so a new data source
 or a new way to ask is a small, isolated addition.
 
@@ -54,7 +54,7 @@ was added this way.
 The index and the episode store are each one JSON file, read whole by every
 command and written whole by every index run. Measured on an M-series laptop
 with the opt-in scale suite
-(`PEEPWHO_SCALE=1 go test ./internal/simorg/ -run TestScale`):
+(`WHOTOASK_SCALE=1 go test ./internal/simorg/ -run TestScale`):
 
 | Size       | People | Conversations | Ingest | Index file | Episode file | Save  | Cold start | Ask  | Heap  |
 | ---------- | ------ | ------------- | ------ | ---------- | ------------ | ----- | ---------- | ---- | ----- |
@@ -81,7 +81,7 @@ is not. A refresh that reads three new commits still re-encodes and rewrites
 the whole index, and pays the full save cost in the table above. Reading a
 delta and writing a corpus is the current shape.
 
-For the work peepwho is pointed at today this is affordable. An assessment is a
+For the work WhoToAsk is pointed at today this is affordable. An assessment is a
 batch run where the save is ten seconds of a minute-long job, and an
 organization of a few hundred people saves in under a third of a second. It
 becomes worth fixing for a long-running `serve` deployment at a large
