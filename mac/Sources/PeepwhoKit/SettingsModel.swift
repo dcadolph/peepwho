@@ -317,7 +317,8 @@ public final class SettingsModel: ObservableObject {
     public func saveSecret(_ name: String, _ value: String) {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
-            forgetSecret(name)
+            secrets.delete(name)
+            readSaved()
             return
         }
         do {
@@ -328,10 +329,20 @@ public final class SettingsModel: ObservableObject {
         readSaved()
     }
 
-    // forgetSecret deletes the secret stored under name.
-    public func forgetSecret(_ name: String) {
-        secrets.delete(name)
-        readSaved()
+    // forgetSecret deletes the secret stored under name and, when a source requires that secret,
+    // stops refreshing the source, since it could only fail from then on. A secret no source
+    // requires leaves every refresh alone. The secret stays if forgetting the scopes fails, so the
+    // person can try again. What the source already put in the index stays until Clear Index.
+    public func forgetSecret(_ name: String) async {
+        let sources = SourceCard.all.map(\.source).filter { SecretName.required(by: $0).contains(name) }
+        await run("Forgetting", cancelable: false) { core in
+            for source in sources {
+                try await core.forgetScopes(source)
+            }
+            self.secrets.delete(name)
+            self.readSaved()
+            return []
+        }
     }
 
     // pick remembers url for slot, stops refreshing the place it replaces, and indexes it. A pick

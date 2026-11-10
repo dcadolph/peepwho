@@ -758,6 +758,32 @@ struct SettingsTests {
         #expect(places.has(.git))
     }
 
+    // Test 13b: Forgetting a token stops its source's refresh, and leaves other sources alone.
+    @Test func forgetSecretStopsRefresh() async throws {
+        let repo = try gitRepo()
+        let dir = tempDir("peepwho-data")
+        defer {
+            try? FileManager.default.removeItem(at: repo)
+            try? FileManager.default.removeItem(at: dir)
+        }
+        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let secrets = MemorySecrets()
+        let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+                                  secrets: secrets, places: MemoryPlaces(), defaults: defaults)
+        await model.pick(repo, as: .git)
+        let runs = #"{"slack":{"":{"flags":[],"found":{"repos":0,"people":5,"channels":1}}},"#
+            + #""git":{"repo:/a":{"flags":["--repo-path","/a"]}}}"#
+        try Data(runs.utf8).write(to: dir.appendingPathComponent("refresh.json"))
+        model.saveSecret(SecretName.slackToken, "xoxb-1")
+        await model.loadStatus()
+        #expect(model.sourceAges.contains { $0.source == "slack" })
+        await model.forgetSecret(SecretName.slackToken)
+        #expect(!model.has(SecretName.slackToken))
+        await model.loadStatus()
+        #expect(!model.sourceAges.contains { $0.source == "slack" })
+        #expect(model.sourceAges.contains { $0.source == "git" })
+    }
+
     // Test 14: A refresh that ran no scope says so instead of showing nothing.
     @Test func refreshOfNothingSaysSo() async throws {
         let repo = try gitRepo()

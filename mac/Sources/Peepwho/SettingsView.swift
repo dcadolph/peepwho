@@ -405,15 +405,22 @@ struct SecretRow: View {
             .onSubmit(save)
             Button("Save", action: save).disabled(text.isEmpty)
             if model.has(name) {
-                Button("Forget") { model.forgetSecret(name) }
+                Button("Forget") { Task { await model.forgetSecret(name) } }
             }
         }
     }
 
-    // save stores the typed value and clears the field.
+    // save stores the typed value and clears the field. A value of only spaces forgets the secret
+    // the way the Forget button does, so its source stops refreshing too.
     private func save() {
         guard !text.isEmpty else { return }
-        model.saveSecret(name, text)
+        if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if model.has(name) {
+                Task { await model.forgetSecret(name) }
+            }
+        } else {
+            model.saveSecret(name, text)
+        }
         text = ""
     }
 }
