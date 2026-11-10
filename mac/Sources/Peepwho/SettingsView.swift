@@ -2,6 +2,51 @@ import AppKit
 import PeepwhoKit
 import SwiftUI
 
+// SettingsWindow brings the settings window to the front. The app lives in the menu bar with no
+// Dock icon, and macOS leaves a window it opens behind the app in front unless the app activates
+// from the person's click and orders the window front itself.
+@MainActor
+enum SettingsWindow {
+    // window is the settings window, recorded when the settings view lands in it.
+    static weak var window: NSWindow?
+
+    // open activates the app, opens the settings scene, and raises its window when it is
+    // already open, since opening an open scene does not raise it.
+    static func open(_ openSettings: OpenSettingsAction) {
+        NSApp.activate()
+        openSettings()
+        raise()
+    }
+
+    // raise activates the app and makes the settings window key and front.
+    static func raise() {
+        guard let window else { return }
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
+    }
+}
+
+// WindowReader records the window its view lands in as the settings window and raises it, so a
+// settings window opened for the first time comes to the front.
+struct WindowReader: NSViewRepresentable {
+    // makeNSView returns the view that watches for its window.
+    func makeNSView(context: Context) -> NSView { Reader() }
+
+    // updateNSView has nothing to update.
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    // Reader is an empty view that reports the window it moves into.
+    final class Reader: NSView {
+        // viewDidMoveToWindow records and raises the window once the view is in one.
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            guard let window else { return }
+            SettingsWindow.window = window
+            SettingsWindow.raise()
+        }
+    }
+}
+
 // SettingsView is the settings window: one tab each for general choices, the sources peepwho
 // reads, the index, and privacy, above a strip showing the action running and its outcome.
 struct SettingsView: View {
@@ -26,6 +71,7 @@ struct SettingsView: View {
             activity
         }
         .frame(width: 640, height: 600)
+        .background(WindowReader())
         .task { await model.loadStatus() }
         .sheet(isPresented: $showingPeople) { PeopleView(model: model) }
         .confirmationDialog("Wipe the index?", isPresented: $confirmingWipe) {

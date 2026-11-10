@@ -10,6 +10,8 @@ struct SearchView: View {
     var onOpen: () async -> Void = {}
     // focused keeps the cursor in the field whenever the window opens.
     @FocusState private var focused: Bool
+    // openSettings opens the settings scene.
+    @Environment(\.openSettings) private var openSettings
 
     // body lays out the field above the results or the person.
     var body: some View {
@@ -43,9 +45,7 @@ struct SearchView: View {
             HStack {
                 Text("Enter messages the first person.").font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                SettingsLink { Text("Settings…") }
-                    .controlSize(.small)
-                    .simultaneousGesture(TapGesture().onEnded { NSApp.activate(ignoringOtherApps: true) })
+                Button("Settings…") { SettingsWindow.open(openSettings) }.controlSize(.small)
                 Button("Quit") { NSApp.terminate(nil) }.controlSize(.small)
             }
         }
