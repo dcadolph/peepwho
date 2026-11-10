@@ -135,6 +135,31 @@ struct DecodeTests {
         #expect(scope("jira", ok: false, error: "bad token", found: nil).line == "Jira: bad token.")
     }
 
+    // people decodes everyone the index holds with team names and links.
+    @Test func people() throws {
+        let got: PeopleList = try Core.decode(fixture("people"))
+        #expect(got.people.map(\.name) == ["Angela Malone", "Bob Smith", "Carol Lee"])
+        let angela = try #require(got.people.first)
+        #expect(angela.id == "angela@example.com")
+        #expect(angela.team == "Payments")
+        #expect(angela.role == "Staff Engineer, Payments")
+        #expect(angela.links.first?.hasPrefix("slack://user?") == true)
+    }
+
+    // peopleFilter keeps a match on name, title, or team in any case, and drops a miss.
+    @Test func peopleFilter() {
+        let ann = ListedPerson(id: "ann@x.com", name: "Ann Lee", title: "Staff Engineer", team: "Payments",
+                               links: [])
+        #expect(ann.matches("payments"))
+        #expect(ann.matches("STAFF"))
+        #expect(ann.matches("ann"))
+        #expect(ann.matches(" "))
+        #expect(!ann.matches("billing"))
+        let bare = ListedPerson(id: "bo@x.com", name: "Bo", title: "", team: "", links: [])
+        #expect(bare.role.isEmpty)
+        #expect(!bare.matches("payments"))
+    }
+
     // countList joins parts the way a sentence lists them.
     @Test func countList() {
         #expect(Count.list([]) == "")

@@ -11,6 +11,8 @@ struct SettingsView: View {
     @State private var confirmingWipe = false
     // confirmingForget shows the forget everything confirmation.
     @State private var confirmingForget = false
+    // showingPeople shows the People sheet.
+    @State private var showingPeople = false
 
     // body lays the tabs out above the activity strip every tab shares.
     var body: some View {
@@ -25,6 +27,7 @@ struct SettingsView: View {
         }
         .frame(width: 640, height: 600)
         .task { await model.loadStatus() }
+        .sheet(isPresented: $showingPeople) { PeopleView(model: model) }
         .confirmationDialog("Wipe the index?", isPresented: $confirmingWipe) {
             Button("Wipe", role: .destructive) { Task { await model.wipe() } }
         } message: {
@@ -158,7 +161,7 @@ struct SettingsView: View {
     private var index: some View {
         Form {
             Section {
-                Text(model.summary).fixedSize(horizontal: false, vertical: true)
+                headline
                 ForEach(model.sourceAges) { row in
                     HStack(alignment: .firstTextBaseline) {
                         Text(row.label)
@@ -191,6 +194,29 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    // headline is the summary sentence with its people count as a link that opens the People sheet.
+    private var headline: some View {
+        Text(Self.linked(model.summary, model.peopleWords))
+            .fixedSize(horizontal: false, vertical: true)
+            .environment(\.openURL, OpenURLAction { url in
+                guard url == Self.peopleURL else { return .systemAction }
+                showingPeople = true
+                return .handled
+            })
+    }
+
+    // peopleURL is the link the people count carries. It never leaves the window.
+    private static let peopleURL = URL(string: "peepwho-settings:people") ?? URL(fileURLWithPath: "/")
+
+    // linked returns summary with the first count matching words made a link to the People sheet.
+    private static func linked(_ summary: String, _ words: String?) -> AttributedString {
+        var text = AttributedString(summary)
+        if let words, let range = text.range(of: words) {
+            text[range].link = peopleURL
+        }
+        return text
     }
 
     // privacy says how the index is kept and holds the actions that remove what peepwho keeps.

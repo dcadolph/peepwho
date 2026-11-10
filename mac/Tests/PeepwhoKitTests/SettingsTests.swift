@@ -266,6 +266,28 @@ struct SettingsTests {
         #expect(SettingsModel.summary(nil, canLoadSample: false) == "The index is not open.")
     }
 
+    // Test 21: The People sheet lists everyone the real core holds after an index, and the
+    // headline's count matches it.
+    @Test func loadPeople() async throws {
+        let repo = try gitRepo()
+        let dir = tempDir("peepwho-data")
+        defer {
+            try? FileManager.default.removeItem(at: repo)
+            try? FileManager.default.removeItem(at: dir)
+        }
+        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+                                  secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
+        await model.loadStatus()
+        #expect(model.peopleWords == nil)
+        await model.pick(repo, as: .git)
+        await model.loadPeople()
+        #expect(model.peopleError == nil)
+        #expect(model.people.map(\.name) == ["Jane Doe"])
+        #expect(model.peopleWords == "1 person")
+        #expect(model.summary.hasPrefix("1 person."))
+    }
+
     // Test 20: The caption under the buttons names the refresh interval as it is set.
     @Test func refreshNote() throws {
         let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))

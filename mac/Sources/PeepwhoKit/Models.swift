@@ -182,6 +182,39 @@ public struct PersonDetail: Codable, Sendable, Identifiable {
     public let links: [String]?
 }
 
+// ListedPerson is one person in the list of everyone the index holds.
+public struct ListedPerson: Codable, Hashable, Sendable, Identifiable {
+    // id is the person's canonical id, which Person takes.
+    public let id: String
+    // name is the person's display name.
+    public let name: String
+    // title is the person's job title, empty when not known.
+    public let title: String
+    // team is the name of the person's team, empty when not known.
+    public let team: String
+    // links open a conversation with the person in a source's own app.
+    public let links: [String]
+
+    // role is the title and team joined, empty when neither is known.
+    public var role: String {
+        [title, team].filter { !$0.isEmpty }.joined(separator: ", ")
+    }
+
+    // matches reports whether text is in the name, title, or team, ignoring case. Empty text
+    // matches everyone.
+    public func matches(_ text: String) -> Bool {
+        let text = text.trimmingCharacters(in: .whitespaces)
+        guard !text.isEmpty else { return true }
+        return [name, title, team].contains { $0.localizedCaseInsensitiveContains(text) }
+    }
+}
+
+// PeopleList is everyone the index holds, sorted by name.
+public struct PeopleList: Codable, Sendable {
+    // people are the people, sorted by name.
+    public let people: [ListedPerson]
+}
+
 // EpisodePerson is someone who took part in a conversation.
 public struct EpisodePerson: Codable, Hashable, Sendable {
     // id is the person's canonical id, when known.

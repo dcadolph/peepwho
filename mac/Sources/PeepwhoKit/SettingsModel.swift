@@ -214,6 +214,10 @@ public final class SettingsModel: ObservableObject {
     @Published public private(set) var login: LoginState?
     // lastRun is the last index or refresh that ran, nil before the first.
     @Published public private(set) var lastRun: LastRun?
+    // people are everyone the index holds, as of the last loadPeople.
+    @Published public private(set) var people: [ListedPerson] = []
+    // peopleError says why the people list did not load, nil when it did.
+    @Published public private(set) var peopleError: String?
     // scopes are what the token sources read, saved on every change.
     @Published public var scopes: Scopes {
         didSet { saveScopes() }
@@ -587,6 +591,29 @@ public final class SettingsModel: ObservableObject {
             return "Sample company, not real people. \(counts) Loaded \(Age.words(s.ageSeconds)).\(sealed)"
         }
         return "\(counts) Indexed \(Age.words(s.ageSeconds)).\(sealed)"
+    }
+
+    // peopleWords is the people count as the summary writes it, such as "6 people", nil when the
+    // index holds no one.
+    public var peopleWords: String? {
+        guard let s = status, s.builtAt != nil, s.people > 0 else { return nil }
+        return Count.words(s.people, "person", "people")
+    }
+
+    // loadPeople reads everyone the index holds, for the People sheet.
+    public func loadPeople() async {
+        guard let core else {
+            people = []
+            peopleError = "The index is not open."
+            return
+        }
+        do {
+            people = try await core.people().people
+            peopleError = nil
+        } catch {
+            people = []
+            peopleError = SearchModel.describe(error)
+        }
     }
 
     // privacy says how the index is kept on this Mac.

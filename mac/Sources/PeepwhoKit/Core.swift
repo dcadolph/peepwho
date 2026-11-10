@@ -78,6 +78,12 @@ public final class Core: @unchecked Sendable {
         try await run { self.handle.person(id, error: $0) }
     }
 
+    // people lists everyone the index holds sorted by name, up to limit, every one when limit is
+    // zero.
+    public func people(limit: Int = 0) async throws -> PeopleList {
+        try await run { self.handle.people(limit, error: $0) }
+    }
+
     // recall returns the conversations person took part in about query.
     public func recall(_ person: String, query: String, limit: Int = 5) async throws -> RecallAnswer {
         try await run { self.handle.recall(person, query: query, limit: limit, error: $0) }
