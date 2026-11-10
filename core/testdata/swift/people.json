@@ -1,0 +1,31 @@
+{
+  "people": [
+    {
+      "id": "angela@example.com",
+      "links": [
+        "slack://user?team=T0\u0026id=U1"
+      ],
+      "name": "Angela Malone",
+      "team": "Payments",
+      "title": "Staff Engineer"
+    },
+    {
+      "id": "bob@example.com",
+      "links": [
+        "slack://user?team=T0\u0026id=U2"
+      ],
+      "name": "Bob Smith",
+      "team": "Data Platform",
+      "title": "Senior Engineer"
+    },
+    {
+      "id": "carol@example.com",
+      "links": [
+        "slack://user?team=T0\u0026id=U3"
+      ],
+      "name": "Carol Lee",
+      "team": "Infrastructure",
+      "title": "Site Reliability Engineer"
+    }
+  ]
+}

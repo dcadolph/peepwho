@@ -15,6 +15,7 @@ package core
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -349,6 +350,59 @@ func (h *Handle) Search(query string, limit int) (out string, err error) {
 		return "", errors.New("core: search needs a query")
 	}
 	return toJSON(map[string]any{"query": query, "results": l.eng.Search(query, clampLimit(limit))})
+}
+
+// peopleView is the JSON shape People returns.
+type peopleView struct {
+	// People lists each person sorted by name.
+	People []personRow `json:"people"`
+}
+
+// personRow is one person in the JSON People returns.
+type personRow struct {
+	// ID is the person's canonical id, which Person takes.
+	ID string `json:"id"`
+	// Name is the person's display name.
+	Name string `json:"name"`
+	// Title is the person's job title, empty when not known.
+	Title string `json:"title"`
+	// Team is the name of the person's team, empty when not known.
+	Team string `json:"team"`
+	// Links are deep links that open a conversation with the person, empty when none.
+	Links []string `json:"links"`
+}
+
+// People lists every person in the index sorted by name, with title, team name,
+// and links, up to limit people, every one when limit is zero or less. A search
+// answers a question and never lists everyone, so a host showing who the index
+// holds reads it here.
+func (h *Handle) People(limit int) (out string, err error) {
+	defer rescue("people", &err)
+	l, err := h.built()
+	if err != nil {
+		return "", err
+	}
+	g := l.eng.Index().Graph
+	v := peopleView{People: make([]personRow, 0, len(g.People))}
+	for _, p := range g.People {
+		row := personRow{ID: string(p.ID), Name: p.Name, Title: p.Title, Links: []string{}}
+		if t, ok := g.Teams[p.TeamID]; ok {
+			row.Team = t.Name
+		}
+		row.Links = append(row.Links, p.Links...)
+		v.People = append(v.People, row)
+	}
+	slices.SortFunc(v.People, func(a, b personRow) int {
+		return cmp.Or(
+			strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)),
+			strings.Compare(a.Name, b.Name),
+			strings.Compare(a.ID, b.ID),
+		)
+	})
+	if limit > 0 && len(v.People) > limit {
+		v.People = v.People[:limit]
+	}
+	return toJSON(v)
 }
 
 // Person returns the full profile of the person with canonical id.

@@ -1262,6 +1262,9 @@ func TestPanicBecomesError(t *testing.T) {
 			copySample(t, engine.Dir(newTestDataDir(t, nil)), bundled)
 			return h.ImportSample(bundled, now)
 		},
+	}, { // Test 7: People.
+		Handle: noEngine, WantMsg: "people: ",
+		Call: func(_ *testing.T, h *Handle) (string, error) { return h.People(0) },
 	}}
 	for testNum, test := range tests {
 		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
@@ -1333,7 +1336,7 @@ func TestEveryExportedCallRescues(t *testing.T) {
 			t.Errorf("%s does not open with defer rescue", fn.Name.Name)
 		}
 	}
-	want := []string{"Open", "Ask", "Search", "Person", "Recall", "Status", "ChangesSince", "Index", "Refresh",
+	want := []string{"Open", "Ask", "Search", "People", "Person", "Recall", "Status", "ChangesSince", "Index", "Refresh",
 		"ForgetScopes", "ImportSample", "Wipe"}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("exported calls mismatch (-want +got):\n%s", diff)
@@ -1798,5 +1801,108 @@ func TestForgetScopesRescues(t *testing.T) {
 	h := &Handle{store: engine.NewStore(dir, panicCodec{})}
 	if err := h.ForgetScopes("git", ""); !errors.Is(err, errPanic) || !strings.Contains(err.Error(), "forget scopes: ") {
 		t.Errorf("error = %v, want %v naming forget scopes", err, errPanic)
+	}
+}
+
+// TestHandlePeople verifies People lists everyone sorted by name with the team's
+// name, honors a limit, and needs an index.
+func TestHandlePeople(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	csv := filepath.Join(t.TempDir(), "people.csv")
+	roster := "name,email,title,team,topics\n" +
+		"Zoe Park,zoe@x.com,Engineer,,retries\n" +
+		"ann lee,ann@x.com,,,ledger\n" +
+		"Bob Ray,bob@x.com,Staff Engineer,Billing,billing\n"
+	if err := os.WriteFile(csv, []byte(roster), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	h, err := Open(t.TempDir(), "")
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	if _, err := h.People(0); err == nil {
+		t.Error("People with no index returned nil")
+	}
+	if _, err := h.Index("org-csv", "--file="+csv, now.Unix()); err != nil {
+		t.Fatalf("Index: %v", err)
+	}
+	tests := []struct {
+		WantNames []string
+		WantTeams []string
+		Limit     int
+	}{{ // Test 0: Everyone, sorted by name without regard to case.
+		Limit: 0, WantNames: []string{"ann lee", "Bob Ray", "Zoe Park"}, WantTeams: []string{"", "Billing", ""},
+	}, { // Test 1: A limit keeps the first by name.
+		Limit: 2, WantNames: []string{"ann lee", "Bob Ray"}, WantTeams: []string{"", "Billing"},
+	}, { // Test 2: A limit past the count keeps everyone.
+		Limit: 10, WantNames: []string{"ann lee", "Bob Ray", "Zoe Park"}, WantTeams: []string{"", "Billing", ""},
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			raw, err := h.People(test.Limit)
+			if err != nil {
+				t.Fatalf("People: %v", err)
+			}
+			var got peopleView
+			if err := json.Unmarshal([]byte(raw), &got); err != nil {
+				t.Fatalf("unmarshal %s: %v", raw, err)
+			}
+			var names, teams []string
+			for _, p := range got.People {
+				names, teams = append(names, p.Name), append(teams, p.Team)
+				if p.ID == "" || p.Links == nil {
+					t.Errorf("person %+v lacks an id or a links list", p)
+				}
+			}
+			if diff := cmp.Diff(test.WantNames, names); diff != "" {
+				t.Errorf("names mismatch (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(test.WantTeams, teams); diff != "" {
+				t.Errorf("teams mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestHandlePeopleSample verifies the sample company lists in full, with titles,
+// teams, and the links the search opens.
+func TestHandlePeopleSample(t *testing.T) {
+	t.Parallel()
+	h, err := Open(newTestDataDir(t, nil), "")
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	raw, err := h.People(0)
+	if err != nil {
+		t.Fatalf("People: %v", err)
+	}
+	var got peopleView
+	if err := json.Unmarshal([]byte(raw), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	status, err := h.Status(time.Now().Unix())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var st statusView
+	if err := json.Unmarshal([]byte(status), &st); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.People) != st.People {
+		t.Errorf("People listed %d, Status counts %d", len(got.People), st.People)
+	}
+	titled, teamed := 0, 0
+	for _, p := range got.People {
+		if p.Title != "" {
+			titled++
+		}
+		if p.Team != "" {
+			teamed++
+		}
+	}
+	if titled == 0 || teamed == 0 {
+		t.Errorf("sample lists %d with titles and %d with teams, want some of each", titled, teamed)
 	}
 }

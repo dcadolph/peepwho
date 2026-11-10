@@ -108,6 +108,7 @@ func TestSwiftFixtures(t *testing.T) {
 		{"ask", func() (string, error) { return h.Ask("terraform", 3) }},
 		{"search", func() (string, error) { return h.Search("angela", 3) }},
 		{"person", func() (string, error) { return h.Person("angela@example.com") }},
+		{"people", func() (string, error) { return h.People(3) }},
 		{"recall", func() (string, error) { return h.Recall("angela@example.com", "billing retries", 2) }},
 		{"status", func() (string, error) { return h.Status(built.Unix() + 3600) }},
 		{"index", func() (string, error) { return w.Index("git", flags, now.Unix()) }},
