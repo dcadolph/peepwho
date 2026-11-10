@@ -42,12 +42,13 @@ core-deps:
 # is the same target under its first name. See docs/APPS.md.
 # -macosversion sets the floor on every cgo object. gomobile overrides CGO_CFLAGS, so the
 # flag is the only way in, and the build cache ignores it: after changing it, build once
-# with GOFLAGS=-a or the cached runtime objects keep the old floor.
+# with GOFLAGS=-a or the cached runtime objects keep the old floor. -trimpath keeps build
+# machine paths out of the app binary.
 MAC_FRAMEWORK := mac/Frameworks/WhoToAskCore.xcframework
 MACOS_MIN := 14.0
 
 mac:
-	gomobile bind -target macos -macosversion $(MACOS_MIN) -o $(MAC_FRAMEWORK) ./core
+	gomobile bind -trimpath -target macos -macosversion $(MACOS_MIN) -o $(MAC_FRAMEWORK) ./core
 	$(MAKE) -C mac host app
 
 host: mac
