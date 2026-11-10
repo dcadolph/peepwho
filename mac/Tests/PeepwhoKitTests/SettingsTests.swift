@@ -183,7 +183,7 @@ struct SettingsTests {
         func at(_ secondsAgo: TimeInterval) -> String { stamp.string(from: now.addingTimeInterval(-secondsAgo)) }
         func scope(_ source: String, _ name: String, age: Int64?, tried: TimeInterval? = nil, error: String? = nil) -> IndexScope {
             IndexScope(source: source, scope: name, ranAt: age.map { at(TimeInterval($0)) }, ageSeconds: age ?? 0,
-                       attemptedAt: tried.map(at), error: error)
+                       attemptedAt: tried.map(at), error: error, found: nil)
         }
         let got = SourceAge.rows([
             scope("slack", "", age: 120),
@@ -207,6 +207,78 @@ struct SettingsTests {
         #expect(SourceAge.rows([], now: now).isEmpty)
     }
 
+    // Test 18: A source whose runs recorded what they found says so, summed across its scopes at
+    // its oldest time, and one with a run recorded before that says only when it was indexed.
+    @Test func sourceAgesFound() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        let stamp = ISO8601DateFormatter()
+        func scope(_ source: String, _ name: String, age: Int64, found: Found?, error: String? = nil) -> IndexScope {
+            let at = stamp.string(from: now.addingTimeInterval(-TimeInterval(age)))
+            return IndexScope(source: source, scope: name, ranAt: at, ageSeconds: age, attemptedAt: at, error: error,
+                              found: found)
+        }
+        let got = SourceAge.rows([
+            scope("git", "repo:/src", age: 120, found: Found(repos: 58, people: 1, channels: 0)),
+            scope("slack", "", age: 120, found: Found(repos: 0, people: 5, channels: 1)),
+            scope("github", "org:a", age: 3600, found: Found(repos: 0, people: 2, channels: 0)),
+            scope("github", "org:b", age: 60, found: Found(repos: 0, people: 1, channels: 0)),
+            scope("jira", "project:A", age: 120, found: nil),
+            scope("pagerduty", "", age: 30, found: Found(repos: 0, people: 3, channels: 0)),
+            scope("org-csv", "file:/a", age: 120, found: Found(repos: 0, people: 4, channels: 0)),
+            scope("org-csv", "file:/b", age: 120, found: nil),
+            scope("codeowners", "file:/c", age: 10800, found: Found(repos: 0, people: 3, channels: 0), error: "gone"),
+        ], now: now)
+        #expect(got == [
+            SourceAge(source: "codeowners", detail: "Found 3 people. 3 hours ago. Last try failed 3 hours ago: gone."),
+            SourceAge(source: "git", detail: "Read 58 repositories and found 1 person. 2 minutes ago."),
+            SourceAge(source: "github", detail: "Found 3 people. 1 hour ago."),
+            SourceAge(source: "jira", detail: "Indexed 2 minutes ago."),
+            SourceAge(source: "org-csv", detail: "Indexed 2 minutes ago."),
+            SourceAge(source: "pagerduty", detail: "Found 3 people. Just now."),
+            SourceAge(source: "slack", detail: "Found 5 people in 1 channel. 2 minutes ago."),
+        ])
+        #expect(got.map(\.label) == ["CODEOWNERS", "Git", "GitHub", "Jira", "Org chart CSV", "PagerDuty", "Slack"])
+        let sample = SourceAge.rows([scope("slack", "sample", age: 0, found: Found(repos: 0, people: 5, channels: 1))],
+                                    sample: true, now: now)
+        #expect(sample == [SourceAge(source: "slack", detail: "Loaded just now.")])
+    }
+
+    // Test 19: The summary is one sentence with singular and plural forms, zero counts left out.
+    @Test func summaryWords() throws {
+        func status(people: Int, teams: Int, channels: Int, sealed: Bool = true,
+                    sample: Bool = false) throws -> IndexStatus {
+            let json = """
+            {"people":\(people),"teams":\(teams),"channels":\(channels),"subjects":0,"words":0,"conversations":0,
+             "sources":{},"embeddings":false,"sealed":\(sealed),"built_at":"2026-11-01T12:00:00Z","age_seconds":10,
+             "scopes":[],"sample":\(sample)}
+            """
+            return try Core.decode(json)
+        }
+        #expect(SettingsModel.summary(try status(people: 1, teams: 0, channels: 1), canLoadSample: false)
+            == "1 person and 1 channel. Indexed just now. Encrypted on disk.")
+        #expect(SettingsModel.summary(try status(people: 6, teams: 2, channels: 1), canLoadSample: false)
+            == "6 people, 2 teams, and 1 channel. Indexed just now. Encrypted on disk.")
+        #expect(SettingsModel.summary(try status(people: 1, teams: 0, channels: 0, sealed: false), canLoadSample: false)
+            == "1 person. Indexed just now.")
+        #expect(SettingsModel.summary(try status(people: 223, teams: 9, channels: 4, sample: true), canLoadSample: true)
+            == "Sample company, not real people. 223 people, 9 teams, and 4 channels. Loaded just now. "
+            + "Encrypted on disk.")
+        #expect(SettingsModel.summary(nil, canLoadSample: false) == "The index is not open.")
+    }
+
+    // Test 20: The caption under the buttons names the refresh interval as it is set.
+    @Test func refreshNote() throws {
+        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let model = SettingsModel(dir: tempDir("peepwho-data"), open: { throw CocoaError(.fileNoSuchFile) },
+                                  secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
+        #expect(model.refreshNote == "Index Now reads every source from the start. Refresh Now picks up what "
+            + "changed since, and runs on its own every 6 hours.")
+        defaults.set(3600.0, forKey: SettingsModel.intervalKey)
+        #expect(model.refreshNote.hasSuffix("every 1 hour."))
+        defaults.set(90.0 * 60, forKey: SettingsModel.intervalKey)
+        #expect(model.refreshNote.hasSuffix("every 90 minutes."))
+    }
+
     // Test 8: Through the real core, a repo that goes missing keeps its last success and shows the
     // failed refresh beside it.
     @Test func sourceAgesThroughCore() async throws {
@@ -220,12 +292,14 @@ struct SettingsTests {
         let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
                                   secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
         await model.pick(repo, as: .git)
-        #expect(model.sourceAges == [SourceAge(source: "git", detail: "Indexed just now.")])
+        let found = "Read 1 repository and found 1 person. Just now."
+        #expect(model.sourceAges == [SourceAge(source: "git", detail: found)])
+        #expect(model.sourceAges.first?.label == "Git")
         try FileManager.default.removeItem(at: repo)
         await model.refresh()
         let row = try #require(model.sourceAges.first)
         #expect(row.source == "git")
-        #expect(row.detail.hasPrefix("Indexed just now. Last try failed just now: "))
+        #expect(row.detail.hasPrefix("\(found) Last try failed just now: "))
     }
 
     // Test 9: A status the core refuses says why, rather than leaving the window claiming the index
@@ -318,22 +392,27 @@ struct SettingsTests {
         }
         let places = MemoryPlaces()
         let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let clock = Date(timeIntervalSince1970: 1_800_000_000)
         let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
-                                  secrets: MemorySecrets(), places: places, defaults: defaults)
+                                  secrets: MemorySecrets(), places: places, defaults: defaults, clock: { clock })
         var handed: [Core?] = []
         model.onCore = { handed.append($0) }
+        let indexed = "Indexed at \(clock.formatted(date: .omitted, time: .shortened))."
 
         await model.pick(repo, as: .git)
-        #expect(model.lines == [readOneRepo(model)])
+        #expect(model.lines == [indexed, readOneRepo(model)])
+        #expect(model.lastRun == LastRun(kind: .indexed, at: clock))
         #expect(model.placeNames[.git] == repo.lastPathComponent)
         #expect((model.status?.people ?? 0) > 0)
         #expect(model.status?.sources["git"] != nil)
 
         await model.refresh()
-        #expect(model.lines == ["git: refreshed repo:\(repo.path)."])
+        let refreshed = "Refreshed at \(clock.formatted(date: .omitted, time: .shortened))."
+        #expect(model.lines == [refreshed, refreshedOneRepo(model)])
+        #expect(model.lastRun?.kind == .refreshed)
 
         await model.indexAll()
-        #expect(model.lines == [readOneRepo(model)])
+        #expect(model.lines == [indexed, readOneRepo(model)])
         #expect(places.open == 0)
         #expect(places.resolves > 3)
 
@@ -507,7 +586,7 @@ struct SettingsTests {
         model.cancel()
         #expect(model.progress == nil)
         await model.pick(repo, as: .git)
-        #expect(model.lines == [readOneRepo(model)])
+        #expect(model.lines == [try #require(model.lastRun).line, readOneRepo(model)])
     }
 
     // Test 11: Picking a new place into a slot stops refreshing the old one, and a place that went
@@ -542,7 +621,7 @@ struct SettingsTests {
         #expect(model.refreshFailure == nil)
         #expect(heard.last == .some(nil))
         await model.refresh()
-        #expect(model.lines == ["git: refreshed repo:\(second.path)."])
+        #expect(model.lines == [try #require(model.lastRun).line, refreshedOneRepo(model)])
     }
 
     // Test 12: Forget stops refreshing the place, leaves the index, refuses while a run is going,
@@ -592,7 +671,8 @@ struct SettingsTests {
         await model.pick(first, as: .git)
         #expect(model.status?.scopes.count == 1)
         await model.pick(tempDir("peepwho-missing"), as: .git)
-        #expect(model.lines.first?.hasPrefix("Git: read") == false)
+        #expect(!model.lines.contains { $0.hasPrefix("Git: read") })
+        #expect(!model.lines.contains { $0.hasPrefix("Indexed at") })
         #expect(model.status?.scopes.isEmpty == true)
     }
 
@@ -620,7 +700,8 @@ struct SettingsTests {
     // missing a secret it needs, and says nothing when none failed.
     @Test func refreshFailureNames() {
         func scope(_ source: String, _ name: String, error: String? = nil) -> IndexScope {
-            IndexScope(source: source, scope: name, ranAt: nil, ageSeconds: 0, attemptedAt: nil, error: error)
+            IndexScope(source: source, scope: name, ranAt: nil, ageSeconds: 0, attemptedAt: nil, error: error,
+                       found: nil)
         }
         let jira = [SecretName.jiraURL, SecretName.jiraToken]
         #expect(SettingsModel.refreshFailure([], saved: []) == nil)
@@ -703,5 +784,13 @@ struct SettingsTests {
 @MainActor
 func readOneRepo(_ model: SettingsModel) -> String {
     let people = model.status?.people ?? 0
-    return "Git: read 1 repository. The index holds \(IndexResult.count(people, "person", "people"))."
+    return "Git: read 1 repository. The index holds \(Count.words(people, "person", "people"))."
+}
+
+// refreshedOneRepo is the line a refresh of one picked repo ends with, since the source holds
+// everyone the index holds.
+@MainActor
+func refreshedOneRepo(_ model: SettingsModel) -> String {
+    let people = model.status?.people ?? 0
+    return "Git: read 1 repository again and found \(Count.words(people, "person", "people"))."
 }

@@ -1,5 +1,75 @@
 import Foundation
 
+// Count writes counts in plain words.
+public enum Count {
+    // words writes n with the singular or plural noun, such as "1 person" or "6 people".
+    public static func words(_ n: Int, _ one: String, _ many: String) -> String {
+        "\(n) \(n == 1 ? one : many)"
+    }
+
+    // list joins parts the way a sentence lists them: "a", "a and b", or "a, b, and c".
+    public static func list(_ parts: [String]) -> String {
+        switch parts.count {
+        case 0: ""
+        case 1: parts[0]
+        case 2: "\(parts[0]) and \(parts[1])"
+        default: "\(parts.dropLast().joined(separator: ", ")), and \(parts[parts.count - 1])"
+        }
+    }
+}
+
+// SourceLabel names sources the way a person knows them.
+public enum SourceLabel {
+    // of is the name a person knows source by, or source itself for one it does not know.
+    public static func of(_ source: String) -> String {
+        switch source {
+        case "git": "Git"
+        case "org-csv": "Org chart CSV"
+        case "codeowners": "CODEOWNERS"
+        case "slack": "Slack"
+        case "github": "GitHub"
+        case "jira": "Jira"
+        case "confluence": "Confluence"
+        case "pagerduty": "PagerDuty"
+        default: source
+        }
+    }
+}
+
+// Found is what one run of a source read.
+public struct Found: Codable, Equatable, Sendable {
+    // repos is how many repositories the run read, zero for a source other than git.
+    public let repos: Int
+    // people is how many distinct people the source holds after the run.
+    public let people: Int
+    // channels is how many channels the source holds after the run.
+    public let channels: Int
+
+    // zero is nothing found, the start of a sum.
+    static let zero = Found(repos: 0, people: 0, channels: 0)
+
+    // who says whom the run found: "found 5 people in 1 channel", "found 1 person", or
+    // "found no one".
+    var who: String {
+        let found = people == 0 ? "found no one" : "found \(Count.words(people, "person", "people"))"
+        return channels > 0 ? "\(found) in \(Count.words(channels, "channel", "channels"))" : found
+    }
+
+    // sentence says what source's runs found as a sentence: "Read 58 repositories and found 1
+    // person." for git, "Found 5 people in 1 channel." for the rest.
+    func sentence(_ source: String) -> String {
+        if source == "git" {
+            return "Read \(Count.words(repos, "repository", "repositories")) and \(who)."
+        }
+        return who.prefix(1).uppercased() + who.dropFirst() + "."
+    }
+
+    // + sums what two runs found.
+    static func + (a: Found, b: Found) -> Found {
+        Found(repos: a.repos + b.repos, people: a.people + b.people, channels: a.channels + b.channels)
+    }
+}
+
 // Member is a person named inside another answer, such as a channel member or a manager.
 public struct Member: Codable, Hashable, Sendable {
     // name is the person's display name.
@@ -234,10 +304,12 @@ public struct IndexScope: Codable, Sendable {
     public let attemptedAt: String?
     // error says why the last try failed, absent when it worked.
     public let error: String?
+    // found is what the last successful run read, absent for a run recorded before runs kept it.
+    public let found: Found?
 
     // CodingKeys maps the core's snake case names.
     enum CodingKeys: String, CodingKey {
-        case source, scope, error
+        case source, scope, error, found
         case ranAt = "ran_at"
         case ageSeconds = "age_seconds"
         case attemptedAt = "attempted_at"
@@ -307,31 +379,11 @@ public struct IndexResult: Codable, Sendable {
 
     // finishLine says in plain words what the run read and what the index now holds.
     public var finishLine: String {
-        let held = "The index holds \(Self.count(people, "person", "people"))."
+        let held = "The index holds \(Count.words(people, "person", "people"))."
         if source == "git" {
-            return "Git: read \(Self.count(repos, "repository", "repositories")). \(held)"
+            return "Git: read \(Count.words(repos, "repository", "repositories")). \(held)"
         }
-        return "\(Self.label(source)): indexed. \(held)"
-    }
-
-    // count writes n with the singular or plural noun.
-    static func count(_ n: Int, _ one: String, _ many: String) -> String {
-        "\(n) \(n == 1 ? one : many)"
-    }
-
-    // label is the name a person knows source by.
-    static func label(_ source: String) -> String {
-        switch source {
-        case "git": "Git"
-        case "org-csv": "Org chart CSV"
-        case "codeowners": "CODEOWNERS"
-        case "slack": "Slack"
-        case "github": "GitHub"
-        case "jira": "Jira"
-        case "confluence": "Confluence"
-        case "pagerduty": "PagerDuty"
-        default: source
-        }
+        return "\(SourceLabel.of(source)): indexed. \(held)"
     }
 }
 
@@ -347,11 +399,25 @@ public struct RefreshScope: Codable, Sendable {
     public let ok: Bool
     // error says why it failed, when it did.
     public let error: String?
+    // found is what it read, absent when it failed.
+    public let found: Found?
 
     // CodingKeys maps the core's snake case names.
     enum CodingKeys: String, CodingKey {
-        case source, scope, ok, error
+        case source, scope, ok, error, found
         case ranAt = "ran_at"
+    }
+
+    // line says in plain words how the scope went, mirroring IndexResult.finishLine: what git read
+    // again and who each source found, or why it failed.
+    public var line: String {
+        let name = SourceLabel.of(source)
+        guard ok else { return "\(name): \(error ?? "failed")." }
+        guard let found else { return "\(name): refreshed." }
+        if source == "git" {
+            return "\(name): read \(Count.words(found.repos, "repository", "repositories")) again and \(found.who)."
+        }
+        return "\(name): refreshed and \(found.who)."
     }
 }
 

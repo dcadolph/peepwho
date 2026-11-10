@@ -159,12 +159,9 @@ struct SettingsView: View {
         Form {
             Section {
                 Text(model.summary).fixedSize(horizontal: false, vertical: true)
-                if let counts = sourceCounts {
-                    Text(counts).font(.caption).foregroundStyle(.secondary)
-                }
                 ForEach(model.sourceAges) { row in
                     HStack(alignment: .firstTextBaseline) {
-                        Text(row.source)
+                        Text(row.label)
                         Spacer()
                         Text(row.detail)
                             .foregroundStyle(.secondary)
@@ -188,6 +185,9 @@ struct SettingsView: View {
                     }
                 }
                 .disabled(model.busy != nil)
+                Text(model.refreshNote)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .formStyle(.grouped)
@@ -267,11 +267,6 @@ struct SettingsView: View {
         NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "peepwho", .credits: credits])
     }
 
-    // sourceCounts lists the records each source holds, nil when there are none.
-    private var sourceCounts: String? {
-        guard let sources = model.status?.sources, !sources.isEmpty else { return nil }
-        return sources.keys.sorted().map { "\($0) \(sources[$0] ?? 0)" }.joined(separator: ", ")
-    }
 }
 
 // PlaceRow shows one picked folder or file with buttons to pick or forget it.

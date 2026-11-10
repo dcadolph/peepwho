@@ -57,6 +57,7 @@ struct DecodeTests {
         #expect((3599...3600).contains(git.ageSeconds))
         #expect(git.attemptedAt?.isEmpty == false)
         #expect(git.error == "repository not found")
+        #expect(git.found == Found(repos: 58, people: 1, channels: 0))
         let slack = try #require(got.scopes.last)
         #expect(slack.source == "slack")
         #expect(slack.ranAt == nil)
@@ -115,6 +116,33 @@ struct DecodeTests {
         let got: RefreshResult = try Core.decode(fixture("refresh"))
         #expect(got.ok)
         #expect(got.results.first?.ranAt.isEmpty == false)
+        #expect(got.results.first?.found == Found(repos: 1, people: 2, channels: 0))
+        #expect(got.results.first?.line == "Git: read 1 repository again and found 2 people.")
+    }
+
+    // refreshLine says what each source found in plain words, or why it failed.
+    @Test func refreshLine() {
+        func scope(_ source: String, ok: Bool = true, error: String? = nil, found: Found?) -> RefreshScope {
+            RefreshScope(source: source, scope: "s", ranAt: "", ok: ok, error: error, found: found)
+        }
+        #expect(scope("slack", found: Found(repos: 0, people: 5, channels: 1)).line
+            == "Slack: refreshed and found 5 people in 1 channel.")
+        #expect(scope("git", found: Found(repos: 58, people: 1, channels: 0)).line
+            == "Git: read 58 repositories again and found 1 person.")
+        #expect(scope("org-csv", found: Found(repos: 0, people: 0, channels: 0)).line
+            == "Org chart CSV: refreshed and found no one.")
+        #expect(scope("jira", found: nil).line == "Jira: refreshed.")
+        #expect(scope("jira", ok: false, error: "bad token", found: nil).line == "Jira: bad token.")
+    }
+
+    // countList joins parts the way a sentence lists them.
+    @Test func countList() {
+        #expect(Count.list([]) == "")
+        #expect(Count.list(["1 person"]) == "1 person")
+        #expect(Count.list(["1 person", "1 channel"]) == "1 person and 1 channel")
+        #expect(Count.list(["6 people", "2 teams", "1 channel"]) == "6 people, 2 teams, and 1 channel")
+        #expect(Count.words(1, "person", "people") == "1 person")
+        #expect(Count.words(0, "person", "people") == "0 people")
     }
 
     // wipe decodes the files removed.

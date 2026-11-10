@@ -121,8 +121,13 @@ public struct SourceAge: Equatable, Sendable, Identifiable {
     // id is the source name, since rows hold one source each.
     public var id: String { source }
 
+    // label is the name a person knows the source by.
+    public var label: String { SourceLabel.of(source) }
+
     // rows groups scopes by source in name order. A source is as old as its oldest scope, and is
-    // of unknown age when any scope is. A sample source reads as loaded, not indexed. now is the
+    // of unknown age when any scope is. A source whose every scope recorded what it found says
+    // so, summed across its scopes; one with a scope recorded before runs kept that says only
+    // when it was indexed, never zeros. A sample source reads as loaded, not indexed. now is the
     // clock the ages were read at.
     public static func rows(_ scopes: [IndexScope], sample: Bool = false, now: Date) -> [SourceAge] {
         let verb = sample ? "Loaded" : "Indexed"
@@ -130,6 +135,12 @@ public struct SourceAge: Equatable, Sendable, Identifiable {
             let known = group.allSatisfy { $0.ranAt != nil }
             let oldest = group.map(\.ageSeconds).max() ?? 0
             var detail = known ? "\(verb) \(Age.words(oldest))." : "\(verb), time unknown."
+            if !sample, group.allSatisfy({ $0.found != nil }) {
+                let found = group.compactMap(\.found).reduce(Found.zero, +)
+                let ago = Age.words(oldest)
+                let when = known ? ago.prefix(1).uppercased() + ago.dropFirst() + "." : "Time unknown."
+                detail = "\(found.sentence(source)) \(when)"
+            }
             if let failure = lastFailure(group, now: now) {
                 detail += " \(failure)"
             }
@@ -148,6 +159,34 @@ public struct SourceAge: Equatable, Sendable, Identifiable {
         }
         guard let at = newest.at else { return "Last try failed: \(newest.error)." }
         return "Last try failed \(Age.words(Int64(now.timeIntervalSince(at)))): \(newest.error)."
+    }
+}
+
+// LastRun is the last index or refresh and who started it.
+public struct LastRun: Equatable, Sendable {
+    // Kind says what ran and who started it.
+    public enum Kind: Equatable, Sendable {
+        // indexed is Index Now or a pick, started by a person.
+        case indexed
+        // refreshed is Refresh Now, started by a person.
+        case refreshed
+        // refreshedOnItsOwn is the refresh the app starts when the index gets old.
+        case refreshedOnItsOwn
+    }
+
+    // kind is what ran and who started it.
+    public let kind: Kind
+    // at is when it started.
+    public let at: Date
+
+    // line names the run and when it started, such as "Indexed at 6:15 PM.".
+    public var line: String {
+        let time = at.formatted(date: .omitted, time: .shortened)
+        switch kind {
+        case .indexed: return "Indexed at \(time)."
+        case .refreshed: return "Refreshed at \(time)."
+        case .refreshedOnItsOwn: return "Refreshed on its own at \(time)."
+        }
     }
 }
 
@@ -173,6 +212,8 @@ public final class SettingsModel: ObservableObject {
     @Published public private(set) var canCancel = false
     // login says whether the app opens at login, nil when it has no login item.
     @Published public private(set) var login: LoginState?
+    // lastRun is the last index or refresh that ran, nil before the first.
+    @Published public private(set) var lastRun: LastRun?
     // scopes are what the token sources read, saved on every change.
     @Published public var scopes: Scopes {
         didSet { saveScopes() }
@@ -205,11 +246,18 @@ public final class SettingsModel: ObservableObject {
     private let sampleDir: URL?
     // loginItem turns opening at login on and off, nil when the app has none.
     private let loginItem: LoginItem?
+    // clock is the time a run starts at.
+    private let clock: () -> Date
+    // ran is what the run going now did, nil until it reads a source.
+    private var ran: LastRun?
 
-    // init opens dir with open and reads which secrets and places are saved.
+    // init opens dir with open and reads which secrets and places are saved. clock tells the time
+    // a run starts at.
     public init(dir: URL, open: @escaping () throws -> Core, secrets: SecretStore, places: PlaceStore,
-                defaults: UserDefaults = .standard, sampleDir: URL? = nil, loginItem: LoginItem? = nil) {
+                defaults: UserDefaults = .standard, sampleDir: URL? = nil, loginItem: LoginItem? = nil,
+                clock: @escaping () -> Date = Date.init) {
         self.dir = dir
+        self.clock = clock
         self.sampleDir = sampleDir
         self.loginItem = loginItem
         login = loginItem?.state
@@ -293,6 +341,7 @@ public final class SettingsModel: ObservableObject {
                 guard let url = try self.places.resolve(slot) else { return [] }
                 defer { self.places.release(url) }
                 try await core.forgetScopes(slot.source)
+                self.started(.indexed)
                 return [try await self.index(core, IndexJob.forPlace(slot, url))]
             } catch {
                 self.places.forget(slot)
@@ -344,39 +393,50 @@ public final class SettingsModel: ObservableObject {
             var jobs = BookmarkSlot.allCases.compactMap { slot in opened[slot].map { IndexJob.forPlace(slot, $0) } }
             jobs += IndexJob.forTokens(self.scopes) { self.secrets.get($0) != nil }
             guard !jobs.isEmpty else { return ["Nothing to index yet. Pick a folder or add a token first."] }
+            self.started(.indexed)
             var out: [String] = []
             for job in jobs {
                 guard !self.canceled else { break }
-                self.busy = "Indexing \(job.source)"
+                self.busy = "Indexing \(SourceLabel.of(job.source))"
                 self.progress = nil
                 do {
                     out.append(try await self.index(core, job))
                 } catch {
                     guard !self.canceled else { break }
-                    out.append("\(job.source): \(SearchModel.describe(error))")
+                    out.append("\(SourceLabel.of(job.source)): \(SearchModel.describe(error))")
                 }
-                self.lines = out
+                self.lines = self.headed(out)
             }
-            return self.canceled ? out + ["Canceled."] : out
+            guard self.canceled else { return out }
+            if out.isEmpty {
+                self.ran = nil
+            }
+            return out + ["Canceled."]
         }
     }
 
     // refresh replays every scope indexed before, with access to every picked place held for the
     // call, since a recorded git or file scope reads that place again.
     public func refresh() async {
-        await run("Refreshing") { core in
+        await refresh(onItsOwn: false)
+    }
+
+    // refresh runs a refresh a person started, or the app on its own when onItsOwn is set, and
+    // says which in the busy label and the first line.
+    private func refresh(onItsOwn: Bool) async {
+        await run(onItsOwn ? "Refreshing on its own" : "Refreshing") { core in
             if try await core.status().builtAt == nil {
                 return ["Nothing to refresh yet. Index something first."]
             }
             let opened = try self.resolveAll()
             defer { opened.values.forEach(self.places.release) }
+            self.started(onItsOwn ? .refreshedOnItsOwn : .refreshed)
             let result = try await core.refresh()
             if result.results.isEmpty, result.canceled != true {
+                self.ran = nil
                 return [Self.nothingRefreshed]
             }
-            let done = result.results.map { r in
-                r.ok ? "\(r.source): refreshed \(r.scope)." : "\(r.source): \(r.error ?? "failed")."
-            }
+            let done = result.results.map(\.line)
             return result.canceled == true ? done + ["Canceled."] : done
         }
     }
@@ -412,6 +472,15 @@ public final class SettingsModel: ObservableObject {
         return stored > 0 ? stored : Self.defaultInterval
     }
 
+    // refreshNote says what the two buttons do and how often a refresh runs on its own.
+    public var refreshNote: String {
+        let minutes = Int(refreshInterval / 60)
+        let every = minutes % 60 == 0
+            ? Count.words(minutes / 60, "hour", "hours") : Count.words(minutes, "minute", "minutes")
+        return "Index Now reads every source from the start. Refresh Now picks up what changed since, "
+            + "and runs on its own every \(every)."
+    }
+
     // reopenIfClosed tries the data directory again after an open that failed, such as under a
     // locked Keychain. The menu opening and the Mac waking call it, and the timer does not, so a
     // Keychain prompt never repeats on its own.
@@ -437,7 +506,7 @@ public final class SettingsModel: ObservableObject {
               TimeInterval(status.ageSeconds) >= interval, busy == nil
         else { return false }
         lastAttempt = now
-        await refresh()
+        await refresh(onItsOwn: true)
         return true
     }
 
@@ -499,12 +568,20 @@ public final class SettingsModel: ObservableObject {
 
     // summary says how much the index holds and how old it is.
     public var summary: String {
+        Self.summary(status, canLoadSample: canLoadSample)
+    }
+
+    // summary says in one sentence what s holds, with zero counts left out, and how old it is.
+    static func summary(_ status: IndexStatus?, canLoadSample: Bool) -> String {
         guard let s = status else { return "The index is not open." }
         guard s.builtAt != nil else {
             let sample = canLoadSample ? ", or load the sample company to look around." : "."
             return "Nothing indexed yet. Pick a folder or add a token, then Index Now\(sample)"
         }
-        let counts = "\(s.people) people, \(s.teams) teams, \(s.channels) channels."
+        let parts = [
+            (s.people, "person", "people"), (s.teams, "team", "teams"), (s.channels, "channel", "channels"),
+        ].filter { $0.0 > 0 }.map { Count.words($0.0, $0.1, $0.2) }
+        let counts = parts.isEmpty ? "No people yet." : "\(Count.list(parts))."
         let sealed = s.sealed ? " Encrypted on disk." : ""
         if s.sample {
             return "Sample company, not real people. \(counts) Loaded \(Age.words(s.ageSeconds)).\(sealed)"
@@ -550,15 +627,33 @@ public final class SettingsModel: ObservableObject {
         busy = label
         canceled = false
         canCancel = cancelable
+        ran = nil
         do {
-            lines = try await body(core)
+            lines = headed(try await body(core))
         } catch {
+            // A run that failed outright read nothing, so no line names it.
+            ran = nil
             lines = [SearchModel.describe(error)]
         }
+        if let ran {
+            lastRun = ran
+        }
+        ran = nil
         busy = nil
         progress = nil
         canCancel = false
         await loadStatus()
+    }
+
+    // started marks the run going now as kind, from the moment it begins reading a source.
+    private func started(_ kind: LastRun.Kind) {
+        ran = LastRun(kind: kind, at: clock())
+    }
+
+    // headed puts the line naming the run going now ahead of out, once it has read a source.
+    private func headed(_ out: [String]) -> [String] {
+        guard let ran, out.first != ran.line else { return out }
+        return [ran.line] + out
     }
 
     // cancel stops the run going now and any job still waiting behind it. Nothing a finished job

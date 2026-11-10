@@ -35,7 +35,10 @@ struct RefreshTests {
         #expect(await !model.refreshIfStale())
         let later = Date().addingTimeInterval(120)
         #expect(await model.refreshIfStale(now: later))
-        #expect(model.lines == ["git: refreshed repo:\(repo.path)."])
+        #expect(model.lastRun?.kind == .refreshedOnItsOwn)
+        let onItsOwn = try #require(model.lastRun).line
+        #expect(onItsOwn.hasPrefix("Refreshed on its own at "))
+        #expect(model.lines == [onItsOwn, refreshedOneRepo(model)])
         #expect(await !model.refreshIfStale(now: later.addingTimeInterval(30)))
 
         defaults.set(86400.0, forKey: SettingsModel.intervalKey)
