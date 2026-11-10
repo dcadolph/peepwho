@@ -2,7 +2,7 @@ BINARY  := whotoask
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X github.com/dcadolph/whotoask/cmd.version=$(VERSION)
 
-.PHONY: build install test test-short e2e vet fmt lint core-deps mac host release clean
+.PHONY: build install test test-short e2e vet fmt lint core-deps bind mac appstore host release clean
 
 build:
 	go build -ldflags "$(LDFLAGS)" -o $(BINARY) .
@@ -39,8 +39,9 @@ core-deps:
 	echo "core-deps: ok"
 
 # mac binds the core into the Swift package and builds the test host and the app, signed. host
-# is the same target under its first name. See docs/APPS.md.
-# -macosversion sets the floor on every cgo object. gomobile overrides CGO_CFLAGS, so the
+# is the same target under its first name. appstore binds the core and builds the Mac App Store
+# package. See docs/APPS.md.
+# bind builds the core framework. -macosversion sets the floor on every cgo object. gomobile overrides CGO_CFLAGS, so the
 # flag is the only way in, and the build cache ignores it: after changing it, build once
 # with GOFLAGS=-a or the cached runtime objects keep the old floor. -trimpath keeps build
 # machine paths out of the app binary. Go still records the folder gomobile's temporary module
@@ -50,14 +51,19 @@ BIND_DIR := /private/tmp/whotoask-bind/whotoask
 MAC_FRAMEWORK := mac/Frameworks/WhoToAskCore.xcframework
 MACOS_MIN := 14.0
 
-mac:
+bind:
 	rm -rf $(BIND_DIR)
 	mkdir -p $(BIND_DIR)
 	git ls-files -co --exclude-standard | while IFS= read -r f; do [ -e "$$f" ] && echo "$$f"; done \
 		| tar -cf - -T - | tar -xf - -C $(BIND_DIR)
 	cd $(BIND_DIR) && gomobile bind -trimpath -target macos -macosversion $(MACOS_MIN) \
 		-o $(CURDIR)/$(MAC_FRAMEWORK) ./core
+
+mac: bind
 	$(MAKE) -C mac host app
+
+appstore: bind
+	$(MAKE) -C mac appstore
 
 host: mac
 

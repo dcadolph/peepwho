@@ -9,8 +9,16 @@ DMG := .build/WhoToAsk.dmg
 ICONSET := .build/AppIcon.iconset
 ICNS := .build/AppIcon.icns
 SAMPLE := .build/SampleCompany
+TEAM_ID := U7L4P2YHWJ
+BUNDLE_ID := com.dcadolph.whotoask
+STORE_SIGN_ID ?= 23FB03D5E7DC84FDEF8DE147EEDC182E0F79C745
+INSTALLER_ID ?= EC0D8D4059738272490666904F66A5027AA4942E
+PROFILE ?=
+BUILD ?=
+PKG := .build/WhoToAsk.pkg
+STORE_ENTITLEMENTS := .build/WhoToAsk-appstore.entitlements
 
-.PHONY: build test host app verify dmg run-host run clean
+.PHONY: build test host app verify appstore dmg run-host run clean
 
 # fat joins one product's per-architecture builds into one binary at the given path.
 fat = lipo -create -output $(2) $(foreach arch,$(ARCHS),.build/arch/$(arch)/$(1))
@@ -62,6 +70,31 @@ app: build $(ICNS)
 # verify fails on a built app that is not the shape a person can install.
 verify:
 	sh verify-bundle.sh $(APP) "$(VERSION)" $(MACOS_MIN)
+
+# appstore builds the Mac App Store package, signed with the team's Apple Distribution and Mac
+# Installer Distribution identities. PROFILE is the downloaded Mac App Store Connect profile and
+# BUILD is the CFBundleVersion, which must rise with every upload. The profile is checked before
+# anything is built. Downloaded profiles carry a quarantine attribute that App Store processing
+# refuses, so the bundle is cleared of extended attributes before the final signature. The store
+# entitlements are the app's own four plus the application and team identifiers the profile
+# grants. Export compliance is answered in App Store Connect per build, not in Info.plist.
+appstore:
+	@echo "$(BUILD)" | grep -Eqx '[0-9]+' || { echo "BUILD=<build number, higher than the last upload> is required" >&2; exit 1; }
+	sh check-profile.sh "$(PROFILE)" $(TEAM_ID) $(BUNDLE_ID)
+	$(MAKE) app SIGN_ID=$(STORE_SIGN_ID)
+	plutil -replace CFBundleVersion -string "$(BUILD)" $(APP)/Contents/Info.plist
+	cp "$(PROFILE)" $(APP)/Contents/embedded.provisionprofile
+	xattr -cr $(APP)
+	cp Sources/WhoToAsk/WhoToAsk.entitlements $(STORE_ENTITLEMENTS)
+	/usr/libexec/PlistBuddy -c "Add :com.apple.application-identifier string $(TEAM_ID).$(BUNDLE_ID)" $(STORE_ENTITLEMENTS)
+	/usr/libexec/PlistBuddy -c "Add :com.apple.developer.team-identifier string $(TEAM_ID)" $(STORE_ENTITLEMENTS)
+	codesign --force --options runtime --timestamp --entitlements $(STORE_ENTITLEMENTS) --sign "$(STORE_SIGN_ID)" $(APP)
+	$(MAKE) verify
+	@codesign -dv $(APP) 2>&1 | grep -qx 'TeamIdentifier=$(TEAM_ID)' || { echo "store app is not signed by team $(TEAM_ID)" >&2; exit 1; }
+	rm -f $(PKG)
+	productbuild --component $(APP) /Applications --sign "$(INSTALLER_ID)" $(PKG)
+	@pkgutil --check-signature $(PKG) | grep -q '($(TEAM_ID))' || { echo "$(PKG) is not signed by team $(TEAM_ID)" >&2; exit 1; }
+	@echo "appstore: $(PKG) ready for Transporter"
 
 # The sample company is built from the simulated company at app build time and bundled as data,
 # so the app links no simorg. The sources sidecar stays out since a sample never merges.

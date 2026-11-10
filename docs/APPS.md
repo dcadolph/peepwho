@@ -102,6 +102,23 @@ spctl --assess --type open --context context:primary-signature -v mac/.build/Who
 `make -C mac dmg` packs the app already built and never rebuilds it, so the stapled app
 keeps its ticket inside the image.
 
+## Mac App Store
+
+`make appstore` binds the core and builds `mac/.build/WhoToAsk.pkg`, signed with the team's
+Apple Distribution and Mac Installer Distribution identities. It needs the Mac App Store
+Connect profile for `com.dcadolph.whotoask`, downloaded from the developer portal, and a build
+number higher than the last one uploaded:
+
+```sh
+make appstore PROFILE=~/Downloads/WhoToAsk_Mac_App_Store.provisionprofile BUILD=2
+open -a Transporter mac/.build/WhoToAsk.pkg
+```
+
+`mac/check-profile.sh` refuses a profile that is not a macOS store profile for this app and
+team, or that has expired, before anything is built. The store build embeds the profile, adds
+the application and team identifiers to the app's four entitlements, and runs the same bundle
+checks as `make -C mac app`. Export compliance is answered in App Store Connect for each build.
+
 ## The test host
 
 `mac/Sources/Host` is a small sandboxed SwiftUI app that proves, against the real framework, the
