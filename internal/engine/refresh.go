@@ -33,6 +33,9 @@ type Run struct {
 	AttemptedAt time.Time `json:"attempted_at,omitzero"`
 	// Error is why the last try failed, empty when it succeeded.
 	Error string `json:"error,omitempty"`
+	// Found is what the scope's last successful run read, nil when it was
+	// recorded before runs kept it or by a caller that does not keep it.
+	Found *Outcome `json:"found,omitempty"`
 }
 
 // UnmarshalJSON reads a run, or a bare flag list from before runs carried times,
@@ -137,6 +140,8 @@ type RefreshResult struct {
 	OK bool
 	// Err is the scope's failure, nil when OK.
 	Err error
+	// Found is what the scope read, nil when it failed.
+	Found *Outcome
 }
 
 // Refresh replays every recorded scope of the named sources, all of them when
@@ -180,11 +185,12 @@ func (x *Indexer) Refresh(ctx context.Context, sources []string, now time.Time) 
 				what += " (" + scope + ")"
 			}
 			fmt.Fprintf(x.log(), "refreshing %s...\n", what)
-			err := x.replay(ctx, src, inv[src][scope].Flags)
+			read, err := x.replay(ctx, src, inv[src][scope].Flags)
 			// A person stopping the run is not this scope failing, so its record stays as it was.
 			if err != nil && ctx.Err() != nil {
 				return results, ctx.Err()
 			}
+			res := RefreshResult{Source: src, Scope: scope, RanAt: now, OK: err == nil, Err: err}
 			if err != nil {
 				failed++
 				fmt.Fprintf(x.log(), "refresh %s failed: %v\n", what, err)
@@ -192,7 +198,13 @@ func (x *Indexer) Refresh(ctx context.Context, sources []string, now time.Time) 
 			if recErr := store.RecordAttempt(src, scope, now, err); recErr != nil {
 				fmt.Fprintf(x.log(), "warning: could not save how refresh %s went: %v\n", what, recErr)
 			}
-			results = append(results, RefreshResult{Source: src, Scope: scope, RanAt: now, OK: err == nil, Err: err})
+			if err == nil {
+				res.Found = &read
+				if recErr := store.RecordFound(src, scope, read); recErr != nil {
+					fmt.Fprintf(x.log(), "warning: could not save what refresh %s found: %v\n", what, recErr)
+				}
+			}
+			results = append(results, res)
 		}
 	}
 	if failed > 0 {
@@ -290,27 +302,35 @@ func ReplayFlags(fs *pflag.FlagSet) []string {
 }
 
 // replay parses one recorded flag list and indexes the source with it as a
-// merge. The recorded --policy, or its absence, picks the policy through
-// PolicyFor, as it did when each scope ran as its own process.
-func (x *Indexer) replay(ctx context.Context, source string, args []string) error {
+// merge, and returns what the run read. The recorded --policy, or its absence,
+// picks the policy through PolicyFor, as it did when each scope ran as its own
+// process. Outcome still hears the run.
+func (x *Indexer) replay(ctx context.Context, source string, args []string) (Outcome, error) {
 	parsed, _, err := parseIndexFlags(source, args, "recorded flags")
 	if err != nil {
-		return err
+		return Outcome{}, err
 	}
 	req := parsed.Request
 	req.Merge = true
 	run := *x
 	run.Record = nil
+	var read Outcome
+	run.Outcome = func(o Outcome) {
+		read = o
+		if x.Outcome != nil {
+			x.Outcome(o)
+		}
+	}
 	if x.PolicyFor != nil {
 		pol, err := x.PolicyFor(parsed.Policy)
 		if err != nil {
-			return err
+			return Outcome{}, err
 		}
 		run.Policy = pol
 	}
 	err = run.Index(ctx, req)
 	x.unlocked = run.unlocked
-	return err
+	return read, err
 }
 
 // RewriteInvocations re-persists an existing refresh config under c, reading it
@@ -379,6 +399,19 @@ func (s *Store) RecordAttempt(source, scope string, now time.Time, attempt error
 		} else {
 			run.RanAt = now.UTC()
 		}
+		inv[source][scope] = run
+	})
+}
+
+// RecordFound saves found as what the last successful run of source's scope
+// read. A scope no longer recorded stays gone.
+func (s *Store) RecordFound(source, scope string, found Outcome) error {
+	return s.updateInvocations(func(inv Invocations) {
+		run, ok := inv[source][scope]
+		if !ok {
+			return
+		}
+		run.Found = &found
 		inv[source][scope] = run
 	})
 }

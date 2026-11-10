@@ -525,11 +525,19 @@ func TestHandleIndexAndRefresh(t *testing.T) {
 	}
 	// The command line runs the same request through an engine indexer.
 	ref := t.TempDir()
+	refStore := engine.NewStore(engine.Dir(ref), nil)
+	var refScope string
 	x := &engine.Indexer{
 		Dir: engine.Dir(ref), Codec: func() (vault.Codec, error) { return testKeyCipher(t), nil },
 		Policy: policy.Default(), Log: &strings.Builder{}, Now: func() time.Time { return now },
 		Record: func(source, scope string) error {
-			return engine.NewStore(engine.Dir(ref), nil).RecordInvocation(source, scope, nil, now)
+			refScope = scope
+			return refStore.RecordInvocation(source, scope, nil, now)
+		},
+		Outcome: func(o engine.Outcome) {
+			if err := refStore.RecordFound("git", refScope, o); err != nil {
+				t.Errorf("RecordFound: %v", err)
+			}
 		},
 	}
 	req := engine.IndexRequest{Source: "git", IndexArgs: engine.IndexArgs{RepoPaths: []string{repo}, GitSinceDays: 10000}}
@@ -554,12 +562,16 @@ func TestHandleIndexAndRefresh(t *testing.T) {
 	if !strings.Contains(got, `"people":2`) {
 		t.Errorf("status %s, want two people", got)
 	}
+	if !strings.Contains(got, `"found":{"repos":1,"people":2,"channels":0}`) {
+		t.Errorf("status %s, want the git scope to have read 1 repository and found 2 people", got)
+	}
 	inv, err := h.store.LoadInvocations()
 	if err != nil {
 		t.Fatal(err)
 	}
+	found := &engine.Outcome{Repos: 1, People: 2}
 	wantInv := engine.Invocations{"git": {"repo:" + repo: {
-		Flags: []string{"--git-since-days=10000", "--repo-path", repo}, RanAt: now, AttemptedAt: now,
+		Flags: []string{"--git-since-days=10000", "--repo-path", repo}, RanAt: now, AttemptedAt: now, Found: found,
 	}}}
 	if diff := cmp.Diff(wantInv, inv); diff != "" {
 		t.Errorf("recorded run mismatch (-want +got):\n%s", diff)
@@ -576,7 +588,10 @@ func TestHandleIndexAndRefresh(t *testing.T) {
 	if err := json.Unmarshal([]byte(raw), &rv); err != nil {
 		t.Fatalf("unmarshal %s: %v", raw, err)
 	}
-	wantResults := []refreshResult{{Source: "git", Scope: "repo:" + repo, RanAt: later.Format(time.RFC3339), OK: true}}
+	// The refresh reads no new commits, yet the source still holds both people.
+	wantResults := []refreshResult{{
+		Source: "git", Scope: "repo:" + repo, RanAt: later.Format(time.RFC3339), OK: true, Found: found,
+	}}
 	if diff := cmp.Diff(wantResults, rv.Results); diff != "" || !rv.OK {
 		t.Errorf("refresh ok %v, results mismatch (-want +got):\n%s", rv.OK, diff)
 	}
@@ -589,6 +604,9 @@ func TestHandleIndexAndRefresh(t *testing.T) {
 	}
 	if !strings.Contains(st, `"built_at":"`+later.Format(time.RFC3339)+`"`) {
 		t.Errorf("status after refresh %s, want built_at %s from the reloaded index", st, later.Format(time.RFC3339))
+	}
+	if !strings.Contains(st, `"found":{"repos":1,"people":2,"channels":0}`) {
+		t.Errorf("status after refresh %s, want the git scope to keep 1 repository and 2 people", st)
 	}
 }
 
@@ -637,7 +655,7 @@ func TestStatusScopes(t *testing.T) {
 	}
 	want := []scopeView{{
 		Source: "git", Scope: "repo:" + repo, RanAt: now.Format(time.RFC3339), AgeSeconds: 7200,
-		AttemptedAt: failedAt.Format(time.RFC3339), Error: failure,
+		AttemptedAt: failedAt.Format(time.RFC3339), Error: failure, Found: &engine.Outcome{Repos: 1, People: 2},
 	}, {Source: "slack"}}
 	if diff := cmp.Diff(want, got.Scopes); diff != "" {
 		t.Errorf("scopes mismatch (-want +got):\n%s", diff)

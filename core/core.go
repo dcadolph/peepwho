@@ -432,6 +432,9 @@ type scopeView struct {
 	AttemptedAt string `json:"attempted_at,omitempty"`
 	// Error is why the last try failed, empty when it succeeded.
 	Error string `json:"error,omitempty"`
+	// Found is what the scope's last successful run read, absent when the run
+	// was recorded without it.
+	Found *engine.Outcome `json:"found,omitempty"`
 }
 
 // scopeViews reads the recorded index runs and says how old each is at now.
@@ -444,7 +447,7 @@ func (h *Handle) scopeViews(now time.Time) ([]scopeView, error) {
 	for _, source := range slices.Sorted(maps.Keys(inv)) {
 		for _, scope := range slices.Sorted(maps.Keys(inv[source])) {
 			run := inv[source][scope]
-			v := scopeView{Source: source, Scope: scope, Error: run.Error}
+			v := scopeView{Source: source, Scope: scope, Error: run.Error, Found: run.Found}
 			if !run.RanAt.IsZero() {
 				v.RanAt = run.RanAt.UTC().Format(time.RFC3339)
 				v.AgeSeconds = max(0, int64(now.Sub(run.RanAt)/time.Second))
@@ -704,6 +707,9 @@ func (h *Handle) Index(source, flags string, nowUnix int64) (out string, err err
 		}
 		return "", fmt.Errorf("core: index %s: %w", source, err)
 	}
+	if err := h.store.RecordFound(source, scope, read); err != nil {
+		fmt.Fprintf(log, "warning: could not save what index %s found: %v\n", source, err)
+	}
 	if err := h.reload(); err != nil {
 		return "", fmt.Errorf("core: index %s saved, but it would not load: "+
 			"open the data directory again: %w", source, err)
@@ -727,6 +733,8 @@ type refreshResult struct {
 	OK bool `json:"ok"`
 	// Error is the scope's failure, empty when OK.
 	Error string `json:"error,omitempty"`
+	// Found is what the scope read, absent when it failed.
+	Found *engine.Outcome `json:"found,omitempty"`
 }
 
 // refreshView is the JSON shape Refresh returns.
@@ -789,7 +797,7 @@ func (h *Handle) Refresh(sources string, nowUnix int64) (out string, err error) 
 	ranOK := false
 	for _, r := range results {
 		rr := refreshResult{
-			Source: r.Source, Scope: r.Scope, RanAt: r.RanAt.UTC().Format(time.RFC3339), OK: r.OK,
+			Source: r.Source, Scope: r.Scope, RanAt: r.RanAt.UTC().Format(time.RFC3339), OK: r.OK, Found: r.Found,
 		}
 		if r.Err != nil {
 			rr.Error = r.Err.Error()

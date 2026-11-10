@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -76,10 +78,57 @@ type Indexer struct {
 }
 
 // Outcome is what one successful index read, for a caller that reports it in
-// plain words rather than as a refresh scope key.
+// plain words rather than as a refresh scope key. The refresh config keeps it
+// per scope as what that scope last found.
 type Outcome struct {
 	// Repos is how many repositories the git source read, zero for other sources.
-	Repos int
+	Repos int `json:"repos"`
+	// People is how many distinct people the records named, by source id, else
+	// by email.
+	People int `json:"people"`
+	// Channels is how many distinct channels the records named.
+	Channels int `json:"channels"`
+}
+
+// heldRecords returns what ix holds after a fold for source and for every source
+// recs name. A full read holds exactly what it fetched; an incremental read
+// fetches only what changed, often nothing, while the index still holds the rest,
+// so counting the fetch would report an unchanged source as finding no one.
+func heldRecords(ix *index.Index, source string, recs []connector.Record) []connector.Record {
+	names := map[string]bool{source: true}
+	for _, r := range recs {
+		names[r.Source] = true
+	}
+	var held []connector.Record
+	for _, name := range slices.Sorted(maps.Keys(names)) {
+		held = append(held, ix.SourceRecords(name)...)
+	}
+	return held
+}
+
+// countRecords returns the distinct people and channels among recs. A person is
+// keyed by its source id, else by its email, and a record with neither is not
+// counted; a channel is keyed by its name.
+func countRecords(recs []connector.Record) (people, channels int) {
+	persons := map[string]bool{}
+	chans := map[string]bool{}
+	for _, r := range recs {
+		switch r.Kind {
+		case connector.KindPerson:
+			key := r.PersonID
+			if key == "" {
+				key = strings.ToLower(strings.TrimSpace(r.Email))
+			}
+			if key != "" {
+				persons[key] = true
+			}
+		case connector.KindChannel:
+			if r.Name != "" {
+				chans[r.Name] = true
+			}
+		}
+	}
+	return len(persons), len(chans)
 }
 
 // IndexRequest names one source and the flags to read it with.
@@ -179,13 +228,15 @@ func (x *Indexer) Index(ctx context.Context, req IndexRequest) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := x.Fold(ctx, recs, FoldParams{
+	ix, err := x.fold(ctx, recs, FoldParams{
 		Merge: req.Merge, Incremental: incremental, AllowShrink: req.AllowShrink, HalfLifeDays: req.HalfLifeDays,
 		AliasesFile: req.AliasesFile, Embed: req.Embed, EmbedModel: req.EmbedModel, OllamaURL: req.OllamaURL,
 		ChangesFile: req.ChangesFile, Episodes: eps,
-	}); err != nil {
+	})
+	if err != nil {
 		return err
 	}
+	out.People, out.Channels = countRecords(heldRecords(ix, req.Source, recs))
 	if err := x.saveProgress(&req, scope, canInc, gitAfter, recs); err != nil {
 		return err
 	}
@@ -287,6 +338,12 @@ func (x *Indexer) resolveCreds(spec SourceSpec) map[string]string {
 // identities, canonicalizes, optionally embeds, then saves atomically. The
 // index and connect commands share it so ingest lives in one place.
 func (x *Indexer) Fold(ctx context.Context, recs []connector.Record, p FoldParams) error {
+	_, err := x.fold(ctx, recs, p)
+	return err
+}
+
+// fold is Fold returning the index it saved.
+func (x *Indexer) fold(ctx context.Context, recs []connector.Record, p FoldParams) (*index.Index, error) {
 	// The whole load-merge-save is one read-modify-write across three files:
 	// the index, its sources sidecar, and the episodes beside them. Two runs
 	// interleaving here, a Sunday 3am scheduled refresh over a manual --merge,
@@ -294,7 +351,7 @@ func (x *Indexer) Fold(ctx context.Context, recs []connector.Record, p FoldParam
 	// the same cross-process lock the state file already takes guards it.
 	unlock, err := util.LockFile(x.Dir.Index() + util.LockSuffix)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer unlock()
 	// Load any existing index once. A missing file is a first run; any other
@@ -302,7 +359,7 @@ func (x *Indexer) Fold(ctx context.Context, recs []connector.Record, p FoldParam
 	// never overwrites an index it could not read.
 	existing, err := x.loadIndex()
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return err
+		return nil, err
 	}
 
 	var prev *model.Graph
@@ -312,15 +369,15 @@ func (x *Indexer) Fold(ctx context.Context, recs []connector.Record, p FoldParam
 
 	ix, err := x.foldBase(existing, p)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := foldRecords(ix, existing, recs, p); err != nil {
-		return err
+		return nil, err
 	}
 	x.joinIdentities(ix)
 	if p.Embed {
 		if err := x.embed(ctx, ix, p); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -330,28 +387,28 @@ func (x *Indexer) Fold(ctx context.Context, recs []connector.Record, p FoldParam
 	// error.
 	history, err := x.loadChanges()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := x.saveIndex(ix); err != nil {
-		return err
+		return nil, err
 	}
 	if err := x.saveEpisodes(ctx, ix, p); err != nil {
-		return err
+		return nil, err
 	}
 	// A first build diffs against nothing, so everyone would read as joined.
 	// That is no change anyone looks for, so only a fold over an index logs.
 	if prev != nil && !changes.Empty() {
 		if err := x.saveChanges(append(history, ChangeEntry{At: x.now().UTC(), Changes: changes})); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	x.reportFold(ix, changes)
 	if p.ChangesFile != "" {
 		if err := writeChangesFile(p.ChangesFile, changes); err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return ix, nil
 }
 
 // foldBase returns the index a fold writes into: the existing one with every

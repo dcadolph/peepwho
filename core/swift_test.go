@@ -72,6 +72,7 @@ func TestSwiftFixtures(t *testing.T) {
 		"git": {"repo:/src/app": {
 			Flags: []string{"--repo-path", "/src/app"}, RanAt: built, AttemptedAt: built.Add(30 * time.Minute),
 			Error: "repository not found",
+			Found: &engine.Outcome{Repos: 58, People: 1},
 		}},
 		"slack": {"": {}},
 	}); err != nil {

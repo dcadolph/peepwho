@@ -32,8 +32,11 @@ func TestInvocationsRoundTrip(t *testing.T) {
 	store := NewStore(Dir(t.TempDir()), nil)
 	at := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
 	in := Invocations{
-		"github": {"org:acme": {Flags: []string{"--github-org", "acme"}, RanAt: at, AttemptedAt: at.Add(time.Hour), Error: "boom"}},
-		"slack":  {"all": {Flags: []string{"--include-private=true"}}},
+		"github": {"org:acme": {
+			Flags: []string{"--github-org", "acme"}, RanAt: at, AttemptedAt: at.Add(time.Hour), Error: "boom",
+			Found: &Outcome{People: 4, Channels: 2},
+		}},
+		"slack": {"all": {Flags: []string{"--include-private=true"}}},
 	}
 	if err := store.SaveInvocations(in); err != nil {
 		t.Fatalf("save: %v", err)
@@ -80,11 +83,14 @@ func TestInvocationsOlderShapes(t *testing.T) {
 			},
 			"slack": {"": {}},
 		},
-	}, { // Test 2: The current shape reads as it is written.
+	}, { // Test 2: A run from before runs kept what they found reads with no found.
 		File: `{"git":{"repo:/a":{"flags":["--repo-path","/a"],"ran_at":"2026-11-01T12:00:00Z","error":"boom"}}}`,
 		WantRuns: Invocations{"git": {"repo:/a": {
 			Flags: []string{"--repo-path", "/a"}, RanAt: time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC), Error: "boom",
 		}}},
+	}, { // Test 3: The current shape reads as it is written.
+		File:     `{"slack":{"":{"flags":[],"found":{"repos":0,"people":5,"channels":1}}}}`,
+		WantRuns: Invocations{"slack": {"": {Flags: []string{}, Found: &Outcome{People: 5, Channels: 1}}}},
 	}}
 	for testNum, test := range tests {
 		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
@@ -101,6 +107,33 @@ func TestInvocationsOlderShapes(t *testing.T) {
 				t.Errorf("load mismatch (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+// TestRecordFound verifies a scope keeps what its last run found, a newer run
+// replaces it, and a scope no longer recorded stays gone.
+func TestRecordFound(t *testing.T) {
+	t.Parallel()
+	store := NewStore(Dir(t.TempDir()), nil)
+	if err := store.SaveInvocations(Invocations{"git": {"repo:/a": {Flags: []string{"--repo-path", "/a"}}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RecordFound("git", "repo:/a", Outcome{Repos: 2, People: 3}); err != nil {
+		t.Fatalf("RecordFound: %v", err)
+	}
+	if err := store.RecordFound("git", "repo:/a", Outcome{Repos: 1, People: 1}); err != nil {
+		t.Fatalf("RecordFound: %v", err)
+	}
+	if err := store.RecordFound("git", "repo:/gone", Outcome{People: 9}); err != nil {
+		t.Fatalf("RecordFound on a missing scope: %v", err)
+	}
+	got, err := store.LoadInvocations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Invocations{"git": {"repo:/a": {Flags: []string{"--repo-path", "/a"}, Found: &Outcome{Repos: 1, People: 1}}}}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("recorded found mismatch (-want +got):\n%s", diff)
 	}
 }
 
@@ -305,7 +338,8 @@ func TestRefresh(t *testing.T) {
 }
 
 // TestRefreshRecordsAttempts verifies each replay writes how it went: a failure
-// keeps the last success and says why, and the next success clears the failure.
+// keeps the last success and what it found and says why, and the next success
+// clears the failure and records what it found.
 func TestRefreshRecordsAttempts(t *testing.T) {
 	t.Parallel()
 	people, err := filepath.Abs("../../examples/people.csv")
@@ -319,7 +353,7 @@ func TestRefreshRecordsAttempts(t *testing.T) {
 	jiraFlags := []string{"--jira-server=true", "--jira-url=" + jira, "--jira-project", "KAFKA"}
 	csvFlags := []string{"--file=" + people}
 	if err := store.SaveInvocations(Invocations{
-		"jira":    {"project:KAFKA": {Flags: jiraFlags, RanAt: then, AttemptedAt: then}},
+		"jira":    {"project:KAFKA": {Flags: jiraFlags, RanAt: then, AttemptedAt: then, Found: &Outcome{People: 3}}},
 		"org-csv": {"file:" + people: {Flags: csvFlags, RanAt: then, AttemptedAt: then}},
 	}); err != nil {
 		t.Fatal(err)
@@ -344,8 +378,10 @@ func TestRefreshRecordsAttempts(t *testing.T) {
 		t.Error("the failed scope recorded no error")
 	}
 	want := Invocations{
-		"jira":    {"project:KAFKA": {Flags: jiraFlags, RanAt: then, AttemptedAt: clock, Error: failure}},
-		"org-csv": {"file:" + people: {Flags: csvFlags, RanAt: clock, AttemptedAt: clock}},
+		"jira": {"project:KAFKA": {
+			Flags: jiraFlags, RanAt: then, AttemptedAt: clock, Error: failure, Found: &Outcome{People: 3},
+		}},
+		"org-csv": {"file:" + people: {Flags: csvFlags, RanAt: clock, AttemptedAt: clock, Found: &Outcome{People: 7}}},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("after a failure (-want +got):\n%s", diff)
@@ -359,7 +395,8 @@ func TestRefreshRecordsAttempts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if diff := cmp.Diff(Run{Flags: jiraFlags, RanAt: clock, AttemptedAt: clock}, got["jira"]["project:KAFKA"]); diff != "" {
+	wantRun := Run{Flags: jiraFlags, RanAt: clock, AttemptedAt: clock, Found: &Outcome{People: 1}}
+	if diff := cmp.Diff(wantRun, got["jira"]["project:KAFKA"]); diff != "" {
 		t.Errorf("after a success (-want +got):\n%s", diff)
 	}
 }

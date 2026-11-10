@@ -230,6 +230,13 @@ func (ix *Index) SourceNames() []string {
 // count kept in the main index, so it works without loading the sources sidecar.
 func (ix *Index) SourceSize(name string) int { return ix.sourceCounts[name] }
 
+// SourceRecords returns a copy of the records the named source contributed, as
+// held after the last build or fold. An index loaded without its sources
+// sidecar holds none.
+func (ix *Index) SourceRecords(name string) []connector.Record {
+	return slices.Clone(ix.sources[name])
+}
+
 // LoadAliases merges a JSON alias file into the index's identity resolver so
 // records indexed afterward key by their canonical identifier. Call
 // Canonicalize to also join people already in the graph.
