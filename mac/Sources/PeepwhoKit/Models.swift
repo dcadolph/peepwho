@@ -40,7 +40,8 @@ public enum SourceLabel {
 public struct Found: Codable, Equatable, Sendable {
     // repos is how many repositories the run read, zero for a source other than git.
     public let repos: Int
-    // people is how many distinct people the source holds after the run.
+    // people is how many people in the index hold a record from the source after the run,
+    // counted after identities are joined.
     public let people: Int
     // channels is how many channels the source holds after the run.
     public let channels: Int
@@ -401,9 +402,19 @@ public struct IndexResult: Codable, Sendable {
     public let people: Int
     // log is the run's progress text.
     public let log: String
+    // found is what the run found, counted the way the Index tab's source rows count it, nil from
+    // a core that did not report it.
+    public var found: Found? = nil
 
-    // finishLine says in plain words what the run read and what the index now holds.
+    // finishLine says in plain words what the run read and found, in the words the Index tab's
+    // source rows use. Without found it says what the index now holds instead.
     public var finishLine: String {
+        if let found {
+            if source == "git" {
+                return "Git: read \(Count.words(found.repos, "repository", "repositories")) and \(found.who)."
+            }
+            return "\(SourceLabel.of(source)): \(found.who)."
+        }
         let held = "The index holds \(Count.words(people, "person", "people"))."
         if source == "git" {
             return "Git: read \(Count.words(repos, "repository", "repositories")). \(held)"

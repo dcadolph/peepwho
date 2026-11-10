@@ -832,12 +832,12 @@ struct SettingsTests {
     }
 }
 
-// readOneRepo is the finish line a pick of one test repository shows, with the people model's
-// status counts.
+// readOneRepo is the finish line a pick of one test repository shows. The test repository is the
+// only source, so git found everyone the index holds.
 @MainActor
 func readOneRepo(_ model: SettingsModel) -> String {
     let people = model.status?.people ?? 0
-    return "Git: read 1 repository. The index holds \(Count.words(people, "person", "people"))."
+    return "Git: read 1 repository and found \(Count.words(people, "person", "people"))."
 }
 
 // refreshedOneRepo is the line a refresh of one picked repo ends with, since the source holds

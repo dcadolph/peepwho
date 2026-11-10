@@ -98,10 +98,12 @@ struct DecodeTests {
         #expect(got.scope.hasPrefix("repo:"))
         #expect(got.repos == 1)
         #expect(got.people == 2)
-        #expect(got.finishLine == "Git: read 1 repository. The index holds 2 people.")
+        #expect(got.found == Found(repos: 1, people: 2, channels: 0))
+        #expect(got.finishLine == "Git: read 1 repository and found 2 people.")
     }
 
-    // finishLine says one or many in plain words, and names a source other than git.
+    // finishLine says what the run found in the source rows' words, and without found says one or
+    // many in plain words and names a source other than git.
     @Test func finishLine() {
         let one = IndexResult(source: "git", scope: "repo:/a", repos: 1, people: 1, log: "")
         #expect(one.finishLine == "Git: read 1 repository. The index holds 1 person.")
@@ -109,6 +111,12 @@ struct DecodeTests {
         #expect(many.finishLine == "Git: read 58 repositories. The index holds 3 people.")
         let csv = IndexResult(source: "org-csv", scope: "file:/a.csv", repos: 0, people: 40, log: "")
         #expect(csv.finishLine == "Org chart CSV: indexed. The index holds 40 people.")
+        let git = IndexResult(source: "git", scope: "repo:/src", repos: 58, people: 6, log: "",
+                              found: Found(repos: 58, people: 1, channels: 0))
+        #expect(git.finishLine == "Git: read 58 repositories and found 1 person.")
+        let slack = IndexResult(source: "slack", scope: "workspace:T1", repos: 0, people: 6, log: "",
+                                found: Found(repos: 0, people: 5, channels: 1))
+        #expect(slack.finishLine == "Slack: found 5 people in 1 channel.")
     }
 
     // refresh decodes each scope's outcome.

@@ -12,7 +12,7 @@
       "place": "corp/billing-service",
       "source": "github",
       "strength": 1,
-      "when": "2026-11-06T21:32:04Z"
+      "when": "2026-11-08T03:04:55Z"
     },
     {
       "id": "pagerduty:PINC1",
@@ -31,7 +31,7 @@
       "place": "Billing API",
       "source": "pagerduty",
       "strength": 0.5,
-      "when": "2026-10-09T20:32:04Z"
+      "when": "2026-10-11T02:04:55Z"
     }
   ],
   "person": "angela@example.com",
@@ -39,7 +39,7 @@
   "scope": {
     "episodes": 6,
     "note": "Covers what peepwho has indexed from github, jira, pagerduty, and slack, within each source's history window. Slack covers channels the bot can read; direct messages are not indexed.",
-    "oldest": "2026-08-10",
+    "oldest": "2026-08-12",
     "sources": [
       "github",
       "jira",

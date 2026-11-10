@@ -707,6 +707,8 @@ type indexView struct {
 	Repos int `json:"repos"`
 	// People is how many people the index holds after the run.
 	People int `json:"people"`
+	// Found is what the run found, counted the way the Index tab's source rows count it.
+	Found *engine.Outcome `json:"found,omitempty"`
 	// Log is the end of the run's progress output.
 	Log string `json:"log"`
 }
@@ -768,7 +770,7 @@ func (h *Handle) Index(source, flags string, nowUnix int64) (out string, err err
 		return "", fmt.Errorf("core: index %s saved, but it would not load: "+
 			"open the data directory again: %w", source, err)
 	}
-	v := indexView{Source: source, Scope: scope, Repos: read.Repos, Log: log.String()}
+	v := indexView{Source: source, Scope: scope, Repos: read.Repos, Found: &read, Log: log.String()}
 	if l := h.current(); l != nil {
 		v.People = l.eng.Status(now).People
 	}
