@@ -1,0 +1,12 @@
+{
+  "name": "whotoask",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "site",
+    "not_found_handling": "404-page"
+  },
+  "routes": [
+    { "pattern": "whotoask.app", "custom_domain": true },
+    { "pattern": "www.whotoask.app", "custom_domain": true }
+  ]
+}
