@@ -30,10 +30,11 @@ type Client struct {
 	// maxRetries bounds retries on HTTP 429 for the quick list and auth calls.
 	maxRetries int
 	// historyRetries bounds retries on HTTP 429 for conversations.history and
-	// conversations.replies. Slack throttles these two methods far harder than
-	// the rest, to roughly one call per minute for apps on the post-2025 tier,
-	// so they need a much larger budget than the list calls to make progress
-	// through a busy channel rather than giving up after a few throttles.
+	// conversations.replies. Slack throttles these two methods harder than the
+	// rest, and since 2025 drops commercially distributed apps to roughly one
+	// call per minute. An app a workspace builds for itself keeps the higher
+	// tier, but the budget stays large so a busy channel still makes progress
+	// under either limit rather than giving up after a few throttles.
 	historyRetries int
 }
 
