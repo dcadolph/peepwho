@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 // Scopes holds what each token source reads, which the user types once and refresh replays.
 public struct Scopes: Equatable, Sendable, Codable {
@@ -254,6 +255,11 @@ public final class SettingsModel: ObservableObject {
     private let clock: () -> Date
     // ran is what the run going now did, nil until it reads a source.
     private var ran: LastRun?
+    // logged is the kind of the run whose start was logged, so its end is logged even when the run
+    // fails and ran is cleared.
+    private var logged: LastRun.Kind?
+    // log records when a run starts and ends, with no paths, names, or line text.
+    private let log = Logger(subsystem: "com.dcadolph.peepwho", category: "index")
 
     // init opens dir with open and reads which secrets and places are saved. clock tells the time
     // a run starts at.
@@ -665,7 +671,17 @@ public final class SettingsModel: ObservableObject {
         if let ran {
             lastRun = ran
         }
+        if let logged {
+            let (action, starter) = Self.logWords(logged)
+            let count = lines.count
+            let stopped = canceled
+            log.notice("""
+                run ended: action=\(action, privacy: .public) by=\(starter, privacy: .public) \
+                lines=\(count, privacy: .public) canceled=\(stopped, privacy: .public)
+                """)
+        }
         ran = nil
+        logged = nil
         busy = nil
         progress = nil
         canCancel = false
@@ -675,6 +691,18 @@ public final class SettingsModel: ObservableObject {
     // started marks the run going now as kind, from the moment it begins reading a source.
     private func started(_ kind: LastRun.Kind) {
         ran = LastRun(kind: kind, at: clock())
+        logged = kind
+        let (action, starter) = Self.logWords(kind)
+        log.notice("run started: action=\(action, privacy: .public) by=\(starter, privacy: .public)")
+    }
+
+    // logWords names the action and who started it for the log, such as ("index", "person").
+    private static func logWords(_ kind: LastRun.Kind) -> (action: String, starter: String) {
+        switch kind {
+        case .indexed: return ("index", "person")
+        case .refreshed: return ("refresh", "person")
+        case .refreshedOnItsOwn: return ("refresh", "app")
+        }
     }
 
     // headed puts the line naming the run going now ahead of out, once it has read a source.
