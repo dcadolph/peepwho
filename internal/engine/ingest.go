@@ -83,8 +83,8 @@ type Indexer struct {
 type Outcome struct {
 	// Repos is how many repositories the git source read, zero for other sources.
 	Repos int `json:"repos"`
-	// People is how many distinct people the source holds after the run, by source id, else
-	// by email.
+	// People is how many people in the index hold a record from this source, counted
+	// after identities are joined, so it never exceeds the headline.
 	People int `json:"people"`
 	// Channels is how many distinct channels the source holds after the run.
 	Channels int `json:"channels"`
@@ -106,21 +106,27 @@ func heldRecords(ix *index.Index, source string, recs []connector.Record) []conn
 	return held
 }
 
-// countRecords returns the distinct people and channels among recs. A person is
-// keyed by its source id, else by its email, and a record with neither is not
-// counted; a channel is keyed by its name.
-func countRecords(recs []connector.Record) (people, channels int) {
-	persons := map[string]bool{}
+// countRecords returns how many people in ix hold a person record among recs, and
+// the distinct channels among recs by name. A record names its person by source
+// id, else by email, as the index keys it, and the name resolves through the
+// joined identities, so one person seen under many addresses or accounts counts
+// once and the count never exceeds the people ix holds. A record with neither id
+// nor email is not counted.
+func countRecords(ix *index.Index, recs []connector.Record) (people, channels int) {
+	persons := map[model.ID]bool{}
 	chans := map[string]bool{}
 	for _, r := range recs {
 		switch r.Kind {
 		case connector.KindPerson:
-			key := r.PersonID
+			key := strings.ToLower(strings.TrimSpace(r.PersonID))
 			if key == "" {
-				key = strings.ToLower(strings.TrimSpace(r.Email))
+				key = util.NormalizeEmail(r.Email)
 			}
-			if key != "" {
-				persons[key] = true
+			if key == "" {
+				continue
+			}
+			if id := ix.CanonicalID(model.ID(key)); ix.Graph.People[id] != nil {
+				persons[id] = true
 			}
 		case connector.KindChannel:
 			if r.Name != "" {
@@ -236,7 +242,7 @@ func (x *Indexer) Index(ctx context.Context, req IndexRequest) error {
 	if err != nil {
 		return err
 	}
-	out.People, out.Channels = countRecords(heldRecords(ix, req.Source, recs))
+	out.People, out.Channels = countRecords(ix, heldRecords(ix, req.Source, recs))
 	if err := x.saveProgress(&req, scope, canInc, gitAfter, recs); err != nil {
 		return err
 	}

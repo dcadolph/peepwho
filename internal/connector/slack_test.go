@@ -379,3 +379,58 @@ func TestSlackFetchDMLinks(t *testing.T) {
 		})
 	}
 }
+
+// TestSlackSkipsNonPeople verifies Slackbot and a bot account become neither
+// person records nor channel members, even when they posted, while a deactivated
+// account stays a person.
+func TestSlackSkipsNonPeople(t *testing.T) {
+	t.Parallel()
+	const (
+		usersJSON = `{"ok":true,"members":[
+			{"id":"U1","profile":{"real_name":"Jane Roe","email":"jane@x.com"}},
+			{"id":"USLACKBOT","profile":{"real_name":"Slackbot"}},
+			{"id":"U2","is_bot":true,"profile":{"real_name":"Deploy Bot"}},
+			{"id":"U3","deleted":true,"profile":{"real_name":"Dee Gone","email":"dee@x.com"}}]}`
+		channelsJSON = `{"ok":true,"channels":[{"id":"C1","name":"billing"}]}`
+		historyJSON  = `{"ok":true,"has_more":false,"messages":[
+			{"type":"message","user":"U1","text":"we fixed the retries bug","ts":"1.0"},
+			{"type":"message","user":"USLACKBOT","text":"reminder: retries","ts":"2.0"},
+			{"type":"message","user":"U2","bot_id":"B2","text":"retries deploy done","ts":"3.0"},
+			{"type":"message","user":"U3","text":"retries were mine","ts":"4.0"}]}`
+	)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/users.list", func(w http.ResponseWriter, _ *http.Request) { io.WriteString(w, usersJSON) })
+	mux.HandleFunc("/conversations.list", func(w http.ResponseWriter, _ *http.Request) {
+		io.WriteString(w, channelsJSON)
+	})
+	mux.HandleFunc("/conversations.history", func(w http.ResponseWriter, _ *http.Request) {
+		io.WriteString(w, historyJSON)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	client := slack.New("xoxb-test", slack.WithBaseURL(srv.URL))
+	recs, err := NewSlackWithClient(client, SlackOptions{}).Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	var people []string
+	var members []string
+	for _, r := range recs {
+		switch r.Kind {
+		case KindPerson:
+			people = append(people, r.PersonID)
+		case KindChannel:
+			members = append(members, r.Members...)
+		}
+	}
+	slices.Sort(people)
+	people = slices.Compact(people)
+	if diff := cmp.Diff([]string{"dee@x.com", "jane@x.com", "slack:U1", "slack:U3"}, people); diff != "" {
+		t.Errorf("person ids mismatch (-want +got):\n%s", diff)
+	}
+	slices.Sort(members)
+	if diff := cmp.Diff([]string{"dee@x.com", "jane@x.com"}, members); diff != "" {
+		t.Errorf("channel members mismatch (-want +got):\n%s", diff)
+	}
+}

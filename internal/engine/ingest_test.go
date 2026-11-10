@@ -327,9 +327,9 @@ func TestIndexCanceledSavesNothing(t *testing.T) {
 	}
 }
 
-// TestCountRecords verifies a run counts distinct people by source id, else by
-// email, and distinct channels by name, so one person seen in many records counts
-// once.
+// TestCountRecords verifies a run counts the people the index holds after
+// identities are joined, so one person under many keys counts once, and counts
+// distinct channels by name.
 func TestCountRecords(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -340,30 +340,56 @@ func TestCountRecords(t *testing.T) {
 		Recs: nil,
 	}, { // Test 1: One person in two records counts once.
 		Recs: []connector.Record{
-			{PersonID: "git:ann", Email: "ann@x.com"}, {PersonID: "git:ann", Email: "ann@x.com"},
+			{Source: "git", PersonID: "git:ann", Email: "ann@x.com", Topics: []string{"ledger"}},
+			{Source: "git", PersonID: "git:ann", Email: "ann@x.com", Topics: []string{"ledger"}},
 		},
 		WantPeople: 1,
 	}, { // Test 2: With no source id the email keys the person, in any case.
-		Recs:       []connector.Record{{Email: "Ann@x.com"}, {Email: "ann@x.com "}, {Email: "bo@x.com"}},
+		Recs: []connector.Record{
+			{Source: "git", Email: "Ann@x.com", Topics: []string{"ledger"}},
+			{Source: "git", Email: "ann@x.com ", Topics: []string{"ledger"}},
+			{Source: "git", Email: "bo@x.com", Topics: []string{"ledger"}},
+		},
 		WantPeople: 2,
 	}, { // Test 3: A person with neither id nor email is not counted.
-		Recs:       []connector.Record{{Name: "Nobody"}},
+		Recs:       []connector.Record{{Source: "git", Name: "Nobody", Topics: []string{"ledger"}}},
 		WantPeople: 0,
 	}, { // Test 4: Channels count by name, and topics count as neither.
 		Recs: []connector.Record{
-			{Kind: connector.KindChannel, Name: "general"}, {Kind: connector.KindChannel, Name: "general"},
-			{Kind: connector.KindChannel, Name: "billing"}, {Kind: connector.KindTopic, Name: "ledger"},
-			{PersonID: "slack:U1"},
+			{Source: "slack", Kind: connector.KindChannel, Name: "general"},
+			{Source: "slack", Kind: connector.KindChannel, Name: "general"},
+			{Source: "slack", Kind: connector.KindChannel, Name: "billing"},
+			{Source: "slack", Kind: connector.KindTopic, Name: "ledger"},
+			{Source: "slack", PersonID: "slack:U1", Name: "Ann", Topics: []string{"ledger"}},
 		},
 		WantPeople: 1, WantChannels: 2,
+	}, { // Test 5: A Slack account and its email-keyed author record are one person.
+		Recs: []connector.Record{
+			{Source: "slack", PersonID: "slack:U1", Email: "ann@x.com", Name: "Ann"},
+			{Source: "slack", PersonID: "ann@x.com", Topics: []string{"ledger"}},
+		},
+		WantPeople: 1,
+	}, { // Test 6: Two addresses joined by an alternate identity are one person.
+		Recs: []connector.Record{
+			{Source: "git", PersonID: "git:ann", Email: "ann@x.com", Topics: []string{"ledger"}},
+			{Source: "git", PersonID: "git:ann2", Email: "ann@home.org", AltIDs: []string{"ann@x.com"},
+				Topics: []string{"ledger"}},
+		},
+		WantPeople: 1,
 	}}
 	for testNum, test := range tests {
 		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
 			t.Parallel()
-			people, channels := countRecords(test.Recs)
+			ix := index.New()
+			ix.Add(test.Recs)
+			ix.Canonicalize()
+			people, channels := countRecords(ix, test.Recs)
 			if people != test.WantPeople || channels != test.WantChannels {
 				t.Errorf("counted %d people and %d channels, want %d and %d",
 					people, channels, test.WantPeople, test.WantChannels)
+			}
+			if people > len(ix.Graph.People) {
+				t.Errorf("counted %d people, more than the %d the index holds", people, len(ix.Graph.People))
 			}
 		})
 	}
@@ -380,11 +406,11 @@ func TestHeldRecords(t *testing.T) {
 		{Source: "org-csv", PersonID: "csv:cy", Email: "cy@x.com", Topics: []string{"payments"}},
 	})
 	ix.MergeIncremental(nil)
-	if people, _ := countRecords(heldRecords(ix, "git", nil)); people != 2 {
+	if people, _ := countRecords(ix, heldRecords(ix, "git", nil)); people != 2 {
 		t.Errorf("git holds %d people after an empty increment, want 2", people)
 	}
 	fetched := []connector.Record{{Source: "org-csv", PersonID: "csv:cy", Email: "cy@x.com"}}
-	if people, _ := countRecords(heldRecords(ix, "org-csv", fetched)); people != 1 {
+	if people, _ := countRecords(ix, heldRecords(ix, "org-csv", fetched)); people != 1 {
 		t.Errorf("org-csv holds %d people, want 1", people)
 	}
 }

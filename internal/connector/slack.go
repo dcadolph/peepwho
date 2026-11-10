@@ -142,7 +142,7 @@ func (s *Slack) Fetch(ctx context.Context) ([]Record, error) {
 	var records []Record
 	noEmail := 0
 	for _, u := range users {
-		if u.Profile.RealName == "" && u.Profile.Email == "" {
+		if notPerson(u) || u.Profile.RealName == "" && u.Profile.Email == "" {
 			continue
 		}
 		if u.Profile.Email == "" {
@@ -426,12 +426,27 @@ func slackPersonID(u slack.User) string {
 	return "slack:" + u.ID
 }
 
-// slackUserRef resolves a message author's user ID to a stable person ID.
+// slackbotID is the user ID Slack gives Slackbot in every workspace. Slackbot is
+// not flagged as a bot, so it is named here.
+const slackbotID = "USLACKBOT"
+
+// notPerson reports whether a Slack account is not a person to index: a bot or
+// Slackbot. A deactivated account is still a person, since the recently departed
+// are who a knowledge-continuity read is about.
+func notPerson(u slack.User) bool {
+	return u.IsBot || u.ID == slackbotID
+}
+
+// slackUserRef resolves a message author's user ID to a stable person ID. It
+// returns "" for an account that is not a person, so its messages name no one.
 func slackUserRef(userID string, byID map[string]slack.User) string {
-	if userID == "" {
+	if userID == "" || userID == slackbotID {
 		return ""
 	}
 	if u, ok := byID[userID]; ok {
+		if notPerson(u) {
+			return ""
+		}
 		return slackPersonID(u)
 	}
 	return "slack:" + userID

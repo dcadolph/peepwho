@@ -131,8 +131,11 @@ func threadEpisode(
 	ch slack.Channel, m slack.Message, byID map[string]slack.User, workspaceURL string,
 ) episode.Episode {
 	asked := model.ID(slackUserRef(m.User, byID))
-	participants := []model.ID{asked}
-	seen := map[model.ID]bool{asked: true}
+	var participants []model.ID
+	if asked != "" {
+		participants = append(participants, asked)
+	}
+	seen := map[model.ID]bool{"": true, asked: true}
 	for _, u := range m.ReplyUsers {
 		pid := model.ID(slackUserRef(u, byID))
 		if pid == "" || seen[pid] {

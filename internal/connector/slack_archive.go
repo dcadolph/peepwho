@@ -106,8 +106,9 @@ func notesFrom(msgs []slack.Message, byID map[string]slack.User) []episode.Note 
 		if !m.FromPerson() {
 			continue
 		}
+		author := model.ID(slackUserRef(m.User, byID))
 		text := noteText(m)
-		if text == "" {
+		if author == "" || text == "" {
 			continue
 		}
 		// Each message is cut to its own cap first, so one pasted log cannot
@@ -118,7 +119,7 @@ func notesFrom(msgs []slack.Message, byID map[string]slack.User) []episode.Note 
 		}
 		kept += len(text)
 		notes = append(notes, episode.Note{
-			Author: model.ID(slackUserRef(m.User, byID)),
+			Author: author,
 			At:     slackTime(m.TS),
 			Text:   text,
 		})
