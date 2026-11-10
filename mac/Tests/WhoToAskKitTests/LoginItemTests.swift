@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import PeepwhoKit
+@testable import WhoToAskKit
 
 // MockLoginItem answers like the system's login item, with a state and errors a test sets.
 final class MockLoginItem: LoginItem {
@@ -40,7 +40,7 @@ final class MockLoginItem: LoginItem {
 struct LoginItemTests {
     // model builds settings over item with nothing open.
     func model(_ item: LoginItem?) -> SettingsModel {
-        SettingsModel(dir: tempDir("peepwho-login"), open: { throw POSIXError(.ENOENT) }, secrets: MemorySecrets(),
+        SettingsModel(dir: tempDir("whotoask-login"), open: { throw POSIXError(.ENOENT) }, secrets: MemorySecrets(),
                       places: MemoryPlaces(), loginItem: item)
     }
 

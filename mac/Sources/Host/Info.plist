@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleIdentifier</key>
-	<string>com.dcadolph.peepwho.host</string>
+	<string>com.dcadolph.whotoask.host</string>
 	<key>CFBundleName</key>
 	<string>Host</string>
 	<key>CFBundleDisplayName</key>
-	<string>peepwho host</string>
+	<string>WhoToAsk host</string>
 	<key>CFBundleExecutable</key>
 	<string>Host</string>
 	<key>CFBundlePackageType</key>

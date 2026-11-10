@@ -2,7 +2,7 @@ import Foundation
 import Security
 import Testing
 
-@testable import PeepwhoKit
+@testable import WhoToAskKit
 
 // IndexKeyTests pin when the index key may be created, since replacing it locks the index.
 struct IndexKeyTests {

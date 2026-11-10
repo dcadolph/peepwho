@@ -7,7 +7,7 @@ set -u
 app=$1
 version=$2
 floor=$3
-binary="$app/Contents/MacOS/Peepwho"
+binary="$app/Contents/MacOS/WhoToAsk"
 plist="$app/Contents/Info.plist"
 failed=0
 

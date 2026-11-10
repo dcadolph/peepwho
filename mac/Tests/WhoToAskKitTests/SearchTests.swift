@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import PeepwhoKit
+@testable import WhoToAskKit
 
 // repoRoot is the Go module the Swift package sits inside.
 let repoRoot = URL(fileURLWithPath: #filePath)
@@ -14,7 +14,7 @@ let repoRoot = URL(fileURLWithPath: #filePath)
 // --save-index, the same index a user gets, and returns the directory.
 func demoDir() throws -> URL {
     let dir = FileManager.default.temporaryDirectory
-        .appendingPathComponent("peepwho-search-\(UUID().uuidString)", isDirectory: true)
+        .appendingPathComponent("whotoask-search-\(UUID().uuidString)", isDirectory: true)
     let go = Process()
     go.executableURL = URL(fileURLWithPath: "/usr/bin/env")
     go.arguments = ["go", "run", ".", "demo", "--save-index", dir.path]
@@ -98,7 +98,7 @@ struct SearchTests {
     // Test 3: An index not built yet says so and opens nothing.
     @Test func emptyIndexOpensNothing() async throws {
         let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("peepwho-empty-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("whotoask-empty-\(UUID().uuidString)", isDirectory: true)
         let opened = Opened()
         let model = SearchModel(core: try Core.open(dir: dir, key: "", secrets: KeychainSecrets()),
                                 opener: opened.open)
@@ -125,7 +125,7 @@ struct SearchTests {
 struct SearchStateTests {
     // Test 0: Core errors read as sentences with no internal prefix and no container path.
     @Test func describeCleansCoreErrors() {
-        let dir = URL(fileURLWithPath: "/Users/x/Library/Containers/com.dcadolph.peepwho/Data/peepwho")
+        let dir = URL(fileURLWithPath: "/Users/x/Library/Containers/com.dcadolph.whotoask/Data/whotoask")
         func text(_ message: String) -> String {
             SearchModel.describe(NSError(domain: "go", code: 1, userInfo: [NSLocalizedDescriptionKey: message]), dataDir: dir)
         }
@@ -139,8 +139,8 @@ struct SearchStateTests {
 
     // Test 1: A new core drops what the old one answered, its changes, and any question waiting.
     @Test func useClearsEverything() async throws {
-        let dir = tempDir("peepwho-data")
-        let csvDir = tempDir("peepwho-csv")
+        let dir = tempDir("whotoask-data")
+        let csvDir = tempDir("whotoask-csv")
         try FileManager.default.createDirectory(at: csvDir, withIntermediateDirectories: true)
         defer {
             try? FileManager.default.removeItem(at: dir)
@@ -156,7 +156,7 @@ struct SearchStateTests {
         try (header + jane + "Ann Lee,ann@x.com,Engineer,Payments,ledger\n").write(to: csv, atomically: true, encoding: .utf8)
         _ = try await core.index("org-csv", flags: ["--file", csv.path], now: start.addingTimeInterval(10))
 
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         defaults.set(start.addingTimeInterval(1), forKey: SearchModel.lastLookKey)
         let model = SearchModel(core: core, delay: .milliseconds(200), defaults: defaults) { _ in true }
         await model.opened(now: start.addingTimeInterval(11))
@@ -205,13 +205,13 @@ struct SearchStateTests {
     // Test 3: A changes read that fails starts no clock and moves no last look, and the next open
     // that reads shows what happened in between.
     @Test func failedReadKeepsLastLook() async throws {
-        let dir = tempDir("peepwho-data")
+        let dir = tempDir("whotoask-data")
         defer { try? FileManager.default.removeItem(at: dir) }
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let core = try Core.open(dir: dir, key: "", secrets: KeychainSecrets())
         let changes = dir.appendingPathComponent("changes.json")
         try "{".write(to: changes, atomically: true, encoding: .utf8)
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         let model = SearchModel(core: core, defaults: defaults) { _ in true }
 
         await model.opened()

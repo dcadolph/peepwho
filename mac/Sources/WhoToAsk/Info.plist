@@ -3,15 +3,15 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleIdentifier</key>
-	<string>com.dcadolph.peepwho</string>
+	<string>com.dcadolph.whotoask</string>
 	<key>CFBundleName</key>
-	<string>Peepwho</string>
+	<string>WhoToAsk</string>
 	<key>CFBundleDisplayName</key>
-	<string>peepwho</string>
+	<string>WhoToAsk</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleExecutable</key>
-	<string>Peepwho</string>
+	<string>WhoToAsk</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleVersion</key>

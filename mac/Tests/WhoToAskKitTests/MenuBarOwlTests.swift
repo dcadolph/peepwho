@@ -1,7 +1,7 @@
 import AppKit
 import Testing
 
-@testable import PeepwhoKit
+@testable import WhoToAskKit
 
 // alphaOfOwl draws the mark at a display's scale and reads its coverage at a point on the path.
 func alphaOfOwl(x: CGFloat, y: CGFloat, scale: Int = 2) throws -> CGFloat {
@@ -28,7 +28,7 @@ func alphaOfOwl(x: CGFloat, y: CGFloat, scale: Int = 2) throws -> CGFloat {
     // templateLetsTheSystemTint holds the flag that makes it white on a dark menu bar.
     @Test func templateLetsTheSystemTint() {
         #expect(MenuBarOwl.image.isTemplate)
-        #expect(MenuBarOwl.image.accessibilityDescription == "peepwho")
+        #expect(MenuBarOwl.image.accessibilityDescription == "Socrates, the WhoToAsk owl")
     }
 
     // fitsTheMenuBar holds the size to what a menu bar holds without cropping.

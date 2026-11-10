@@ -1,9 +1,9 @@
 import Foundation
-import PeepwhoCore
+import WhoToAskCore
 import Security
 import Testing
 
-@testable import PeepwhoKit
+@testable import WhoToAskKit
 
 // SettingsLayoutTests check the tabs and source cards the settings window is built from, and the
 // Privacy tab's line and Reset action through the real core.
@@ -58,12 +58,12 @@ struct SettingsLayoutTests {
     // Test 3: The Privacy line says when the index is not open, and says the index is not
     // encrypted when it opened without a key.
     @Test func privacyLine() async throws {
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
-        let closed = SettingsModel(dir: tempDir("peepwho-data"), open: { throw KeychainError(status: errSecInteractionNotAllowed) },
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let closed = SettingsModel(dir: tempDir("whotoask-data"), open: { throw KeychainError(status: errSecInteractionNotAllowed) },
                                    secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
         await closed.loadStatus()
         #expect(closed.privacy == "The index is not open.")
-        let dir = tempDir("peepwho-data")
+        let dir = tempDir("whotoask-data")
         defer { try? FileManager.default.removeItem(at: dir) }
         let open = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
                                  secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
@@ -75,12 +75,12 @@ struct SettingsLayoutTests {
     // Test 4: Reset deletes every token, scope, place, and the index, and refuses while a run is going.
     @Test func reset() async throws {
         let repo = try gitRepo()
-        let dir = tempDir("peepwho-data")
+        let dir = tempDir("whotoask-data")
         defer {
             try? FileManager.default.removeItem(at: repo)
             try? FileManager.default.removeItem(at: dir)
         }
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         let secrets = MemorySecrets()
         let places = MemoryPlaces()
         let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },

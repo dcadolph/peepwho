@@ -1,5 +1,5 @@
 import Foundation
-import PeepwhoCore
+import WhoToAskCore
 
 // ProgressLines hands the core's progress lines to a closure.
 final class ProgressLines: NSObject, CoreProgressProtocol {
@@ -25,9 +25,9 @@ public final class Core: @unchecked Sendable {
     // handle is the bound Go handle every call goes through.
     private let handle: CoreHandle
     // reads runs questions, several at once.
-    private let reads = DispatchQueue(label: "com.dcadolph.peepwho.core.reads", attributes: .concurrent)
+    private let reads = DispatchQueue(label: "com.dcadolph.whotoask.core.reads", attributes: .concurrent)
     // writes runs Index and Refresh one at a time.
-    private let writes = DispatchQueue(label: "com.dcadolph.peepwho.core.writes")
+    private let writes = DispatchQueue(label: "com.dcadolph.whotoask.core.writes")
 
     // init wraps a handle already opened.
     private init(handle: CoreHandle) {

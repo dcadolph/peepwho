@@ -1,11 +1,11 @@
 import Foundation
 import Testing
 
-@testable import PeepwhoKit
+@testable import WhoToAskKit
 
 // sampleCompany builds the sample company the way the app build does, once per test run.
 let sampleCompany: Result<URL, Error> = Result {
-    let dir = tempDir("peepwho-sample")
+    let dir = tempDir("whotoask-sample")
     let go = Process()
     go.executableURL = URL(fileURLWithPath: "/usr/bin/env")
     go.arguments = ["go", "run", ".", "demo", "--big", "--save-index", dir.path]
@@ -23,7 +23,7 @@ let sampleCompany: Result<URL, Error> = Result {
 struct SampleTests {
     // model returns settings over dir that bundle the sample company.
     private func model(_ dir: URL, places: PlaceStore = MemoryPlaces()) throws -> SettingsModel {
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         return SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
                              secrets: MemorySecrets(), places: places, defaults: defaults,
                              sampleDir: try sampleCompany.get())
@@ -33,7 +33,7 @@ struct SampleTests {
     // planted question finds its known person first, nothing can index or refresh into it, and a
     // wipe takes it all.
     @Test func loadUseWipe() async throws {
-        let dir = tempDir("peepwho-data")
+        let dir = tempDir("whotoask-data")
         defer { try? FileManager.default.removeItem(at: dir) }
         let settings = try model(dir)
         var heard: [Bool] = []
@@ -87,7 +87,7 @@ struct SampleTests {
     // Test 1: The control is gone once real data is indexed, and a load is refused anyway.
     @Test func realIndexKeepsItsPlace() async throws {
         let repo = try gitRepo()
-        let dir = tempDir("peepwho-data")
+        let dir = tempDir("whotoask-data")
         defer {
             try? FileManager.default.removeItem(at: repo)
             try? FileManager.default.removeItem(at: dir)
@@ -104,8 +104,8 @@ struct SampleTests {
 
     // Test 2: With no bundled company there is no control and no mention of one.
     @Test func noBundledCompany() async throws {
-        let dir = tempDir("peepwho-data")
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let dir = tempDir("whotoask-data")
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         let settings = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
                                      secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
         await settings.loadStatus()

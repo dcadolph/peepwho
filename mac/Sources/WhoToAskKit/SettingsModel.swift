@@ -259,7 +259,7 @@ public final class SettingsModel: ObservableObject {
     // fails and ran is cleared.
     private var logged: LastRun.Kind?
     // log records when a run starts and ends, with no paths, names, or line text.
-    private let log = Logger(subsystem: "com.dcadolph.peepwho", category: "index")
+    private let log = Logger(subsystem: "com.dcadolph.whotoask", category: "index")
 
     // init opens dir with open and reads which secrets and places are saved. clock tells the time
     // a run starts at.
@@ -301,7 +301,7 @@ public final class SettingsModel: ObservableObject {
 
     // loginNote says what a person has to do before the app opens at login, nil when nothing.
     public var loginNote: String? {
-        login == .needsApproval ? "Turn peepwho on in System Settings, under General, Login Items." : nil
+        login == .needsApproval ? "Turn WhoToAsk on in System Settings, under General, Login Items." : nil
     }
 
     // saveScopes keeps the scopes in the secret store, or says why it could not.
@@ -385,7 +385,7 @@ public final class SettingsModel: ObservableObject {
     }
 
     // reset forgets every token, site address, scope, and picked place while the core is open,
-    // then deletes the data directory and opens a fresh, empty one, so peepwho is back to the way
+    // then deletes the data directory and opens a fresh, empty one, so WhoToAsk is back to the way
     // it was when first installed. Nothing is touched when the index is not open or a run is going.
     public func reset() async {
         guard refuseWhileBusy() else { return }
@@ -497,7 +497,7 @@ public final class SettingsModel: ObservableObject {
 
     // intervalKey is the UserDefaults key for how many seconds old the index may get before
     // refreshIfStale refreshes it.
-    public static let intervalKey = "PeepwhoRefreshIntervalSeconds"
+    public static let intervalKey = "WhoToAskRefreshIntervalSeconds"
     // defaultInterval is six hours.
     public static let defaultInterval: TimeInterval = 6 * 3600
 

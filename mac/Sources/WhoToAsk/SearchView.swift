@@ -1,5 +1,5 @@
 import AppKit
-import PeepwhoKit
+import WhoToAskKit
 import SwiftUI
 
 // SearchView is the menu bar window: the search field, then the results or one person.

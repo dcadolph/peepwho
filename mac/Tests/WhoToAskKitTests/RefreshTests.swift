@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import PeepwhoKit
+@testable import WhoToAskKit
 
 // RefreshTests check the stale refresh rule and the changes since the last look through the
 // real core.
@@ -20,12 +20,12 @@ struct RefreshTests {
     // interval does not, and a long interval never refreshes a fresh index.
     @Test func refreshIfStale() async throws {
         let repo = try gitRepo()
-        let dir = tempDir("peepwho-data")
+        let dir = tempDir("whotoask-data")
         defer {
             try? FileManager.default.removeItem(at: repo)
             try? FileManager.default.removeItem(at: dir)
         }
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         defaults.set(60.0, forKey: SettingsModel.intervalKey)
         let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
                                   secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
@@ -52,8 +52,8 @@ struct RefreshTests {
     // Test 2: A person added between two index runs shows as joined at the next open, and not
     // again after the menu closes.
     @Test func changesSinceLastLook() async throws {
-        let dir = tempDir("peepwho-data")
-        let csvDir = tempDir("peepwho-csv")
+        let dir = tempDir("whotoask-data")
+        let csvDir = tempDir("whotoask-csv")
         try FileManager.default.createDirectory(at: csvDir, withIntermediateDirectories: true)
         defer {
             try? FileManager.default.removeItem(at: dir)
@@ -67,7 +67,7 @@ struct RefreshTests {
         let start = Date()
         _ = try await core.index("org-csv", flags: ["--file", csv.path], now: start)
 
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         let model = SearchModel(core: core, defaults: defaults) { _ in true }
         await model.opened(now: start.addingTimeInterval(1))
         #expect(model.changes.isEmpty)

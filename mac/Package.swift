@@ -3,28 +3,28 @@
 import PackageDescription
 
 let package = Package(
-    name: "Peepwho",
+    name: "WhoToAsk",
     platforms: [.macOS(.v14)],
     targets: [
-        .binaryTarget(name: "PeepwhoCore", path: "Frameworks/PeepwhoCore.xcframework"),
+        .binaryTarget(name: "WhoToAskCore", path: "Frameworks/WhoToAskCore.xcframework"),
         .target(
-            name: "PeepwhoKit",
-            dependencies: ["PeepwhoCore"],
+            name: "WhoToAskKit",
+            dependencies: ["WhoToAskCore"],
             linkerSettings: [.linkedLibrary("resolv"), .linkedFramework("Security")]
         ),
         .executableTarget(
             name: "Host",
-            dependencies: ["PeepwhoKit"],
+            dependencies: ["WhoToAskKit"],
             exclude: ["Info.plist", "Host.entitlements"]
         ),
         .executableTarget(
-            name: "Peepwho",
-            dependencies: ["PeepwhoKit"],
-            exclude: ["Info.plist", "Peepwho.entitlements"]
+            name: "WhoToAsk",
+            dependencies: ["WhoToAskKit"],
+            exclude: ["Info.plist", "WhoToAsk.entitlements"]
         ),
         .testTarget(
-            name: "PeepwhoKitTests",
-            dependencies: ["PeepwhoKit"]
+            name: "WhoToAskKitTests",
+            dependencies: ["WhoToAskKit"]
         ),
     ],
     swiftLanguageModes: [.v5]

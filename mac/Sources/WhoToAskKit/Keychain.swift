@@ -7,7 +7,7 @@ import Security
 public enum Keychain {
     // service is the Keychain service every item is stored under: the running app's bundle id, so
     // two apps built from this package never read each other's items.
-    static let service = Bundle.main.bundleIdentifier ?? "com.dcadolph.peepwho"
+    static let service = Bundle.main.bundleIdentifier ?? "com.dcadolph.whotoask"
 
     // read returns the secret stored under name and nil only when the Keychain says there is none.
     // A locked Keychain or a denied prompt throws, so a caller never takes a failure for absence.

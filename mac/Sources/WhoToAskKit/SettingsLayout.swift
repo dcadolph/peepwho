@@ -4,7 +4,7 @@ import Foundation
 public enum SettingsTab: String, CaseIterable, Identifiable, Sendable {
     // general holds opening at login, the version, and About.
     case general
-    // sources holds one card per place peepwho reads.
+    // sources holds one card per place WhoToAsk reads.
     case sources
     // index holds what the index holds and the actions that build it.
     case index

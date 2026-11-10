@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import PeepwhoKit
+@testable import WhoToAskKit
 
 // fixture reads one core answer the Go test TestSwiftFixtures wrote under core/testdata/swift.
 func fixture(_ name: String) throws -> String {

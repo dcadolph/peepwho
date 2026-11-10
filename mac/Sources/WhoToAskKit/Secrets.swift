@@ -1,31 +1,31 @@
 import Foundation
-import PeepwhoCore
+import WhoToAskCore
 
 // SecretName holds the names secrets are stored under: the environment variable names the command
 // line reads, which the core asks the app's Secrets for. They match the env names in the Go tree.
 public enum SecretName {
     // indexKey holds the base64 key the data directory is sealed with.
-    public static let indexKey = "PEEPWHO_INDEX_KEY"
+    public static let indexKey = "WHOTOASK_INDEX_KEY"
     // slackToken holds the Slack user or bot token.
-    public static let slackToken = "PEEPWHO_SLACK_TOKEN"
+    public static let slackToken = "WHOTOASK_SLACK_TOKEN"
     // githubToken holds the GitHub token.
-    public static let githubToken = "PEEPWHO_GITHUB_TOKEN"
+    public static let githubToken = "WHOTOASK_GITHUB_TOKEN"
     // jiraURL holds the Jira site URL.
-    public static let jiraURL = "PEEPWHO_JIRA_URL"
+    public static let jiraURL = "WHOTOASK_JIRA_URL"
     // jiraEmail holds the Jira account email.
-    public static let jiraEmail = "PEEPWHO_JIRA_EMAIL"
+    public static let jiraEmail = "WHOTOASK_JIRA_EMAIL"
     // jiraToken holds the Jira API token.
-    public static let jiraToken = "PEEPWHO_JIRA_TOKEN"
+    public static let jiraToken = "WHOTOASK_JIRA_TOKEN"
     // confluenceURL holds the Confluence site URL.
-    public static let confluenceURL = "PEEPWHO_CONFLUENCE_URL"
+    public static let confluenceURL = "WHOTOASK_CONFLUENCE_URL"
     // confluenceEmail holds the Confluence account email.
-    public static let confluenceEmail = "PEEPWHO_CONFLUENCE_EMAIL"
+    public static let confluenceEmail = "WHOTOASK_CONFLUENCE_EMAIL"
     // confluenceToken holds the Confluence API token.
-    public static let confluenceToken = "PEEPWHO_CONFLUENCE_TOKEN"
+    public static let confluenceToken = "WHOTOASK_CONFLUENCE_TOKEN"
     // pagerdutyToken holds the PagerDuty API token.
-    public static let pagerdutyToken = "PEEPWHO_PAGERDUTY_TOKEN"
+    public static let pagerdutyToken = "WHOTOASK_PAGERDUTY_TOKEN"
     // scopes holds what each token source reads, as JSON. The core never asks for it.
-    public static let scopes = "PEEPWHO_APP_SCOPES"
+    public static let scopes = "WHOTOASK_APP_SCOPES"
 
     // required names the secrets source cannot run without, none for a source reading a place.
     public static func required(by source: String) -> [String] {

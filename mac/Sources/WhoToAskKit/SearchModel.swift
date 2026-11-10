@@ -67,7 +67,7 @@ public final class SearchModel: ObservableObject {
     }
 
     // lastLookKey is the UserDefaults key for when the menu last closed.
-    public static let lastLookKey = "PeepwhoLastLook"
+    public static let lastLookKey = "WhoToAskLastLook"
 
     // opened shows what changed since the last look. The first open ever starts the clock and
     // shows nothing, since everything would count as new. A read that fails starts nothing and

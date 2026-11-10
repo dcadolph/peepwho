@@ -33,7 +33,7 @@ public enum MenuBarOwl {
             return true
         }
         image.isTemplate = true
-        image.accessibilityDescription = "peepwho"
+        image.accessibilityDescription = "Socrates, the WhoToAsk owl"
         return image
     }()
 

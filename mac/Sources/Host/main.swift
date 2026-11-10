@@ -68,7 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
             backing: .buffered, defer: false
         )
-        window.title = "peepwho host"
+        window.title = "WhoToAsk host"
         window.contentView = NSHostingView(rootView: ContentView(model: model))
         window.center()
         window.makeKeyAndOrderFront(nil)

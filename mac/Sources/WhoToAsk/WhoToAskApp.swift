@@ -1,10 +1,10 @@
 import AppKit
-import PeepwhoKit
+import WhoToAskKit
 import SwiftUI
 
-// PeepwhoApp is the menu bar app: a search field over the index and a settings window.
+// WhoToAskApp is the menu bar app: a search field over the index and a settings window.
 @main
-struct PeepwhoApp: App {
+struct WhoToAskApp: App {
     // app holds the search and the settings over one open index.
     @StateObject private var app = AppModel()
 

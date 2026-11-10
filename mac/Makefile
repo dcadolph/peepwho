@@ -1,11 +1,11 @@
 SIGN_ID ?= 96776319F63EFEBAFC132A30304DA2ABEA6298EA
 TIMESTAMP := $(if $(filter -,$(SIGN_ID)),,--timestamp)
-FRAMEWORK := Frameworks/PeepwhoCore.xcframework
+FRAMEWORK := Frameworks/WhoToAskCore.xcframework
 ARCHS := arm64 x86_64
 MACOS_MIN := 14.0
 VERSION ?= $(shell git describe --tags --abbrev=0 --match 'v*' 2>/dev/null | sed 's/^v//')
-APP := .build/Peepwho.app
-DMG := .build/Peepwho.dmg
+APP := .build/WhoToAsk.app
+DMG := .build/WhoToAsk.dmg
 ICONSET := .build/AppIcon.iconset
 ICNS := .build/AppIcon.icns
 SAMPLE := .build/SampleCompany
@@ -25,11 +25,11 @@ build: $(FRAMEWORK)
 		swift build -c release --arch $$arch || exit 1; \
 		bin=$$(swift build -c release --arch $$arch --show-bin-path) || exit 1; \
 		rm -rf .build/arch/$$arch && mkdir -p .build/arch/$$arch || exit 1; \
-		cp "$$bin/Peepwho" "$$bin/Host" .build/arch/$$arch/ || exit 1; \
-		lipo "$$bin/Peepwho" -verify_arch $$arch || exit 1; \
+		cp "$$bin/WhoToAsk" "$$bin/Host" .build/arch/$$arch/ || exit 1; \
+		lipo "$$bin/WhoToAsk" -verify_arch $$arch || exit 1; \
 	done
 
-# test runs the PeepwhoKit tests, which decode the core's fixtures.
+# test runs the WhoToAskKit tests, which decode the core's fixtures.
 test: $(FRAMEWORK)
 	swift test
 
@@ -45,15 +45,15 @@ host: build
 app: build $(ICNS)
 	rm -rf $(APP)
 	mkdir -p $(APP)/Contents/MacOS $(APP)/Contents/Resources
-	$(call fat,Peepwho,$(APP)/Contents/MacOS/Peepwho)
-	cp Sources/Peepwho/Info.plist $(APP)/Contents/Info.plist
+	$(call fat,WhoToAsk,$(APP)/Contents/MacOS/WhoToAsk)
+	cp Sources/WhoToAsk/Info.plist $(APP)/Contents/Info.plist
 	plutil -replace CFBundleShortVersionString -string "$(VERSION)" $(APP)/Contents/Info.plist
 	cp $(ICNS) $(APP)/Contents/Resources/AppIcon.icns
 	rm -rf $(SAMPLE)
 	cd .. && go run . demo --big --save-index mac/$(SAMPLE)
 	mkdir -p $(APP)/Contents/Resources/SampleCompany
 	install -m 644 $(SAMPLE)/index.json $(SAMPLE)/episodes.json $(APP)/Contents/Resources/SampleCompany/
-	codesign --force --options runtime $(TIMESTAMP) --entitlements Sources/Peepwho/Peepwho.entitlements --sign "$(SIGN_ID)" $(APP)
+	codesign --force --options runtime $(TIMESTAMP) --entitlements Sources/WhoToAsk/WhoToAsk.entitlements --sign "$(SIGN_ID)" $(APP)
 	$(MAKE) verify
 
 # verify fails on a built app that is not the shape a person can install.
@@ -88,9 +88,9 @@ dmg:
 		test "$$here" = "$$stamped" || { echo "the app says $$stamped but the tree is at '$$here': tag, then make app"; exit 1; }
 	rm -rf .build/dmg $(DMG)
 	mkdir -p .build/dmg
-	ditto $(APP) .build/dmg/Peepwho.app
+	ditto $(APP) .build/dmg/WhoToAsk.app
 	ln -s /Applications .build/dmg/Applications
-	hdiutil create -quiet -volname peepwho -srcfolder .build/dmg -format UDZO -ov $(DMG)
+	hdiutil create -quiet -volname whotoask -srcfolder .build/dmg -format UDZO -ov $(DMG)
 	$(if $(filter-out -,$(SIGN_ID)),codesign --force --sign "$(SIGN_ID)" --timestamp $(DMG))
 
 $(FRAMEWORK):
@@ -101,8 +101,8 @@ run-host: host
 	open .build/Host.app
 
 run: app
-	-pkill -x Peepwho
-	open .build/Peepwho.app
+	-pkill -x WhoToAsk
+	open .build/WhoToAsk.app
 
 clean:
 	rm -rf .build Frameworks

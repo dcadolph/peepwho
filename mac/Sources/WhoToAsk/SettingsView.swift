@@ -1,5 +1,5 @@
 import AppKit
-import PeepwhoKit
+import WhoToAskKit
 import SwiftUI
 
 // SettingsWindow brings the settings window to the front. The app lives in the menu bar with no
@@ -47,14 +47,14 @@ struct WindowReader: NSViewRepresentable {
     }
 }
 
-// SettingsView is the settings window: one tab each for general choices, the sources peepwho
+// SettingsView is the settings window: one tab each for general choices, the sources WhoToAsk
 // reads, the index, and privacy, above a strip showing the action running and its outcome.
 struct SettingsView: View {
     // model holds the settings and runs the actions.
     @ObservedObject var model: SettingsModel
     // confirmingClear shows the Clear Index confirmation.
     @State private var confirmingClear = false
-    // confirmingReset shows the Reset peepwho confirmation.
+    // confirmingReset shows the Reset WhoToAsk confirmation.
     @State private var confirmingReset = false
     // showingPeople shows the People sheet.
     @State private var showingPeople = false
@@ -77,14 +77,14 @@ struct SettingsView: View {
         .confirmationDialog("Clear the index?", isPresented: $confirmingClear) {
             Button("Clear Index", role: .destructive) { Task { await model.clearIndex() } }
         } message: {
-            Text("This deletes everything peepwho has indexed on this Mac. "
+            Text("This deletes everything WhoToAsk has indexed on this Mac. "
                 + "Your tokens and picked folders stay, so Index Now can build it again.")
         }
-        .confirmationDialog("Reset peepwho?", isPresented: $confirmingReset) {
+        .confirmationDialog("Reset WhoToAsk?", isPresented: $confirmingReset) {
             Button("Reset", role: .destructive) { Task { await model.reset() } }
         } message: {
             Text("This deletes the index, every token and site address, and every picked folder and file "
-                + "from this Mac. peepwho goes back to the way it was when first installed.")
+                + "from this Mac. WhoToAsk goes back to the way it was when first installed.")
         }
     }
 
@@ -124,7 +124,7 @@ struct SettingsView: View {
                 HStack {
                     Text(version).foregroundStyle(.secondary)
                     Spacer()
-                    Button("About peepwho") { showAbout() }
+                    Button("About WhoToAsk") { showAbout() }
                 }
             }
         }
@@ -255,7 +255,7 @@ struct SettingsView: View {
     }
 
     // peopleURL is the link the people count carries. It never leaves the window.
-    private static let peopleURL = URL(string: "peepwho-settings:people") ?? URL(fileURLWithPath: "/")
+    private static let peopleURL = URL(string: "whotoask-settings:people") ?? URL(fileURLWithPath: "/")
 
     // linked returns summary with the first count matching words made a link to the People sheet.
     private static func linked(_ summary: String, _ words: String?) -> AttributedString {
@@ -266,7 +266,7 @@ struct SettingsView: View {
         return text
     }
 
-    // privacy says how the index is kept and holds the actions that remove what peepwho keeps.
+    // privacy says how the index is kept and holds the actions that remove what WhoToAsk keeps.
     private var privacy: some View {
         Form {
             Section {
@@ -275,18 +275,18 @@ struct SettingsView: View {
             }
             Section {
                 HStack {
-                    Text("Clear Index deletes everything peepwho has indexed on this Mac. "
+                    Text("Clear Index deletes everything WhoToAsk has indexed on this Mac. "
                         + "Your tokens and picked folders stay, so Index Now can build it again.")
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer()
                     Button("Clear Index…", role: .destructive) { confirmingClear = true }
                 }
                 HStack {
-                    Text("Reset peepwho deletes the index, every token and site address, "
+                    Text("Reset WhoToAsk deletes the index, every token and site address, "
                         + "and every picked folder and file. Nothing is kept.")
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer()
-                    Button("Reset peepwho…", role: .destructive) { confirmingReset = true }
+                    Button("Reset WhoToAsk…", role: .destructive) { confirmingReset = true }
                 }
             }
             .disabled(model.busy != nil)
@@ -333,12 +333,12 @@ struct SettingsView: View {
     // showAbout opens the standard panel, which reads the version and copyright from the bundle.
     // The app has no menu bar of its own to hold it.
     private func showAbout() {
-        let credits = NSAttributedString(string: "peepwho.app", attributes: [
-            .link: URL(string: "https://peepwho.app") as Any,
+        let credits = NSAttributedString(string: "whotoask.app", attributes: [
+            .link: URL(string: "https://whotoask.app") as Any,
             .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
         ])
         NSApp.activate(ignoringOtherApps: true)
-        NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "peepwho", .credits: credits])
+        NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "WhoToAsk", .credits: credits])
     }
 
 }

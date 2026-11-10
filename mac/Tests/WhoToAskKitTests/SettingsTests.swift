@@ -1,11 +1,11 @@
 import Combine
 import Darwin
 import Foundation
-import PeepwhoCore
+import WhoToAskCore
 import Security
 import Testing
 
-@testable import PeepwhoKit
+@testable import WhoToAskKit
 
 // MemorySecrets keeps secrets in a dictionary.
 final class MemorySecrets: SecretStore {
@@ -117,7 +117,7 @@ func tempDir(_ prefix: String) -> URL {
 
 // gitRepo makes a repository with one commit by one author and returns its folder.
 func gitRepo() throws -> URL {
-    let dir = tempDir("peepwho-repo")
+    let dir = tempDir("whotoask-repo")
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     try "package main\n".write(to: dir.appendingPathComponent("main.go"), atomically: true, encoding: .utf8)
     for args in [["init", "-q"], ["add", "main.go"], ["commit", "-q", "-m", "Add main"]] {
@@ -275,12 +275,12 @@ struct SettingsTests {
     // headline's count matches it.
     @Test func loadPeople() async throws {
         let repo = try gitRepo()
-        let dir = tempDir("peepwho-data")
+        let dir = tempDir("whotoask-data")
         defer {
             try? FileManager.default.removeItem(at: repo)
             try? FileManager.default.removeItem(at: dir)
         }
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
                                   secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
         await model.loadStatus()
@@ -295,8 +295,8 @@ struct SettingsTests {
 
     // Test 20: The caption under the buttons names the refresh interval as it is set.
     @Test func refreshNote() throws {
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
-        let model = SettingsModel(dir: tempDir("peepwho-data"), open: { throw CocoaError(.fileNoSuchFile) },
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let model = SettingsModel(dir: tempDir("whotoask-data"), open: { throw CocoaError(.fileNoSuchFile) },
                                   secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
         #expect(model.refreshNote == "Index Now reads every source from the start. Refresh Now picks up what "
             + "changed since, and runs on its own every 6 hours.")
@@ -310,12 +310,12 @@ struct SettingsTests {
     // failed refresh beside it.
     @Test func sourceAgesThroughCore() async throws {
         let repo = try gitRepo()
-        let dir = tempDir("peepwho-data")
+        let dir = tempDir("whotoask-data")
         defer {
             try? FileManager.default.removeItem(at: repo)
             try? FileManager.default.removeItem(at: dir)
         }
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
                                   secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
         await model.pick(repo, as: .git)
@@ -332,9 +332,9 @@ struct SettingsTests {
     // Test 9: A status the core refuses says why, rather than leaving the window claiming the index
     // is closed.
     @Test func statusFailureShows() async throws {
-        let dir = tempDir("peepwho-data")
+        let dir = tempDir("whotoask-data")
         defer { try? FileManager.default.removeItem(at: dir) }
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
                                   secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -346,9 +346,9 @@ struct SettingsTests {
 
     // Test 2: A saved token is stored, an empty one deletes it, and scopes persist.
     @Test func secretsAndScopes() throws {
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         let secrets = MemorySecrets()
-        let model = SettingsModel(dir: tempDir("peepwho-data"), open: { try Core.open(dir: tempDir("x"), key: "", secrets: KeychainSecrets()) },
+        let model = SettingsModel(dir: tempDir("whotoask-data"), open: { try Core.open(dir: tempDir("x"), key: "", secrets: KeychainSecrets()) },
                                   secrets: secrets, places: MemoryPlaces(), defaults: defaults)
         model.saveSecret(SecretName.slackToken, "  xoxb-1  ")
         #expect(secrets.values[SecretName.slackToken] == "xoxb-1")
@@ -363,9 +363,9 @@ struct SettingsTests {
     // does not decode reads as empty scopes.
     @Test func scopesStayOutOfPreferences() throws {
         let planted = "PLANTED-\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         let secrets = MemorySecrets()
-        let model = SettingsModel(dir: tempDir("peepwho-data"), open: { try Core.open(dir: tempDir("x"), key: "", secrets: KeychainSecrets()) },
+        let model = SettingsModel(dir: tempDir("whotoask-data"), open: { try Core.open(dir: tempDir("x"), key: "", secrets: KeychainSecrets()) },
                                   secrets: secrets, places: MemoryPlaces(), defaults: defaults)
         model.scopes.jiraProjects = planted
         model.scopes.jiraServer = true
@@ -381,9 +381,9 @@ struct SettingsTests {
 
     // Test 11: A failed scope save says so instead of dropping it in silence.
     @Test func scopeSaveFailureShows() throws {
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         let secrets = RefusingSecrets()
-        let model = SettingsModel(dir: tempDir("peepwho-data"), open: { try Core.open(dir: tempDir("x"), key: "", secrets: KeychainSecrets()) },
+        let model = SettingsModel(dir: tempDir("whotoask-data"), open: { try Core.open(dir: tempDir("x"), key: "", secrets: KeychainSecrets()) },
                                   secrets: secrets, places: MemoryPlaces(), defaults: defaults)
         model.scopes.jiraProjects = "KAFKA"
         #expect(model.lines.first?.hasPrefix("Could not save to the Keychain") == true)
@@ -392,7 +392,7 @@ struct SettingsTests {
     // Test 12: A bookmark lives in the secret store and never in preferences, resolves back to
     // its place, and forgetting it leaves nothing.
     @Test func bookmarksStayOutOfPreferences() throws {
-        let place = tempDir("peepwho-place-\(UUID().uuidString)")
+        let place = tempDir("whotoask-place-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: place, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: place) }
         let secrets = MemorySecrets()
@@ -412,13 +412,13 @@ struct SettingsTests {
     // and hands the search a fresh, empty core.
     @Test func indexRefreshWipe() async throws {
         let repo = try gitRepo()
-        let dir = tempDir("peepwho-data")
+        let dir = tempDir("whotoask-data")
         defer {
             try? FileManager.default.removeItem(at: repo)
             try? FileManager.default.removeItem(at: dir)
         }
         let places = MemoryPlaces()
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         let clock = Date(timeIntervalSince1970: 1_800_000_000)
         let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
                                   secrets: MemorySecrets(), places: places, defaults: defaults, clock: { clock })
@@ -454,8 +454,8 @@ struct SettingsTests {
 
     // Test 4: Indexing with nothing set up says what to do.
     @Test func nothingToIndex() async throws {
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
-        let dir = tempDir("peepwho-data")
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let dir = tempDir("whotoask-data")
         let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
                                   secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
         await model.indexAll()
@@ -468,12 +468,12 @@ struct SettingsTests {
     // index cannot write its files back after the wipe.
     @Test func actionsNeverOverlap() async throws {
         let repo = try gitRepo()
-        let dir = tempDir("peepwho-data")
+        let dir = tempDir("whotoask-data")
         defer {
             try? FileManager.default.removeItem(at: repo)
             try? FileManager.default.removeItem(at: dir)
         }
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         let places = MemoryPlaces()
         let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
                                   secrets: MemorySecrets(), places: places, defaults: defaults)
@@ -496,12 +496,12 @@ struct SettingsTests {
     // Test 7: Progress lines show during a run with no path into the data directory.
     @Test func progressShowsNoDataPath() async throws {
         let repo = try gitRepo()
-        let dir = tempDir("peepwho-data")
+        let dir = tempDir("whotoask-data")
         defer {
             try? FileManager.default.removeItem(at: repo)
             try? FileManager.default.removeItem(at: dir)
         }
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
                                   secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
         var seen: [String] = []
@@ -519,14 +519,14 @@ struct SettingsTests {
     // Test 18: A pick whose first index fails is forgotten, so no row claims a place that never
     // indexed.
     @Test func failedPickIsForgotten() async throws {
-        let place = tempDir("peepwho-place")
-        let dir = tempDir("peepwho-data")
+        let place = tempDir("whotoask-place")
+        let dir = tempDir("whotoask-data")
         try FileManager.default.createDirectory(at: place, withIntermediateDirectories: true)
         defer {
             try? FileManager.default.removeItem(at: place)
             try? FileManager.default.removeItem(at: dir)
         }
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         let places = MemoryPlaces()
         let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
                                   secrets: MemorySecrets(), places: places, defaults: defaults)
@@ -541,8 +541,8 @@ struct SettingsTests {
     // every place is released.
     @Test func cancelStopsTheJobLoop() async throws {
         let repo = try gitRepo()
-        let dir = tempDir("peepwho-data")
-        let csv = tempDir("peepwho-roster").appendingPathExtension("csv")
+        let dir = tempDir("whotoask-data")
+        let csv = tempDir("whotoask-roster").appendingPathExtension("csv")
         defer {
             try? FileManager.default.removeItem(at: repo)
             try? FileManager.default.removeItem(at: dir)
@@ -552,7 +552,7 @@ struct SettingsTests {
             .write(to: csv, atomically: true, encoding: .utf8)
         let places = MemoryPlaces()
         places.urls = [.git: repo, .csv: csv]
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
                                   secrets: MemorySecrets(), places: places, defaults: defaults)
         async let all: Void = model.indexAll()
@@ -575,11 +575,11 @@ struct SettingsTests {
     @Test func cancelReachesAStuckServer() async throws {
         let server = try SilentServer()
         defer { server.close() }
-        let dir = tempDir("peepwho-data")
+        let dir = tempDir("whotoask-data")
         defer { try? FileManager.default.removeItem(at: dir) }
         let secrets = MemorySecrets()
         secrets.values = [SecretName.jiraURL: server.url, SecretName.jiraToken: "token"]
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: CoreMemorySecrets(secrets)) },
                                   secrets: secrets, places: MemoryPlaces(), defaults: defaults)
         var scopes = model.scopes
@@ -602,12 +602,12 @@ struct SettingsTests {
     // Test 10: Cancel does nothing with no run going, and nothing it did reaches the next run.
     @Test func cancelWithNoRun() async throws {
         let repo = try gitRepo()
-        let dir = tempDir("peepwho-data")
+        let dir = tempDir("whotoask-data")
         defer {
             try? FileManager.default.removeItem(at: repo)
             try? FileManager.default.removeItem(at: dir)
         }
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
                                   secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
         model.cancel()
@@ -620,13 +620,13 @@ struct SettingsTests {
     // away shows in the menu after an automatic refresh, until picking another clears it.
     @Test func replacedPlaceStopsRefreshing() async throws {
         let (first, second) = (try gitRepo(), try gitRepo())
-        let dir = tempDir("peepwho-data")
+        let dir = tempDir("whotoask-data")
         defer {
             try? FileManager.default.removeItem(at: first)
             try? FileManager.default.removeItem(at: second)
             try? FileManager.default.removeItem(at: dir)
         }
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         defaults.set(60.0, forKey: SettingsModel.intervalKey)
         let places = MemoryPlaces()
         let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
@@ -655,12 +655,12 @@ struct SettingsTests {
     // and refresh then says there is nothing to do.
     @Test func forgetStopsRefreshing() async throws {
         let repo = try gitRepo()
-        let dir = tempDir("peepwho-data")
+        let dir = tempDir("whotoask-data")
         defer {
             try? FileManager.default.removeItem(at: repo)
             try? FileManager.default.removeItem(at: dir)
         }
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         let places = MemoryPlaces()
         let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
                                   secrets: MemorySecrets(), places: places, defaults: defaults)
@@ -687,17 +687,17 @@ struct SettingsTests {
     // the slot no longer holds access to it.
     @Test func failedPickDropsOldScope() async throws {
         let first = try gitRepo()
-        let dir = tempDir("peepwho-data")
+        let dir = tempDir("whotoask-data")
         defer {
             try? FileManager.default.removeItem(at: first)
             try? FileManager.default.removeItem(at: dir)
         }
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
                                   secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
         await model.pick(first, as: .git)
         #expect(model.status?.scopes.count == 1)
-        await model.pick(tempDir("peepwho-missing"), as: .git)
+        await model.pick(tempDir("whotoask-missing"), as: .git)
         #expect(!model.lines.contains { $0.hasPrefix("Git: read") })
         #expect(!model.lines.contains { $0.hasPrefix("Indexed at") })
         #expect(model.status?.scopes.isEmpty == true)
@@ -707,13 +707,13 @@ struct SettingsTests {
     // being read on refresh.
     @Test func indexReplacesOldScope() async throws {
         let (first, second) = (try gitRepo(), try gitRepo())
-        let dir = tempDir("peepwho-data")
+        let dir = tempDir("whotoask-data")
         defer {
             try? FileManager.default.removeItem(at: first)
             try? FileManager.default.removeItem(at: second)
             try? FileManager.default.removeItem(at: dir)
         }
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         let places = MemoryPlaces()
         let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
                                   secrets: MemorySecrets(), places: places, defaults: defaults)
@@ -748,10 +748,10 @@ struct SettingsTests {
 
     // Test 13: A place stays when the index is not open to forget it in.
     @Test func forgetWithNoCoreKeepsPlace() async throws {
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         let places = MemoryPlaces()
         places.urls = [.git: URL(fileURLWithPath: "/tmp/repo")]
-        let model = SettingsModel(dir: tempDir("peepwho-data"), open: { throw KeychainError(status: errSecInteractionNotAllowed) },
+        let model = SettingsModel(dir: tempDir("whotoask-data"), open: { throw KeychainError(status: errSecInteractionNotAllowed) },
                                   secrets: MemorySecrets(), places: places, defaults: defaults)
         await model.forgetPlace(.git)
         #expect(model.lines == ["The index is not open."])
@@ -761,12 +761,12 @@ struct SettingsTests {
     // Test 13b: Forgetting a token stops its source's refresh, and leaves other sources alone.
     @Test func forgetSecretStopsRefresh() async throws {
         let repo = try gitRepo()
-        let dir = tempDir("peepwho-data")
+        let dir = tempDir("whotoask-data")
         defer {
             try? FileManager.default.removeItem(at: repo)
             try? FileManager.default.removeItem(at: dir)
         }
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         let secrets = MemorySecrets()
         let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
                                   secrets: secrets, places: MemoryPlaces(), defaults: defaults)
@@ -787,12 +787,12 @@ struct SettingsTests {
     // Test 14: A refresh that ran no scope says so instead of showing nothing.
     @Test func refreshOfNothingSaysSo() async throws {
         let repo = try gitRepo()
-        let dir = tempDir("peepwho-data")
+        let dir = tempDir("whotoask-data")
         defer {
             try? FileManager.default.removeItem(at: repo)
             try? FileManager.default.removeItem(at: dir)
         }
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
         let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
                                   secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
         await model.pick(repo, as: .git)
@@ -804,8 +804,8 @@ struct SettingsTests {
     // Test 5: An open that failed, such as under a locked Keychain, opens on the next try, hands
     // the search the core, and clears the failure.
     @Test func reopenAfterFailure() throws {
-        let defaults = try #require(UserDefaults(suiteName: "peepwho-test-\(UUID().uuidString)"))
-        let dir = tempDir("peepwho-data")
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let dir = tempDir("whotoask-data")
         var locked = true
         let model = SettingsModel(dir: dir, open: {
             if locked { throw KeychainError(status: errSecInteractionNotAllowed) }

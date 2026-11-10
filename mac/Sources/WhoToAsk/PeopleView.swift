@@ -1,5 +1,5 @@
 import AppKit
-import PeepwhoKit
+import WhoToAskKit
 import SwiftUI
 
 // PeopleView is the People sheet: everyone the index holds, sorted by name, with a filter and a

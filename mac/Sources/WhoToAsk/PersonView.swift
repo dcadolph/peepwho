@@ -1,4 +1,4 @@
-import PeepwhoKit
+import WhoToAskKit
 import SwiftUI
 
 // PersonView shows everything the index knows about one person, with a way back to the results.

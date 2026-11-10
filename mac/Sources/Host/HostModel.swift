@@ -1,8 +1,8 @@
 import AppKit
 import Foundation
 import os
-import PeepwhoCore
-import PeepwhoKit
+import WhoToAskCore
+import WhoToAskKit
 import Security
 
 // HostModel runs the core calls the host proves and keeps the log the window shows. Core calls
@@ -11,11 +11,11 @@ final class HostModel: ObservableObject {
     // lines is the log pane, oldest first.
     @Published var lines: [String] = []
     // queue runs every core call in order off the main thread.
-    private let queue = DispatchQueue(label: "com.dcadolph.peepwho.host.core")
+    private let queue = DispatchQueue(label: "com.dcadolph.whotoask.host.core")
     // handle is the open data directory, nil until opened or after a wipe.
     private var handle: CoreHandle?
     // logger writes each line to the unified log, where the checks read it.
-    private let logger = Logger(subsystem: "com.dcadolph.peepwho.host", category: "host")
+    private let logger = Logger(subsystem: "com.dcadolph.whotoask.host", category: "host")
 
     // dataDir is the data directory inside the app's sandbox container.
     let dataDir = DataDir.url
