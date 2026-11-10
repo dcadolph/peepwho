@@ -303,19 +303,33 @@ struct LinkTests {
 
 // ConcurrencyTests check that a question never waits behind an index run.
 struct ConcurrencyTests {
-    // Test 0: An ask started after a long index run starts finishes before it.
+    // Test 0: An ask started while an index run is held at its first progress line finishes
+    // before the run does. Holding the run, rather than sleeping and hoping it is still going,
+    // keeps a fast disk from finishing the index first.
     @Test func askDuringIndex() async throws {
         let dir = try demoDir()
         defer { try? FileManager.default.removeItem(at: dir) }
         let core = try Core.open(dir: dir, key: "", secrets: KeychainSecrets())
         let order = Order()
+        let started = DispatchSemaphore(value: 0)
+        let release = DispatchSemaphore(value: 0)
+        let first = Once()
+        core.observeProgress { _ in
+            guard first.take() else { return }
+            started.signal()
+            _ = release.wait(timeout: .now() + 10)
+        }
         let index = Task {
             _ = try await core.index("git", flags: ["--repo-path", repoRoot.path, "--git-since-days", "10000"])
             await order.add("index")
         }
-        try await Task.sleep(for: .milliseconds(100))
+        let running = await withCheckedContinuation { cont in
+            DispatchQueue.global().async { cont.resume(returning: started.wait(timeout: .now() + 10)) }
+        }
+        try #require(running == .success, "the index run never logged a line")
         let answer = try await core.ask("terraform")
         await order.add("ask")
+        release.signal()
         try await index.value
         #expect(answer.people?.first?.name == "Carol Lee")
         #expect(await order.names == ["ask", "index"])
@@ -329,4 +343,21 @@ actor Order {
 
     // add records name as finished.
     func add(_ name: String) { names.append(name) }
+}
+
+// Once is true the first time take is called and false after, from any thread.
+final class Once: @unchecked Sendable {
+    // lock guards taken.
+    private let lock = NSLock()
+    // taken is true once take has returned true.
+    private var taken = false
+
+    // take reports whether this is the first call.
+    func take() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        if taken { return false }
+        taken = true
+        return true
+    }
 }
