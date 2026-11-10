@@ -52,10 +52,10 @@ struct WindowReader: NSViewRepresentable {
 struct SettingsView: View {
     // model holds the settings and runs the actions.
     @ObservedObject var model: SettingsModel
-    // confirmingWipe shows the wipe confirmation.
-    @State private var confirmingWipe = false
-    // confirmingForget shows the forget everything confirmation.
-    @State private var confirmingForget = false
+    // confirmingClear shows the Clear Index confirmation.
+    @State private var confirmingClear = false
+    // confirmingReset shows the Reset peepwho confirmation.
+    @State private var confirmingReset = false
     // showingPeople shows the People sheet.
     @State private var showingPeople = false
 
@@ -74,16 +74,17 @@ struct SettingsView: View {
         .background(WindowReader())
         .task { await model.loadStatus() }
         .sheet(isPresented: $showingPeople) { PeopleView(model: model) }
-        .confirmationDialog("Wipe the index?", isPresented: $confirmingWipe) {
-            Button("Wipe", role: .destructive) { Task { await model.wipe() } }
+        .confirmationDialog("Clear the index?", isPresented: $confirmingClear) {
+            Button("Clear Index", role: .destructive) { Task { await model.clearIndex() } }
         } message: {
-            Text("This deletes everything peepwho has indexed on this Mac. Tokens and picked folders stay.")
+            Text("This deletes everything peepwho has indexed on this Mac. "
+                + "Your tokens and picked folders stay, so Index Now can build it again.")
         }
-        .confirmationDialog("Forget every token and folder?", isPresented: $confirmingForget) {
-            Button("Forget Everything", role: .destructive) { Task { await model.forgetEverything() } }
+        .confirmationDialog("Reset peepwho?", isPresented: $confirmingReset) {
+            Button("Reset", role: .destructive) { Task { await model.reset() } }
         } message: {
-            Text("This deletes every token, site address, and picked folder and file from the Keychain. "
-                + "The index keeps what it holds until a wipe.")
+            Text("This deletes the index, every token and site address, and every picked folder and file "
+                + "from this Mac. peepwho goes back to the way it was when first installed.")
         }
     }
 
@@ -274,17 +275,18 @@ struct SettingsView: View {
             }
             Section {
                 HStack {
-                    Text("Wipe deletes everything peepwho has indexed on this Mac. Tokens and picked folders stay.")
+                    Text("Clear Index deletes everything peepwho has indexed on this Mac. "
+                        + "Your tokens and picked folders stay, so Index Now can build it again.")
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer()
-                    Button("Wipe…", role: .destructive) { confirmingWipe = true }
+                    Button("Clear Index…", role: .destructive) { confirmingClear = true }
                 }
                 HStack {
-                    Text("Forget deletes every token, site address, and picked folder and file. "
-                        + "The index keeps what it holds until a wipe.")
+                    Text("Reset peepwho deletes the index, every token and site address, "
+                        + "and every picked folder and file. Nothing is kept.")
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer()
-                    Button("Forget Everything…", role: .destructive) { confirmingForget = true }
+                    Button("Reset peepwho…", role: .destructive) { confirmingReset = true }
                 }
             }
             .disabled(model.busy != nil)

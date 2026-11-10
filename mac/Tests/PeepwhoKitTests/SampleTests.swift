@@ -43,7 +43,7 @@ struct SampleTests {
         #expect(settings.summary.hasSuffix("or load the sample company to look around."))
 
         await settings.loadSample()
-        #expect(settings.lines == ["Loaded the sample company: 223 people from 8 sources. Wipe removes it."])
+        #expect(settings.lines == ["Loaded the sample company: 223 people from 8 sources. Clear Index removes it."])
         let status = try #require(settings.status)
         #expect(status.sample)
         #expect(status.people == 223)
@@ -77,7 +77,7 @@ struct SampleTests {
         await settings.refresh()
         #expect(settings.lines.first?.contains("holds sample data") == true)
 
-        await settings.wipe()
+        await settings.clearIndex()
         #expect(!FileManager.default.fileExists(atPath: dir.path))
         #expect(settings.status?.sample == false)
         #expect(settings.canLoadSample)

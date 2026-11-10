@@ -6,7 +6,7 @@ import Testing
 @testable import PeepwhoKit
 
 // SettingsLayoutTests check the tabs and source cards the settings window is built from, and the
-// Privacy tab's line and Forget Everything action through the real core.
+// Privacy tab's line and Reset action through the real core.
 @MainActor
 struct SettingsLayoutTests {
     // Test 0: The window shows General, Sources, Index, and Privacy in that order, each with a
@@ -72,9 +72,8 @@ struct SettingsLayoutTests {
         #expect(open.privacy.hasPrefix(sealed ? "The index is encrypted on disk." : "The index is not encrypted on disk."))
     }
 
-    // Test 4: Forget Everything deletes every token, scope, and place, stops refreshing them, keeps
-    // the index, and refuses while a run is going.
-    @Test func forgetEverything() async throws {
+    // Test 4: Reset deletes every token, scope, place, and the index, and refuses while a run is going.
+    @Test func reset() async throws {
         let repo = try gitRepo()
         let dir = tempDir("peepwho-data")
         defer {
@@ -92,7 +91,7 @@ struct SettingsLayoutTests {
         // Tokens are saved only after the run, so no run ever reaches a real service with them.
         async let running: Void = model.indexAll()
         while model.busy == nil { await Task.yield() }
-        await model.forgetEverything()
+        await model.reset()
         #expect(model.lines.first?.hasSuffix("is still running. Try again when it finishes.") == true)
         #expect(places.has(.git))
         await running
@@ -102,8 +101,8 @@ struct SettingsLayoutTests {
         }
         model.scopes.jiraProjects = "KAFKA"
         #expect(model.saved == Set(SourceCard.entered))
-        await model.forgetEverything()
-        #expect(model.lines == ["Forgot every token, folder, and file. The index keeps what it holds until a wipe."])
+        await model.reset()
+        #expect(model.lines == ["Reset. Nothing is kept."])
         #expect(model.saved.isEmpty)
         #expect(model.placeNames.isEmpty)
         #expect(BookmarkSlot.allCases.allSatisfy { !places.has($0) })
@@ -111,9 +110,11 @@ struct SettingsLayoutTests {
         #expect(model.scopes == Scopes())
         #expect(Scopes.load(secrets) == Scopes())
         #expect(model.status?.scopes.isEmpty == true)
-        #expect((model.status?.people ?? 0) > 0)
+        #expect(model.status?.builtAt == nil)
+        #expect(model.status?.people == 0)
+        #expect(!FileManager.default.fileExists(atPath: dir.path))
         #expect(places.open == 0)
         await model.refresh()
-        #expect(model.lines == ["Nothing to refresh: index a source at least once first."])
+        #expect(model.lines == ["Nothing to refresh yet. Index something first."])
     }
 }

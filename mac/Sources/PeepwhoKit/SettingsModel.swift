@@ -192,7 +192,7 @@ public struct LastRun: Equatable, Sendable {
 }
 
 // SettingsModel drives the settings window: tokens, picked places, what the index holds, and
-// the Index, Refresh, and Wipe actions. It owns the open core and hands it to the search.
+// the Index, Refresh, Clear Index, and Reset actions. It owns the open core and hands it to the search.
 @MainActor
 public final class SettingsModel: ObservableObject {
     // status is what the index held when last read, nil before the first read.
@@ -228,14 +228,14 @@ public final class SettingsModel: ObservableObject {
     // lastAttempt is when refreshIfStale last started a refresh, so a refresh that keeps failing
     // waits a full interval before it runs again.
     private var lastAttempt: Date?
-    // onCore hears every core the model opens, so the search follows a wipe.
+    // onCore hears every core the model opens, so the search follows a clear.
     public var onCore: ((Core?) -> Void)?
     // onSample hears whether the index holds the sample company after each status read.
     public var onSample: ((Bool) -> Void)?
     // onRefreshFailure hears refreshFailure after each status read.
     public var onRefreshFailure: ((String?) -> Void)?
 
-    // dir is the data directory Wipe removes.
+    // dir is the data directory Clear Index removes.
     private let dir: URL
     // open opens dir under its key.
     private let open: () throws -> Core
@@ -363,7 +363,7 @@ public final class SettingsModel: ObservableObject {
 
     // forgetPlace drops slot's place and stops refreshing it, since it could only fail from then
     // on. The place stays if that fails, so the person can try again. What it already put in the
-    // index stays until a wipe.
+    // index stays until Clear Index.
     public func forgetPlace(_ slot: BookmarkSlot) async {
         await run("Forgetting", cancelable: false) { core in
             try await core.forgetScopes(slot.source)
@@ -373,26 +373,40 @@ public final class SettingsModel: ObservableObject {
         }
     }
 
-    // forgetEverything deletes every token, site address, and scope and drops every picked place,
-    // and stops refreshing every source, since each could only fail from then on. What the index
-    // already holds stays until a wipe. Nothing is forgotten when the index is not open, so the
-    // refresh record never names a source the person thinks is gone.
-    public func forgetEverything() async {
-        await run("Forgetting", cancelable: false) { core in
+    // reset forgets every token, site address, scope, and picked place while the core is open,
+    // then deletes the data directory and opens a fresh, empty one, so peepwho is back to the way
+    // it was when first installed. Nothing is touched when the index is not open or a run is going.
+    public func reset() async {
+        guard refuseWhileBusy() else { return }
+        guard let core else {
+            lines = ["The index is not open."]
+            return
+        }
+        busy = "Resetting"
+        do {
             for card in SourceCard.all where !card.source.isEmpty {
                 try await core.forgetScopes(card.source)
             }
             for slot in BookmarkSlot.allCases {
                 try await core.forgetScopes(slot.source)
-                self.places.forget(slot)
+                places.forget(slot)
             }
             for name in SourceCard.entered {
-                self.secrets.delete(name)
+                secrets.delete(name)
             }
-            self.scopes = Scopes()
-            self.readSaved()
-            return ["Forgot every token, folder, and file. The index keeps what it holds until a wipe."]
+            scopes = Scopes()
+            readSaved()
+        } catch {
+            lines = [SearchModel.describe(error)]
+            busy = nil
+            return
         }
+        if wipeIndex() != nil {
+            lines = ["Reset. Nothing is kept."]
+        }
+        reopen()
+        busy = nil
+        await loadStatus()
     }
 
     // indexAll indexes every picked place and every token source with a scope.
@@ -466,7 +480,7 @@ public final class SettingsModel: ObservableObject {
         guard let sampleDir else { return }
         await run("Loading the sample company", cancelable: false) { core in
             let got = try await core.importSample(from: sampleDir)
-            return ["Loaded the sample company: \(got.people) people from \(got.sources) sources. Wipe removes it."]
+            return ["Loaded the sample company: \(got.people) people from \(got.sources) sources. Clear Index removes it."]
         }
     }
 
@@ -520,22 +534,30 @@ public final class SettingsModel: ObservableObject {
         return true
     }
 
-    // wipe deletes the data directory and opens a fresh, empty one in its place. Tokens and
-    // picked places stay until forgotten one by one.
-    public func wipe() async {
+    // clearIndex deletes the data directory and opens a fresh, empty one in its place. Tokens and
+    // picked places stay until reset.
+    public func clearIndex() async {
         guard refuseWhileBusy() else { return }
-        busy = "Wiping"
-        core = nil
-        onCore?(nil)
-        do {
-            let removed = try Core.wipe(dir: dir).removed ?? []
-            lines = ["Deleted \(removed.count) files. The index is empty."]
-        } catch {
-            lines = ["Wipe failed: \(SearchModel.describe(error))"]
+        busy = "Clearing"
+        if let removed = wipeIndex() {
+            lines = ["Deleted \(removed) files. The index is empty."]
         }
         reopen()
         busy = nil
         await loadStatus()
+    }
+
+    // wipeIndex closes the core, deletes the data directory, and returns how many files it
+    // removed. It sets lines to the failure and returns nil when the delete fails.
+    private func wipeIndex() -> Int? {
+        core = nil
+        onCore?(nil)
+        do {
+            return try Core.wipe(dir: dir).removed?.count ?? 0
+        } catch {
+            lines = ["Clear Index failed: \(SearchModel.describe(error))"]
+            return nil
+        }
     }
 
     // loadStatus reads what the index holds at now.

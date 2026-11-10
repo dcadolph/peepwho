@@ -134,7 +134,7 @@ func gitRepo() throws -> URL {
     return dir
 }
 
-// SettingsTests check the flags each source runs with and the Index, Refresh, and Wipe actions
+// SettingsTests check the flags each source runs with and the Index, Refresh, Clear Index, and Reset actions
 // through the real core.
 @MainActor
 struct SettingsTests {
@@ -443,7 +443,7 @@ struct SettingsTests {
         #expect(places.open == 0)
         #expect(places.resolves > 3)
 
-        await model.wipe()
+        await model.clearIndex()
         #expect(model.lines.first?.hasPrefix("Deleted ") == true)
         #expect(!FileManager.default.fileExists(atPath: dir.path))
         #expect(model.status?.people == 0)
@@ -482,7 +482,7 @@ struct SettingsTests {
         let picked = Task { await model.pick(repo, as: .git) }
         await Task.yield()
         #expect(model.busy != nil)
-        await model.wipe()
+        await model.clearIndex()
         #expect(model.lines.first?.hasSuffix("is still running. Try again when it finishes.") == true)
         await model.indexAll()
         #expect(model.lines.first?.hasSuffix("is still running. Try again when it finishes.") == true)
