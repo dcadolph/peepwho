@@ -33,6 +33,6 @@ jobs:
           go-version-file: go.mod
       - uses: golangci/golangci-lint-action@v8
         with:
-          version: v2.12.2
+          version: v2.14.0
       - name: Core dependencies
         run: make core-deps
