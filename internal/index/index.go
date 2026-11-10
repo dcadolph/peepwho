@@ -97,8 +97,20 @@ type channelText struct {
 type Index struct {
 	// Graph is the entity graph this index was built from.
 	Graph *model.Graph
-	// postings maps a token to per-person accumulated weight.
+	// postings maps a token to per-person accumulated weight. It holds every
+	// person record, CODEOWNERS teams included, and is what the index saves.
 	postings map[string]map[model.ID]float64
+	// peoplePostings is postings without the teams, the only view the people
+	// ranking reads, so a team never moves a person's score.
+	peoplePostings map[string]map[model.ID]float64
+	// teamPostings holds the teams alone, their subjects plus the words of
+	// their handles, for the separate teams answer.
+	teamPostings map[string]map[model.ID]float64
+	// peopleN is how many entries of the graph are people, not teams, the
+	// universe the people ranking weighs rarity against.
+	peopleN int
+	// teamN is how many entries of the graph are teams.
+	teamN int
 	// texts holds normalized per-person field text for reason lookup.
 	texts map[model.ID]*personText
 	// channelPostings maps a token to per-channel accumulated weight.
@@ -143,14 +155,16 @@ type Index struct {
 	sourceCounts map[string]int
 	// builtAt is when a loaded index was last written, empty for a fresh one.
 	builtAt time.Time
-	// personLens and channelLens cache BM25 document lengths, refreshed when
-	// postings change so a query never rescans every posting.
+	// personLens, teamLens, and channelLens cache BM25 document lengths,
+	// refreshed when postings change so a query never rescans every posting.
 	personLens  entityLens
+	teamLens    entityLens
 	channelLens entityLens
-	// personVocab and channelVocab bucket posting keys by length so a fuzzy term
-	// scans only candidates within its edit-distance band, not the whole
-	// vocabulary.
+	// personVocab, teamVocab, and channelVocab bucket posting keys by length so
+	// a fuzzy term scans only candidates within its edit-distance band, not the
+	// whole vocabulary.
 	personVocab  vocabIndex
+	teamVocab    vocabIndex
 	channelVocab vocabIndex
 }
 
@@ -180,9 +194,20 @@ func New(opts ...Option) *Index {
 // serving reads never rescan the full posting set. It must not run concurrently
 // with a search, matching the index's build-then-serve lifecycle.
 func (ix *Index) refreshStats() {
-	ix.personLens = lengthsOf(ix.postings)
+	ix.peoplePostings, ix.teamPostings = ix.splitTeams()
+	ix.peopleN, ix.teamN = 0, 0
+	for id := range ix.Graph.People {
+		if id.IsTeam() {
+			ix.teamN++
+		} else {
+			ix.peopleN++
+		}
+	}
+	ix.personLens = lengthsOf(ix.peoplePostings)
+	ix.teamLens = lengthsOf(ix.teamPostings)
 	ix.channelLens = lengthsOf(ix.channelPostings)
-	ix.personVocab = newVocabIndex(ix.postings)
+	ix.personVocab = newVocabIndex(ix.peoplePostings)
+	ix.teamVocab = newVocabIndex(ix.teamPostings)
 	ix.channelVocab = newVocabIndex(ix.channelPostings)
 }
 

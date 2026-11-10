@@ -67,6 +67,10 @@ func nameMatch(ix *index.Index, query string, limit int) []model.Match {
 	}
 	var hits []scored
 	for _, p := range ix.Graph.People {
+		// A team handle is not a colleague's name, and teams answer apart.
+		if p.ID.IsTeam() {
+			continue
+		}
 		name := strings.ToLower(p.Name)
 		email := strings.ToLower(p.Email)
 		local, _, _ := strings.Cut(email, "@")

@@ -1,0 +1,33 @@
+{
+  "people": [
+    {
+      "email": "carla@example.com",
+      "id": "carla@example.com",
+      "name": "Carla Counsel",
+      "reasons": [
+        "contracts (topic)"
+      ],
+      "score": 2.0428571428571427,
+      "strength": 1,
+      "topics": [
+        "contracts"
+      ]
+    }
+  ],
+  "query": "contracts",
+  "teams": [
+    {
+      "id": "codeowners:acme/legal-squad",
+      "name": "@acme/legal-squad",
+      "reasons": [
+        "contracts (topic)",
+        "legal (name) for \"contracts\""
+      ],
+      "score": 3.6771428571428575,
+      "strength": 1,
+      "topics": [
+        "contracts"
+      ]
+    }
+  ]
+}

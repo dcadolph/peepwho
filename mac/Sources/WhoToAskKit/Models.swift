@@ -111,14 +111,35 @@ public struct AskChannel: Codable, Hashable, Sendable {
     public let strength: Double
 }
 
+// AskTeam is one team of record an Ask answer names: a CODEOWNERS handle that owns what was
+// asked. It is somewhere to look, not somebody to message, so it has no profile and no link.
+public struct AskTeam: Codable, Hashable, Sendable, Identifiable {
+    // id is the team's identifier, such as codeowners:simcorp/legal-squad.
+    public let id: String
+    // name is the handle as CODEOWNERS writes it.
+    public let name: String
+    // team is the org chart team the handle names, when exactly one matches.
+    public let team: String?
+    // topics are the areas the team owns.
+    public let topics: [String]?
+    // reasons say why the team matched.
+    public let reasons: [String]?
+    // score is the ranking score among the teams.
+    public let score: Double
+    // strength is how strongly the team matches, zero to one.
+    public let strength: Double?
+}
+
 // AskAnswer is who to talk to and where to ask about a question.
 public struct AskAnswer: Codable, Sendable {
     // query is the question as asked.
     public let query: String
-    // people are the people to talk to, best first.
+    // people are the people to talk to, best first. They never include a team.
     public let people: [AskPerson]?
     // channels are the channels to ask in, best first.
     public let channels: [AskChannel]?
+    // teams are the owners of record, ranked apart from the people.
+    public let teams: [AskTeam]?
 }
 
 // SearchResult is one person a name or keyword search matched.

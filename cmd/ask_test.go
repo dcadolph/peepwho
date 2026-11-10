@@ -2,6 +2,10 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -79,5 +83,63 @@ func TestWarnEmptyAskSuggests(t *testing.T) {
 	warnEmptyAsk(cmd, ix, "who on the payments team can help", resolve.Answer{})
 	if out := buf.String(); !strings.Contains(out, "Kevin Novak") {
 		t.Errorf("multi-word question gave no suggestion: %q", out)
+	}
+}
+
+// TestAskTeamsOnlyCodeowners verifies a CODEOWNERS file that names only team
+// handles still answers: the people list is empty, the teams of record carry
+// the answer, the command succeeds, and nothing reads as a miss.
+func TestAskTeamsOnlyCodeowners(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		Owners   string
+		Query    string
+		WantTeam string
+	}{{ // Test 0: A path topic owned by the team.
+		Owners: "* @prometheus/default-maintainers\n/tsdb/ @prometheus/default-maintainers\n",
+		Query:  "tsdb", WantTeam: "codeowners:prometheus/default-maintainers",
+	}, { // Test 1: A catch-all file found by the words of its handle.
+		Owners: "* @prometheus/default-maintainers\n",
+		Query:  "maintainers", WantTeam: "codeowners:prometheus/default-maintainers",
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			owners := filepath.Join(dir, "CODEOWNERS")
+			if err := os.WriteFile(owners, []byte(test.Owners), 0o600); err != nil {
+				t.Fatalf("write CODEOWNERS: %v", err)
+			}
+			if _, _, err := runCmd(t, "index", "--data-dir", dir, "--source", "codeowners", "--file", owners); err != nil {
+				t.Fatalf("index: %v", err)
+			}
+			stdout, stderr, err := runCmd(t, "ask", "--data-dir", dir, "--json", test.Query)
+			if err != nil {
+				t.Fatalf("ask: %v", err)
+			}
+			var got resolve.JSONAnswer
+			if err := json.Unmarshal(stdout, &got); err != nil {
+				t.Fatalf("decode %s: %v", stdout, err)
+			}
+			if len(got.People) != 0 {
+				t.Errorf("people = %+v, want none", got.People)
+			}
+			if len(got.Teams) == 0 || got.Teams[0].ID != test.WantTeam {
+				t.Errorf("teams = %+v, want %s first", got.Teams, test.WantTeam)
+			}
+			if strings.Contains(string(stderr), "No match") {
+				t.Errorf("a teams-only answer warned as a miss:\n%s", stderr)
+			}
+			human, _, err := runCmd(t, "ask", "--data-dir", dir, "--human", test.Query)
+			if err != nil {
+				t.Fatalf("ask --human: %v", err)
+			}
+			if strings.Contains(string(human), "Nothing matched") {
+				t.Errorf("a teams-only answer printed Nothing matched:\n%s", human)
+			}
+			if !strings.Contains(string(human), "TEAMS (OWNERS OF RECORD)") {
+				t.Errorf("no teams section in:\n%s", human)
+			}
+		})
 	}
 }

@@ -10,7 +10,7 @@ import (
 // the graph is escaped, so text like <!channel> or <@Uxxx> renders as literal
 // characters rather than a workspace-wide broadcast or a mention.
 func Format(query string, ans resolve.Answer) string {
-	if len(ans.People) == 0 && len(ans.Channels) == 0 {
+	if len(ans.People) == 0 && len(ans.Channels) == 0 && len(ans.Teams) == 0 {
 		return "No matches for *" + escapeMrkdwn(query) + "*. Try different words."
 	}
 
@@ -51,6 +51,21 @@ func Format(query string, ans resolve.Answer) string {
 			line := "• #" + escapeMrkdwn(c.Channel.Name)
 			if c.Channel.Topic != "" {
 				line += " - " + escapeMrkdwn(c.Channel.Topic)
+			}
+			b.WriteString(line)
+			b.WriteString("\n")
+		}
+	}
+
+	if len(ans.Teams) > 0 {
+		if b.Len() > 0 {
+			b.WriteString("\n")
+		}
+		b.WriteString("*Teams (owners of record)*\n")
+		for _, m := range ans.Teams {
+			line := "• " + escapeMrkdwn(m.Person.Name)
+			if m.Team != nil && m.Team.Name != "" {
+				line += " (" + escapeMrkdwn(m.Team.Name) + ")"
 			}
 			b.WriteString(line)
 			b.WriteString("\n")

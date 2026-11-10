@@ -10,6 +10,8 @@ public final class SearchModel: ObservableObject {
     @Published public private(set) var people: [AskPerson] = []
     // channels are the channels the last answered query suggests, best first.
     @Published public private(set) var channels: [AskChannel] = []
+    // teams are the owners of record the last answered query names. They are shown, never opened.
+    @Published public private(set) var teams: [AskTeam] = []
     // detail is the person shown in place of the results, nil while the results show.
     @Published public private(set) var detail: PersonDetail?
     // message says why there is nothing to show, such as an index not built yet.
@@ -60,6 +62,7 @@ public final class SearchModel: ObservableObject {
         generation += 1
         people = []
         channels = []
+        teams = []
         detail = nil
         changes = []
         answered = ""
@@ -108,7 +111,7 @@ public final class SearchModel: ObservableObject {
         detail = nil
         guard let core else { return }
         guard !trimmed.isEmpty else {
-            show(people: [], channels: [], message: nil, for: text)
+            show(people: [], channels: [], teams: [], message: nil, for: text)
             return
         }
         do {
@@ -116,16 +119,19 @@ public final class SearchModel: ObservableObject {
             guard mine == generation else { return }
             let people = answer.people ?? []
             let channels = answer.channels ?? []
-            let none = people.isEmpty && channels.isEmpty ? "No one matches \"\(trimmed)\" yet." : nil
-            show(people: people, channels: channels, message: none, for: text)
+            let teams = answer.teams ?? []
+            let empty = people.isEmpty && channels.isEmpty && teams.isEmpty
+            let none = empty ? "No one matches \"\(trimmed)\" yet." : nil
+            show(people: people, channels: channels, teams: teams, message: none, for: text)
         } catch {
             guard mine == generation else { return }
-            show(people: [], channels: [], message: Self.describe(error), for: text)
+            show(people: [], channels: [], teams: [], message: Self.describe(error), for: text)
         }
     }
 
     // submit answers the field if its results are stale, then opens the first person's first
-    // link. With no link it shows that person instead.
+    // link. With no link it shows that person instead. A team is never the target: with no
+    // person in the answer, Enter does nothing.
     public func submit() async {
         pending?.cancel()
         if answered != query {
@@ -206,9 +212,11 @@ public final class SearchModel: ObservableObject {
     }
 
     // show replaces the result list with the answer to text.
-    private func show(people: [AskPerson], channels: [AskChannel], message: String?, for text: String) {
+    private func show(people: [AskPerson], channels: [AskChannel], teams: [AskTeam], message: String?,
+                      for text: String) {
         self.people = people
         self.channels = channels
+        self.teams = teams
         self.message = message
         answered = text
     }

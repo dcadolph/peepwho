@@ -261,8 +261,8 @@ func (ix *Index) TopicSimilarity(query []float32, tid model.ID) float64 {
 }
 
 // TopicExperts returns the people with the strongest affinity for a topic,
-// most expert first. It is the deterministic half of a semantic answer: the
-// vector picks the subject, the graph picks who owns it.
+// most expert first, never a team. It is the deterministic half of a semantic
+// answer: the vector picks the subject, the graph picks who owns it.
 func (ix *Index) TopicExperts(tid model.ID, limit int) []*model.Person {
 	type scored struct {
 		p *model.Person
@@ -271,7 +271,7 @@ func (ix *Index) TopicExperts(tid model.ID, limit int) []*model.Person {
 	var out []scored
 	for _, p := range ix.Graph.People {
 		w := p.Topics[tid]
-		if w <= 0 {
+		if w <= 0 || p.ID.IsTeam() {
 			continue
 		}
 		// Discounted by everything else this person does. Ranked on raw weight,
@@ -372,7 +372,9 @@ func (ix *Index) SemanticPeople(query []float32, limit int) []model.Match {
 	// list. Measured against the truncated ranking, the same match reported a
 	// different strength at limit 5 than at limit 50, and strength must be a
 	// fact about the match, not about how much of the list was requested.
-	ranked := rankByCosine(ix.personVecs, query)
+	// Teams are not people, so they leave before the field is measured, which
+	// ranks the people exactly as an index without the teams would.
+	ranked := slices.DeleteFunc(rankByCosine(ix.personVecs, query), func(r scoredID) bool { return r.id.IsTeam() })
 	if !discriminating(ranked) {
 		return nil
 	}

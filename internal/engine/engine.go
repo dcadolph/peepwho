@@ -92,6 +92,10 @@ func (e *Engine) Search(query string, limit int) []resolve.SearchResult {
 // Person returns the profile of the person with canonical id, and false when
 // no such person is indexed.
 func (e *Engine) Person(id string) (resolve.JSONProfile, bool) {
+	// A team of record has no profile to show: it is a handle, not a person.
+	if model.ID(id).IsTeam() {
+		return resolve.JSONProfile{}, false
+	}
 	profile, ok := e.ix.Profile(model.ID(id))
 	if !ok {
 		return resolve.JSONProfile{}, false

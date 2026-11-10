@@ -11,7 +11,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/dcadolph/whotoask/internal/connector"
 	"github.com/dcadolph/whotoask/internal/engine"
+	"github.com/dcadolph/whotoask/internal/index"
 )
 
 // updateSwift rewrites the fixtures the Swift decode tests read when set.
@@ -101,11 +103,16 @@ func TestSwiftFixtures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open sampled: %v", err)
 	}
+	teams, err := Open(newTeamsDataDir(t), "")
+	if err != nil {
+		t.Fatalf("Open teams: %v", err)
+	}
 	calls := []struct {
 		Name string
 		Call func() (string, error)
 	}{
 		{"ask", func() (string, error) { return h.Ask("terraform", 3) }},
+		{"ask_teams", func() (string, error) { return teams.Ask("contracts", 3) }},
 		{"search", func() (string, error) { return h.Search("angela", 3) }},
 		{"person", func() (string, error) { return h.Person("angela@example.com") }},
 		{"people", func() (string, error) { return h.People(3) }},
@@ -151,6 +158,25 @@ func TestSwiftFixtures(t *testing.T) {
 				testNum, c.Name, diff)
 		}
 	}
+}
+
+// newTeamsDataDir saves an index of one person and one CODEOWNERS team that own the same
+// subject, so an answer carries both people and teams of record.
+func newTeamsDataDir(t *testing.T) string {
+	t.Helper()
+	ix := index.New()
+	ix.Build([]connector.Record{
+		{Kind: connector.KindPerson, Name: "Carla Counsel", Email: "carla@example.com",
+			Topics: []string{"contracts"}, Source: "git"},
+		{Kind: connector.KindPerson, Source: "codeowners", Weight: 1, Name: "@acme/legal-squad",
+			PersonID: "codeowners:acme/legal-squad", Topics: []string{"contracts"}},
+	})
+	ix.Canonicalize()
+	dir := t.TempDir()
+	if err := engine.NewStore(engine.Dir(dir), nil).SaveIndex(ix); err != nil {
+		t.Fatalf("SaveIndex: %v", err)
+	}
+	return dir
 }
 
 // copySample copies the plain index and conversations from src to dir, as the app bundles them.

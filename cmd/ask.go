@@ -91,9 +91,10 @@ Examples:
 // warnEmptyAsk explains an empty answer on stderr so it does not read as a
 // silent success. An empty index, a query with no term the index knows, and a
 // genuine miss are different problems with different fixes, and the JSON on
-// stdout cannot tell them apart.
+// stdout cannot tell them apart. An answer holding only teams of record is an
+// answer, the one a CODEOWNERS file of team handles gives.
 func warnEmptyAsk(cmd *cobra.Command, ix *index.Index, query string, ans resolve.Answer) {
-	if len(ans.People) > 0 || len(ans.Channels) > 0 {
+	if len(ans.People) > 0 || len(ans.Channels) > 0 || len(ans.Teams) > 0 {
 		return
 	}
 	w := cmd.ErrOrStderr()

@@ -77,12 +77,12 @@ type UnlinkedOwner struct {
 // and double digits line up.
 func rank(n int) string { return fmt.Sprintf("%2d", n) }
 
-// nameWidth returns the column width to pad names to, capped so one long name
-// does not push every row far to the right.
-func nameWidth(people []resolve.JSONPerson) int {
+// nameWidth returns the column width to pad the names of rows to, capped so one
+// long name does not push every row far to the right.
+func nameWidth[T any](rows []T, name func(T) string) int {
 	width := 0
-	for _, p := range people {
-		if n := len([]rune(p.Name)); n > width {
+	for _, r := range rows {
+		if n := len([]rune(name(r))); n > width {
 			width = n
 		}
 	}
@@ -101,14 +101,24 @@ func RenderAsk(w io.Writer, query string, view resolve.JSONAnswer, s Style) {
 	if view.Summary != "" {
 		fmt.Fprintf(w, "%s\n", s.Dim(EscapeControls(view.Summary)))
 	}
-	if len(view.People) == 0 && len(view.Channels) == 0 {
+	if len(view.People) == 0 && len(view.Channels) == 0 && len(view.Teams) == 0 {
 		fmt.Fprintf(w, "\n  %s\n\n", s.Dim(
 			"Nothing matched. Try the words your team would use, or `whotoask directory` to see what is indexed."))
 		return
 	}
+	// Each section ends on a blank line, so only the first one printed needs
+	// its own to stand clear of the title.
+	first := true
+	section := func(title string) {
+		if first {
+			fmt.Fprintln(w)
+			first = false
+		}
+		fmt.Fprintf(w, "  %s\n\n", s.Dim(title))
+	}
 	if len(view.People) > 0 {
-		fmt.Fprintf(w, "\n  %s\n\n", s.Dim("PEOPLE"))
-		width := nameWidth(view.People)
+		section("PEOPLE")
+		width := nameWidth(view.People, func(p resolve.JSONPerson) string { return p.Name })
 		for i, p := range view.People {
 			name := EscapeControls(p.Name)
 			fmt.Fprintf(w, "  %s  %s  %s\n",
@@ -121,7 +131,7 @@ func RenderAsk(w io.Writer, query string, view resolve.JSONAnswer, s Style) {
 		}
 	}
 	if len(view.Channels) > 0 {
-		fmt.Fprintf(w, "  %s\n\n", s.Dim("CHANNELS"))
+		section("CHANNELS")
 		for i, ch := range view.Channels {
 			fmt.Fprintf(w, "  %s  %s\n", s.Dim(rank(i+1)), s.Bold("#"+EscapeControls(ch.Name)))
 			fmt.Fprintf(w, "      %s %s   %s\n",
@@ -130,6 +140,19 @@ func RenderAsk(w io.Writer, query string, view resolve.JSONAnswer, s Style) {
 			if ch.URL != "" {
 				fmt.Fprintf(w, "      %s %s\n", s.Accent("\u2192"), s.Dim(EscapeControls(ch.URL)))
 			}
+			fmt.Fprintln(w)
+		}
+	}
+	if len(view.Teams) > 0 {
+		section("TEAMS (OWNERS OF RECORD)")
+		width := nameWidth(view.Teams, func(t resolve.JSONTeam) string { return t.Name })
+		for i, t := range view.Teams {
+			name := EscapeControls(t.Name)
+			fmt.Fprintf(w, "  %s  %s  %s\n", s.Dim(rank(i+1)), pad(s.Bold(name), name, width),
+				s.Dim(EscapeControls(t.Team)))
+			fmt.Fprintf(w, "      %s %s   %s\n",
+				s.ConfBar(t.Strength), s.Accent(pct(t.Strength)),
+				s.Dim(strings.Join(EscapeControlsList(t.Reasons), " · ")))
 			fmt.Fprintln(w)
 		}
 	}

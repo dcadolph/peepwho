@@ -172,7 +172,9 @@ func coveredShare(matched map[string]bool, covers map[string][]string, originals
 }
 
 // Search ranks people for query and returns up to limit matches. A non-positive
-// limit returns all matches.
+// limit returns all matches. Teams are not people and never appear here: the
+// ranking reads only the people view, so scores, order, and strength are what
+// an index without the teams would give. SearchTeams answers for them.
 func (ix *Index) Search(query string, limit int) []model.Match {
 	terms, covers, asked := expandedQuery(query)
 	if len(terms) == 0 {
@@ -185,12 +187,12 @@ func (ix *Index) Search(query string, limit int) []model.Match {
 			originals++
 		}
 	}
-	resolved := resolveTerms(ix.postings, ix.personVocab, terms)
+	resolved := resolveTerms(ix.peoplePostings, ix.personVocab, terms)
 	applyExpansionPenalty(resolved, asked)
 	baseTerms, tieTerms := splitTieTerms(terms, asked)
-	scores, matched := scoreByTerms(ix.postings, baseTerms, resolved, len(ix.Graph.People), ix.personLens)
+	scores, matched := scoreByTerms(ix.peoplePostings, baseTerms, resolved, ix.peopleN, ix.personLens)
 	if len(tieTerms) > 0 {
-		tieScores, tieMatched := scoreByTerms(ix.postings, tieTerms, resolved, len(ix.Graph.People), ix.personLens)
+		tieScores, tieMatched := scoreByTerms(ix.peoplePostings, tieTerms, resolved, ix.peopleN, ix.personLens)
 		mergeReach(scores, matched, tieScores, tieMatched)
 	}
 	nets := ix.feedbackNets(terms, false)
@@ -334,9 +336,9 @@ func (ix *Index) SearchChannels(query string, limit int) []model.ChannelMatch {
 	// every person and sorting every channel's whole membership up front, only to
 	// keep a handful of channels, was the bulk of a query at scale.
 	if len(matches) > 0 {
-		personResolved := resolveTerms(ix.postings, ix.personVocab, terms)
+		personResolved := resolveTerms(ix.peoplePostings, ix.personVocab, terms)
 		personScores, _ := scoreByTerms(
-			ix.postings, terms, personResolved, len(ix.Graph.People), ix.personLens)
+			ix.peoplePostings, terms, personResolved, ix.peopleN, ix.personLens)
 		for i := range matches {
 			matches[i].TopMembers = ix.topMembers(matches[i].Channel, personScores, 3)
 		}
@@ -754,23 +756,28 @@ func (ix *Index) channelReasons(
 		}
 		// mapsum: strength is a constant picked in this iteration, and max is exact in any order.
 		evidence = max(evidence, strength)
-		if from := asked[term]; from != "" && from != term {
-			out = append(out, fmt.Sprintf("%s (%s) for %q", term, field, from))
-			continue
-		}
-		// A correction has to name what it corrected to. Told only that
-		// "zigby" was fuzzy, a reader cannot tell whether whotoask read it as
-		// zigbee or as zigzag, which is the difference between a lucky save
-		// and a wrong guess presented with strength.
-		if hit.fuzzy() && found != "" && found != term {
-			out = append(out, fmt.Sprintf("%s (%s, read for %q)", found, field, term))
-			continue
-		}
-		if hit.fuzzy() {
-			field += ", fuzzy"
-		}
-		out = append(out, fmt.Sprintf("%s (%s)", term, field))
+		out = append(out, hitReason(term, field, found, hit, asked))
 	}
 	sort.Strings(out)
 	return out, evidence
+}
+
+// hitReason writes the reason line for one matched term of a channel or team:
+// the term and the field it hit, what it stood in for when it was a synonym,
+// and what it was read as when it was corrected.
+func hitReason(term, field, found string, hit termHit, asked map[string]string) string {
+	if from := asked[term]; from != "" && from != term {
+		return fmt.Sprintf("%s (%s) for %q", term, field, from)
+	}
+	// A correction has to name what it corrected to. Told only that "zigby"
+	// was fuzzy, a reader cannot tell whether whotoask read it as zigbee or as
+	// zigzag, which is the difference between a lucky save and a wrong guess
+	// presented with strength.
+	if hit.fuzzy() && found != "" && found != term {
+		return fmt.Sprintf("%s (%s, read for %q)", found, field, term)
+	}
+	if hit.fuzzy() {
+		field += ", fuzzy"
+	}
+	return fmt.Sprintf("%s (%s)", term, field)
 }

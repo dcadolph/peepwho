@@ -91,10 +91,31 @@ type JSONAnswer struct {
 	Query string `json:"query,omitempty"`
 	// Summary is the written recommendation, present in LLM mode.
 	Summary string `json:"summary,omitempty"`
-	// People is the ranked list of people to talk to.
+	// People is the ranked list of people to talk to. It never holds a team.
 	People []JSONPerson `json:"people"`
 	// Channels is the ranked list of places to ask.
 	Channels []JSONChannel `json:"channels,omitempty"`
+	// Teams are the owners of record, ranked apart from People.
+	Teams []JSONTeam `json:"teams,omitempty"`
+}
+
+// JSONTeam is one team of record: a CODEOWNERS handle that owns what was asked.
+// It is somewhere to look, not somebody to ask, so it carries no contact.
+type JSONTeam struct {
+	// ID is the team's identifier, such as codeowners:simcorp/legal-squad.
+	ID string `json:"id"`
+	// Name is the handle as CODEOWNERS writes it.
+	Name string `json:"name"`
+	// Team is the org chart team the handle names, when exactly one matches.
+	Team string `json:"team,omitempty"`
+	// Topics are the areas the team owns, strongest first.
+	Topics []string `json:"topics,omitempty"`
+	// Score is the relevance score among the teams.
+	Score float64 `json:"score"`
+	// Strength is how strongly the team matches, from zero to one.
+	Strength float64 `json:"strength,omitempty"`
+	// Reasons explains why the team matched.
+	Reasons []string `json:"reasons,omitempty"`
 }
 
 // JSONPerson is one ranked person.
@@ -266,6 +287,20 @@ func (a Answer) View(query string) JSONAnswer {
 			jc.Members = append(jc.Members, JSONMember{Name: p.Name, Email: p.Email})
 		}
 		out.Channels = append(out.Channels, jc)
+	}
+	for _, m := range a.Teams {
+		jt := JSONTeam{
+			ID:       string(m.Person.ID),
+			Name:     nameOr(m.Person.Name, string(m.Person.ID)),
+			Topics:   salientTopics(a.ix, m.Person.Topics, 8),
+			Score:    m.Score,
+			Strength: roundStrength(m.Strength),
+			Reasons:  m.Reasons,
+		}
+		if m.Team != nil {
+			jt.Team = m.Team.Name
+		}
+		out.Teams = append(out.Teams, jt)
 	}
 	return out
 }

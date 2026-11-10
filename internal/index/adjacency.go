@@ -132,13 +132,15 @@ type candidate struct {
 // shared topics. Co-membership is size-normalized so a tight group counts more
 // than a broad one, org-wide groups are dropped, and permission tiers of one
 // group are folded together. It returns at most limit people, nearest first.
+// A team is nobody's neighbor: it is refused as the focal person and never
+// listed near one.
 func (ix *Index) Near(focal model.ID, limit int) []Adjacent {
 	g := ix.Graph
-	if g == nil || g.People[focal] == nil {
+	if g == nil || g.People[focal] == nil || focal.IsTeam() {
 		return nil
 	}
 	r := ix.identityResolver()
-	total := len(g.People)
+	total := ix.peopleN
 
 	// Build folded groups, unioning members that share a folded name.
 	groups := make(map[string]map[model.ID]bool)
@@ -214,7 +216,7 @@ func (ix *Index) Near(focal model.ID, limit int) []Adjacent {
 	fp := g.People[focal]
 	focalReach := math.Sqrt(fp.Reach())
 	for pid, p2 := range g.People {
-		if pid == focal || len(p2.Topics) == 0 {
+		if pid == focal || pid.IsTeam() || len(p2.Topics) == 0 {
 			continue
 		}
 		var overlap float64

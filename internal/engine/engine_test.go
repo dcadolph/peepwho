@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/dcadolph/whotoask/internal/connector"
 	"github.com/dcadolph/whotoask/internal/index"
 	"github.com/dcadolph/whotoask/internal/policy"
 	"github.com/dcadolph/whotoask/internal/recall"
@@ -192,5 +193,36 @@ func TestEngineRecaller(t *testing.T) {
 		recall.Query{Text: "billing retries", Person: stranger, Limit: 5})
 	if len(other.Episodes) != 0 {
 		t.Errorf("recall for a stranger returned %d conversations, want 0", len(other.Episodes))
+	}
+}
+
+// TestEnginePersonRefusesTeam verifies a CODEOWNERS team id has no profile,
+// while a person beside it still does.
+func TestEnginePersonRefusesTeam(t *testing.T) {
+	t.Parallel()
+	ix := index.New()
+	ix.Build([]connector.Record{
+		{Kind: connector.KindPerson, Name: "Carla Counsel", Email: "carla@corp.com",
+			Topics: []string{"contracts"}, Source: "git"},
+		{Kind: connector.KindPerson, Source: "codeowners", Name: "@acme/legal-squad",
+			PersonID: "codeowners:acme/legal-squad", Topics: []string{"contracts"}},
+	})
+	ix.Canonicalize()
+	eng := New(ix, policy.Default())
+	tests := []struct {
+		ID     string
+		WantOK bool
+	}{{ // Test 0: A team of record.
+		ID: "codeowners:acme/legal-squad",
+	}, { // Test 1: The person beside it.
+		ID: "carla@corp.com", WantOK: true,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			if _, ok := eng.Person(test.ID); ok != test.WantOK {
+				t.Errorf("Person(%q) ok = %t, want %t", test.ID, ok, test.WantOK)
+			}
+		})
 	}
 }

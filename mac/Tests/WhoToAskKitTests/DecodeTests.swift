@@ -18,6 +18,18 @@ struct DecodeTests {
         #expect(got.people?.first?.name == "Carol Lee")
         #expect(got.people?.first?.strength == 1)
         #expect(got.channels?.first?.members?.isEmpty == false)
+        #expect(got.teams == nil)
+    }
+
+    // askTeams decodes the teams of record apart from the people.
+    @Test func askTeams() throws {
+        let got: AskAnswer = try Core.decode(fixture("ask_teams"))
+        #expect(got.people?.map(\.name) == ["Carla Counsel"])
+        #expect(got.teams?.map(\.id) == ["codeowners:acme/legal-squad"])
+        #expect(got.teams?.first?.name == "@acme/legal-squad")
+        #expect(got.teams?.first?.team == nil)
+        #expect(got.teams?.first?.strength == 1)
+        #expect(got.teams?.first?.reasons?.isEmpty == false)
     }
 
     // search decodes matches with their kind.

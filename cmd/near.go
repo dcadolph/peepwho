@@ -36,6 +36,9 @@ id, or an exact name.
 			if p == nil {
 				return fmt.Errorf("%w: no person matches %q; try an email, or run `whotoask directory`", ErrBadArgs, who)
 			}
+			if p.ID.IsTeam() {
+				return fmt.Errorf("%w: %s is a team of record, not a person", ErrBadArgs, p.Name)
+			}
 			nearList := ix.Near(p.ID, limit)
 			view := map[string]any{
 				"person": map[string]string{"id": string(p.ID), "name": p.Name, "email": p.Email},

@@ -85,7 +85,31 @@ struct ResultsView: View {
                     ChannelRow(channel: channel, model: model)
                 }
             }
+            if !model.teams.isEmpty {
+                Text("Teams of record").font(.caption).foregroundStyle(.secondary).padding(.top, 4)
+                ForEach(model.teams) { team in
+                    TeamRow(team: team)
+                }
+            }
         }
+    }
+}
+
+// TeamRow is one team of record: its handle and the org chart team it names. It is plain text
+// on purpose, since a team has no profile to show and nobody to message.
+struct TeamRow: View {
+    // team is the team shown.
+    let team: AskTeam
+
+    // body shows the handle, with the org chart team beside it when one matches.
+    var body: some View {
+        HStack {
+            Text(team.name).font(.callout)
+            if let label = team.team?.nonEmpty {
+                Text(label).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 2)
     }
 }
 

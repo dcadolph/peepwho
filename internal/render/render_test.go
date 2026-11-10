@@ -141,6 +141,13 @@ func goldenCases() []goldenCase {
 	return []goldenCase{
 		{"ask", func(w io.Writer, s Style) { RenderAsk(w, "billing", answer, s) }},
 		{"ask_empty", func(w io.Writer, s Style) { RenderAsk(w, "nothing", resolve.JSONAnswer{}, s) }},
+		{"ask_teams", func(w io.Writer, s Style) {
+			RenderAsk(w, "tsdb", resolve.JSONAnswer{Teams: []resolve.JSONTeam{
+				{ID: "codeowners:acme/legal-squad", Name: "@acme/legal-squad", Team: "Legal", Strength: 1,
+					Reasons: []string{"tsdb (topic)"}},
+				{ID: "codeowners:acme/default-maintainers", Name: "@acme/default-maintainers", Strength: 0.5},
+			}}, s)
+		}},
 		{"near", func(w io.Writer, s Style) {
 			RenderNear(w, "Kim Doe", []index.Adjacent{
 				{Name: "Lee Roe", Reasons: []string{"team Payments", "topic billing"}},

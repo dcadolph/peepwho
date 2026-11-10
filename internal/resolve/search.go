@@ -14,7 +14,8 @@ const defaultSearchLimit = 20
 
 // SearchResult is one match from a free-text search over indexed entities.
 type SearchResult struct {
-	// Kind is "person" or "channel".
+	// Kind is "person", "team", or "channel". A team is a CODEOWNERS handle,
+	// somewhere to look rather than somebody to ask.
 	Kind string `json:"kind"`
 	// ID is the entity's identifier: a person's canonical id or a channel name.
 	ID string `json:"id"`
@@ -54,8 +55,12 @@ func Search(ix *index.Index, query string, limit int) []SearchResult {
 		if score <= 0 {
 			continue
 		}
+		kind := "person"
+		if id.IsTeam() {
+			kind = "team"
+		}
 		out = append(out, SearchResult{
-			Kind: "person", ID: string(id), Name: nameOr(p.Name, string(id)),
+			Kind: kind, ID: string(id), Name: nameOr(p.Name, string(id)),
 			Email: p.Email, Title: p.Title, Team: team, Topics: salientTopics(ix, p.Topics, 8),
 			Score: score, Matched: matched,
 		})

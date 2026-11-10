@@ -19,11 +19,16 @@ import (
 	"github.com/dcadolph/whotoask/internal/util"
 )
 
-// Answer is a resolved response: ranked people, ranked channels, and an
-// optional written summary that the LLM resolver fills in.
+// Answer is a resolved response: ranked people, ranked channels, the teams of
+// record, and an optional written summary that the LLM resolver fills in.
 type Answer struct {
-	// People is the ranked list of people to talk to.
+	// People is the ranked list of people to talk to. It never holds a team.
 	People []model.Match
+	// Teams are the CODEOWNERS teams that own what was asked, ranked among
+	// themselves and kept apart from People, so a team never takes a person's
+	// place under the limit. Their members are not expanded: with an org chart
+	// they already rank as people through their team name.
+	Teams []model.Match
 	// Channels is the ranked list of places to ask.
 	Channels []model.ChannelMatch
 	// Summary is a short written recommendation; empty in keyword mode.
@@ -70,8 +75,21 @@ func (k *Keyword) Resolve(_ context.Context, query string, limit int) (Answer, e
 	return Answer{
 		People:   withoutChatter(people, func(m model.Match) bool { return m.Declared }),
 		Channels: withoutChatter(k.ix.SearchChannels(query, limit), func(m model.ChannelMatch) bool { return m.Declared }),
+		Teams:    teamsOfRecord(k.ix, query, limit),
 		ix:       k.ix,
 	}, nil
+}
+
+// teamsOfRecord ranks the teams for query and labels each with the org chart
+// team its handle names, when exactly one team matches that way.
+func teamsOfRecord(ix *index.Index, query string, limit int) []model.Match {
+	teams := ix.SearchTeams(query, limit)
+	for i := range teams {
+		if tid := squadTeam(ix.Graph, teams[i].Person.ID); tid != "" {
+			teams[i].Team = ix.Graph.Teams[tid]
+		}
+	}
+	return teams
 }
 
 // withoutChatter drops the undeclared matches when the top match is declared,
@@ -222,8 +240,9 @@ func extractJSON(raw string) string {
 func (l *LLM) Resolve(ctx context.Context, query string, limit int) (Answer, error) {
 	n := candidateN(limit)
 	people, channels := l.retrieve(ctx, query, n)
+	teams := teamsOfRecord(l.ix, query, limit)
 	if len(people) == 0 && len(channels) == 0 {
-		return Answer{}, nil
+		return Answer{Teams: teams}, nil
 	}
 
 	system, prompt := llmSystem, buildPrompt(query, people, channels)
@@ -239,21 +258,25 @@ func (l *LLM) Resolve(ctx context.Context, query string, limit int) (Answer, err
 	if jsonErr := json.Unmarshal([]byte(extractJSON(raw)), &out); jsonErr != nil {
 		// The reply was not usable JSON: keep keyword order rather than trusting
 		// unparsed prose, and write the summary from those grounded results.
-		answer := groundedAnswer(Cap(people, limit), Cap(channels, limit))
+		answer := groundedAnswer(Cap(people, limit), Cap(channels, limit), teams)
 		return answer, nil //nolint:nilerr // Unusable model output falls back to grounded results.
 	}
 	return groundedAnswer(
 		rankedPeople(people, out.People, limit),
 		rankedChannels(channels, out.Channels, limit),
+		teams,
 	), nil
 }
 
 // groundedAnswer assembles an Answer and writes its recommendation locally from
-// the top-ranked results, so the summary can never name a non-candidate.
-func groundedAnswer(people []model.Match, channels []model.ChannelMatch) Answer {
+// the top-ranked results, so the summary can never name a non-candidate. Teams
+// ride along unranked by the model and never reach the summary, which only
+// ever tells the asker to talk to a person.
+func groundedAnswer(people []model.Match, channels []model.ChannelMatch, teams []model.Match) Answer {
 	return Answer{
 		People:   people,
 		Channels: channels,
+		Teams:    teams,
 		Summary:  localSummary(people, channels),
 	}
 }
@@ -495,7 +518,7 @@ func (s *Semantic) Resolve(ctx context.Context, query string, limit int) (Answer
 		fusePeople(s.ix.Search(query, pool),
 			s.ix.SemanticPeople(vec, pool), s.topicPeople(vec, pool), limit), limit)
 	channels := fuseChannels(s.ix.SearchChannels(query, pool), s.ix.SemanticChannels(vec, pool), limit)
-	return Answer{People: people, Channels: channels, ix: s.ix}, nil
+	return Answer{People: people, Channels: channels, Teams: teamsOfRecord(s.ix, query, limit), ix: s.ix}, nil
 }
 
 // topicSubjects is how many subjects a question is matched against, and

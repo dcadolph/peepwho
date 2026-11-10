@@ -100,6 +100,12 @@ func Risk(ix *index.Index, limit int) []TopicRisk {
 	// could break differently between runs, and an assessment a client cannot
 	// reproduce byte for byte is not the thing this product claims to be.
 	for _, id := range slices.Sorted(maps.Keys(ix.Graph.People)) {
+		// Knowledge sits in heads. A team of record holds a subject on paper,
+		// and counting it as an expert would split a share that belongs to
+		// the people in it.
+		if id.IsTeam() {
+			continue
+		}
 		p := ix.Graph.People[id]
 		for _, tid := range slices.Sorted(maps.Keys(p.Topics)) {
 			w := p.Topics[tid]
