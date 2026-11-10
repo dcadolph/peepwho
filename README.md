@@ -171,8 +171,7 @@ what is kept, where, and for how long.
 - [Privacy](docs/PRIVACY.md): what WhoToAsk stores and what can leave the machine.
 - [Accuracy](docs/ACCURACY.md): how the findings were measured against real repositories.
 - [Architecture](docs/ARCHITECTURE.md), [deploying](docs/DEPLOY.md),
-  [weekly digest](docs/DIGEST.md), [roadmap](docs/ROADMAP.md), and
-  [contributing](CONTRIBUTING.md).
+  [roadmap](docs/ROADMAP.md), and [contributing](CONTRIBUTING.md).
 
 ## License
 
