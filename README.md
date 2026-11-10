@@ -20,12 +20,11 @@
   <img src="docs/demo.gif" width="100%" alt="whotoask ask answering who knows about payments retry and kafka consumer lag, with people, channels, match strength, and reasons">
 </p>
 
-Know who knows. WhoToAsk reads the tools your team already works in and answers a plain question
-with the people and channels to ask, the reasons for each, and how strong the match is. It also
-shows where knowledge has narrowed to one person, and when nobody who knew is left, it points
-back at the conversation where the problem was solved last time.
+Ask a question about your work. WhoToAsk tells you who on your team knows the answer, why, and
+which channel to post it in. It also shows where only one person knows how something works, and
+when the person who fixed something has moved on, it finds the conversation where they fixed it.
 
-It runs on your machine, with or without a language model.
+It runs on your machine, with or without an AI model.
 
 ## What this is not for
 
