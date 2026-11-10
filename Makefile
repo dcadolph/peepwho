@@ -43,12 +43,20 @@ core-deps:
 # -macosversion sets the floor on every cgo object. gomobile overrides CGO_CFLAGS, so the
 # flag is the only way in, and the build cache ignores it: after changing it, build once
 # with GOFLAGS=-a or the cached runtime objects keep the old floor. -trimpath keeps build
-# machine paths out of the app binary.
+# machine paths out of the app binary. Go still records the folder gomobile's temporary module
+# replaces this one with, so the core is bound from a copy of the working tree at BIND_DIR, a
+# path that names no person. The copy takes untracked files too, so local edits reach the build.
+BIND_DIR := /private/tmp/whotoask-bind/whotoask
 MAC_FRAMEWORK := mac/Frameworks/WhoToAskCore.xcframework
 MACOS_MIN := 14.0
 
 mac:
-	gomobile bind -trimpath -target macos -macosversion $(MACOS_MIN) -o $(MAC_FRAMEWORK) ./core
+	rm -rf $(BIND_DIR)
+	mkdir -p $(BIND_DIR)
+	git ls-files -co --exclude-standard | while IFS= read -r f; do [ -e "$$f" ] && echo "$$f"; done \
+		| tar -cf - -T - | tar -xf - -C $(BIND_DIR)
+	cd $(BIND_DIR) && gomobile bind -trimpath -target macos -macosversion $(MACOS_MIN) \
+		-o $(CURDIR)/$(MAC_FRAMEWORK) ./core
 	$(MAKE) -C mac host app
 
 host: mac

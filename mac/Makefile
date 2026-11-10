@@ -19,13 +19,16 @@ fat = lipo -create -output $(2) $(foreach arch,$(ARCHS),.build/arch/$(arch)/$(1)
 # swift build cannot link the core's Objective-C classes. The build engine writes every
 # architecture to the one folder --show-bin-path names, so each architecture's products are
 # copied aside into a fresh folder before the next build overwrites them. Reading fixed paths
-# instead once lipoed a morning's leftover binaries into a new app.
+# instead once lipoed a morning's leftover binaries into a new app. strip -S drops the debug
+# stabs, which name every source and object file by its path on the build machine, and keeps
+# the symbol table crash reports read.
 build: $(FRAMEWORK)
 	for arch in $(ARCHS); do \
 		swift build -c release --arch $$arch || exit 1; \
 		bin=$$(swift build -c release --arch $$arch --show-bin-path) || exit 1; \
 		rm -rf .build/arch/$$arch && mkdir -p .build/arch/$$arch || exit 1; \
 		cp "$$bin/WhoToAsk" "$$bin/Host" .build/arch/$$arch/ || exit 1; \
+		strip -S .build/arch/$$arch/WhoToAsk .build/arch/$$arch/Host || exit 1; \
 		lipo "$$bin/WhoToAsk" -verify_arch $$arch || exit 1; \
 	done
 

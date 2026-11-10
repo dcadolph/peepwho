@@ -1,6 +1,7 @@
 #!/bin/sh
 # verify-bundle.sh fails unless a built app is the shape a person can install: it runs on Apple
-# silicon and Intel, says the version it was built from, and carries its category and copyright.
+# silicon and Intel, says the version it was built from, carries its category and copyright, and
+# names no path on the machine that built it.
 # Usage: verify-bundle.sh APP VERSION MINIMUM_MACOS
 set -u
 
@@ -36,6 +37,15 @@ value CFBundleVersion | grep -Eqx '[0-9]+' || fail "CFBundleVersion is not an in
 value LSApplicationCategoryType | grep -q '^public\.app-category\.' || fail "no LSApplicationCategoryType"
 value NSHumanReadableCopyright | grep -q '^Copyright' || fail "no NSHumanReadableCopyright"
 codesign --verify --strict "$app" 2>/dev/null || fail "$app does not verify as signed"
+
+# A shipped binary must not name the machine it was built on: home folder paths leak through Go
+# build info in the strings and through Swift debug stabs that only nm shows.
+paths=$(strings -a "$binary" | grep -c '/Users/')
+[ "$paths" -eq 0 ] || fail "$binary holds $paths build machine paths in its strings"
+for arch in arm64 x86_64; do
+	stabs=$(nm -pa -arch "$arch" "$binary" 2>/dev/null | grep -c '/Users/')
+	[ "$stabs" -eq 0 ] || fail "$arch slice holds $stabs build machine paths in its symbols"
+done
 
 [ "$failed" -eq 0 ] && echo "verify-bundle: ok, $short ($(value CFBundleVersion)), $(lipo -archs "$binary")"
 exit "$failed"
