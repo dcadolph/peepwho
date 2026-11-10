@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
 
 	"github.com/spf13/cobra"
 
@@ -356,7 +357,7 @@ whotoask from answering, so it works as a gate in a script.`,
 			} else {
 				facts.IndexLoaded = true
 				facts.DeclaredOwners, facts.UnlinkedOwners = ownerLinkage(ix)
-				facts.People = len(ix.Graph.People)
+				facts.People = model.PeopleCount(ix.Graph.People)
 				facts.BuiltAt = ix.BuiltAt()
 				facts.Embeddings = ix.HasEmbeddings()
 				facts.IndexSources = ix.SourceNames()

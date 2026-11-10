@@ -376,6 +376,13 @@ func TestCountRecords(t *testing.T) {
 				Topics: []string{"ledger"}},
 		},
 		WantPeople: 1,
+	}, { // Test 7: A CODEOWNERS team is not a person.
+		Recs: []connector.Record{
+			{Source: "codeowners", PersonID: "codeowners:acme/ledger-squad", Name: "@acme/ledger-squad",
+				Topics: []string{"ledger"}},
+			{Source: "codeowners", PersonID: "codeowners:zoe", Name: "@zoe", Topics: []string{"ledger"}},
+		},
+		WantPeople: 1,
 	}}
 	for testNum, test := range tests {
 		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {

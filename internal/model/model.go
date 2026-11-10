@@ -13,6 +13,30 @@ import (
 // ID is a stable identifier for a graph entity.
 type ID string
 
+// IsTeam reports whether a person id names a team rather than a person. A
+// CODEOWNERS entry may name @org/team, which keeps its slash through to the id,
+// and no source puts a slash in a person's own identifier. The graph keeps such
+// owners as people so ownership can see them, but nothing that counts or lists
+// people may include them.
+func (id ID) IsTeam() bool {
+	s := string(id)
+	if _, rest, ok := strings.Cut(s, ":"); ok {
+		s = rest
+	}
+	return strings.Contains(s, "/")
+}
+
+// PeopleCount returns how many entries of people name a person, not a team.
+func PeopleCount(people map[ID]*Person) int {
+	n := 0
+	for id := range people {
+		if !id.IsTeam() {
+			n++
+		}
+	}
+	return n
+}
+
 // Person is an individual in the organization.
 type Person struct {
 	// ID uniquely identifies the person.

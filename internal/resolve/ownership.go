@@ -74,24 +74,6 @@ func ownerStanding(ix *index.Index, owners map[model.ID]bool, topic model.ID) st
 	}
 }
 
-// isTeam reports whether an owner of record is a team rather than a person. A
-// CODEOWNERS entry may name @org/team, which keeps its slash through to the id.
-//
-// A team cannot be displaced, because a team does not commit. Measured on
-// prometheus/prometheus, whose CODEOWNERS assigns almost everything to
-// @prometheus/default-maintainers: every area it owns looked as though the work
-// had moved away, because the owner of record could never have done any. Both
-// verifiable findings there were wrong for this one reason. WhoToAsk cannot
-// enumerate a team's membership from a CODEOWNERS file, so the honest answer is
-// that these areas cannot be judged, not that they have drifted.
-func isTeam(id model.ID) bool {
-	s := string(id)
-	if i := strings.IndexByte(s, ':'); i >= 0 {
-		s = s[i+1:]
-	}
-	return strings.Contains(s, "/")
-}
-
 // automationOwner reports whether an owner id names a machine account, such as
 // @grafanabot or @renovate-bot. A separator-delimited "bot" token is decisive;
 // a bare trailing "bot" counts only on a long handle, because Talbot and Abbot
@@ -190,9 +172,17 @@ func teamMembers(ix *index.Index, tid model.ID) map[model.ID]bool {
 // allGroups reports whether every owner of record for an area is a team or a
 // machine account: ownership with nobody to have held it and nobody to have
 // lost it.
+//
+// A team cannot be displaced, because a team does not commit. Measured on
+// prometheus/prometheus, whose CODEOWNERS assigns almost everything to
+// @prometheus/default-maintainers: every area it owns looked as though the work
+// had moved away, because the owner of record could never have done any. Both
+// verifiable findings there were wrong for this one reason. WhoToAsk cannot
+// enumerate a team's membership from a CODEOWNERS file, so the honest answer is
+// that these areas cannot be judged, not that they have drifted.
 func allGroups(owners map[model.ID]bool) bool {
 	for oid := range owners {
-		if !isTeam(oid) && !automationOwner(oid) {
+		if !oid.IsTeam() && !automationOwner(oid) {
 			return false
 		}
 	}
@@ -522,7 +512,7 @@ func OwnedAreas(ix *index.Index) []OwnedArea {
 		if allGroups(owners) {
 			members := make(map[model.ID]bool)
 			for oid := range owners {
-				if isTeam(oid) {
+				if oid.IsTeam() {
 					if tid := squadTeam(ix.Graph, oid); tid != "" {
 						for m := range teamMembers(ix, tid) {
 							members[m] = true

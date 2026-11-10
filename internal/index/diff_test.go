@@ -45,6 +45,28 @@ func TestDiff(t *testing.T) {
 	}
 }
 
+// TestDiffSkipsTeams verifies a CODEOWNERS team added or removed is not a
+// person joining or leaving.
+func TestDiffSkipsTeams(t *testing.T) {
+	t.Parallel()
+	prev := New()
+	prev.Build([]connector.Record{
+		{Source: "codeowners", PersonID: "codeowners:acme/old-squad", Name: "@acme/old-squad"},
+	})
+	cur := New()
+	cur.Build([]connector.Record{
+		{Source: "codeowners", PersonID: "codeowners:acme/new-squad", Name: "@acme/new-squad"},
+		{Source: "codeowners", PersonID: "codeowners:zoe", Name: "@zoe"},
+	})
+	c := Diff(prev.Graph, cur.Graph)
+	if diff := cmp.Diff([]string{"@zoe"}, c.PeopleJoined, cmpopts.EquateEmpty()); diff != "" {
+		t.Errorf("PeopleJoined mismatch (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]string(nil), c.PeopleLeft, cmpopts.EquateEmpty()); diff != "" {
+		t.Errorf("PeopleLeft mismatch (-want +got):\n%s", diff)
+	}
+}
+
 // TestDiffEmpty verifies an unchanged graph reports no changes.
 func TestDiffEmpty(t *testing.T) {
 	t.Parallel()

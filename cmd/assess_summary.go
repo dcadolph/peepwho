@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
 	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
@@ -100,7 +101,7 @@ func writeSummaryScope(b *strings.Builder, ix *index.Index, res *assessment, c a
 	ownership, regions, spans := res.Ownership, res.Regions, res.Spans
 	fmt.Fprintf(b, "# Knowledge continuity summary\n\n")
 	fmt.Fprintf(b, "Scope: %d %s, %d subjects scored, sources: %s.\n\n",
-		len(ix.Graph.People), people(len(ix.Graph.People)), len(res.Findings),
+		model.PeopleCount(ix.Graph.People), people(model.PeopleCount(ix.Graph.People)), len(res.Findings),
 		strings.Join(ix.SourceNames(), ", "))
 	b.WriteString(concentrationLine(c))
 	if c.Quiet > 0 {

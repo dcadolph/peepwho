@@ -125,7 +125,7 @@ func countRecords(ix *index.Index, recs []connector.Record) (people, channels in
 			if key == "" {
 				continue
 			}
-			if id := ix.CanonicalID(model.ID(key)); ix.Graph.People[id] != nil {
+			if id := ix.CanonicalID(model.ID(key)); ix.Graph.People[id] != nil && !id.IsTeam() {
 				persons[id] = true
 			}
 		case connector.KindChannel:
@@ -523,7 +523,7 @@ func (x *Indexer) reportFold(ix *index.Index, changes index.Changes) {
 	}
 	fmt.Fprintf(out,
 		"indexed %d people, %d channels, %d teams, %d subjects and %d words from text into %s\n",
-		len(ix.Graph.People), len(ix.Graph.Channels), len(ix.Graph.Teams),
+		model.PeopleCount(ix.Graph.People), len(ix.Graph.Channels), len(ix.Graph.Teams),
 		stated, len(ix.Graph.Topics)-stated, x.Dir.Index())
 	if c, _ := x.codec(); c == nil && len(ix.Graph.People) > 0 {
 		fmt.Fprintln(out,

@@ -1827,11 +1827,29 @@ func TestHandlePeople(t *testing.T) {
 	if _, err := h.Index("org-csv", "--file="+csv, now.Unix()); err != nil {
 		t.Fatalf("Index: %v", err)
 	}
+	owners := filepath.Join(t.TempDir(), "CODEOWNERS")
+	if err := os.WriteFile(owners, []byte("/ledger/ @acme/ledger-squad\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.Index("codeowners", "--file="+owners, now.Unix()); err != nil {
+		t.Fatalf("Index codeowners: %v", err)
+	}
+	status, err := h.Status(now.Unix())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var st statusView
+	if err := json.Unmarshal([]byte(status), &st); err != nil {
+		t.Fatal(err)
+	}
+	if st.People != 3 {
+		t.Errorf("Status counts %d people, want 3 with the CODEOWNERS team left out", st.People)
+	}
 	tests := []struct {
 		WantNames []string
 		WantTeams []string
 		Limit     int
-	}{{ // Test 0: Everyone, sorted by name without regard to case.
+	}{{ // Test 0: Everyone, sorted by name without regard to case, and no CODEOWNERS team.
 		Limit: 0, WantNames: []string{"ann lee", "Bob Ray", "Zoe Park"}, WantTeams: []string{"", "Billing", ""},
 	}, { // Test 1: A limit keeps the first by name.
 		Limit: 2, WantNames: []string{"ann lee", "Bob Ray"}, WantTeams: []string{"", "Billing"},

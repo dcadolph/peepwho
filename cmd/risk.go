@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
 	"github.com/dcadolph/whotoask/internal/render"
 	"github.com/dcadolph/whotoask/internal/report"
 	"github.com/dcadolph/whotoask/internal/resolve"
@@ -162,7 +163,7 @@ func riskHTML(
 	systems, checks := report.ListedSystems(found.Systems, found.Checks, briefSystems)
 	brief := report.Brief{
 		Generated: now,
-		People:    len(ix.Graph.People),
+		People:    model.PeopleCount(ix.Graph.People),
 		Scored:    len(all),
 		Sources:   ix.SourceNames(),
 		Risks:     listed,

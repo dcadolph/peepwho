@@ -17,6 +17,7 @@ import (
 	"github.com/dcadolph/whotoask/internal/episode"
 	"github.com/dcadolph/whotoask/internal/feedback"
 	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
 	"github.com/dcadolph/whotoask/internal/resolve"
 	"github.com/dcadolph/whotoask/internal/simorg"
 )
@@ -119,7 +120,7 @@ set becomes an open relay to your paid account.`,
 			link := "http://" + cfg.addr + "/?q=" + url.QueryEscape(query)
 			fmt.Fprintf(cmd.ErrOrStderr(),
 				"whotoask demo: %d people, %d channels across %d sources\nwhotoask demo: try %s\n",
-				len(ix.Graph.People), len(ix.Graph.Channels), sources, link)
+				model.PeopleCount(ix.Graph.People), len(ix.Graph.Channels), sources, link)
 			if open {
 				go openBrowser(link)
 			}
@@ -196,7 +197,7 @@ func demoRepo(
 	// demo keeps the token and stays on loopback: the exemption that lets the
 	// simulation serve open exists because there is nothing there to protect.
 	link := "http://" + cfg.addr + "/#/exposure"
-	people, places := len(ix.Graph.People), len(cfg.places)
+	people, places := model.PeopleCount(ix.Graph.People), len(cfg.places)
 	fmt.Fprintf(log, "whotoask demo: %d %s, %d place%s, %d resting on one person\n",
 		people, personNoun(people), places, plural(places), soleHeld(cfg.places))
 	fmt.Fprintf(log, "whotoask demo: open %s\n", link)

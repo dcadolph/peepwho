@@ -145,7 +145,7 @@ func (e *Engine) Status(now time.Time) Status {
 		sources[name] = e.ix.SourceSize(name)
 	}
 	st := Status{
-		People:     len(e.ix.Graph.People),
+		People:     model.PeopleCount(e.ix.Graph.People),
 		Channels:   len(e.ix.Graph.Channels),
 		Teams:      len(e.ix.Graph.Teams),
 		Subjects:   stated,

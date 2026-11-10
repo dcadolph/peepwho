@@ -107,3 +107,54 @@ func TestPersonReach(t *testing.T) {
 		})
 	}
 }
+
+// TestIDIsTeam verifies a CODEOWNERS team id is told apart from a person id.
+func TestIDIsTeam(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		ID       ID
+		WantTeam bool
+	}{{ // Test 0: A CODEOWNERS team.
+		ID: "codeowners:acme/ledger-squad", WantTeam: true,
+	}, { // Test 1: A CODEOWNERS user handle.
+		ID: "codeowners:zoe", WantTeam: false,
+	}, { // Test 2: An email id.
+		ID: "zoe@x.com", WantTeam: false,
+	}, { // Test 3: A source id.
+		ID: "slack:U123", WantTeam: false,
+	}, { // Test 4: Empty.
+		ID: "", WantTeam: false,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			if got := test.ID.IsTeam(); got != test.WantTeam {
+				t.Errorf("IsTeam(%q) = %v, want %v", test.ID, got, test.WantTeam)
+			}
+		})
+	}
+}
+
+// TestPeopleCount verifies teams kept as graph people are not counted.
+func TestPeopleCount(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		People    map[ID]*Person
+		WantCount int
+	}{{ // Test 0: Nil map.
+		People: nil, WantCount: 0,
+	}, { // Test 1: People and one team.
+		People: map[ID]*Person{
+			"zoe@x.com": {}, "codeowners:zoe": {}, "codeowners:acme/ledger-squad": {},
+		},
+		WantCount: 2,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			if got := PeopleCount(test.People); got != test.WantCount {
+				t.Errorf("PeopleCount = %d, want %d", got, test.WantCount)
+			}
+		})
+	}
+}

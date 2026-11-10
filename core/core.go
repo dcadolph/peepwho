@@ -384,7 +384,10 @@ func (h *Handle) People(limit int) (out string, err error) {
 	}
 	g := l.eng.Index().Graph
 	v := peopleView{People: make([]personRow, 0, len(g.People))}
-	for _, p := range g.People {
+	for id, p := range g.People {
+		if id.IsTeam() {
+			continue
+		}
 		row := personRow{ID: string(p.ID), Name: p.Name, Title: p.Title, Links: []string{}}
 		if t, ok := g.Teams[p.TeamID]; ok {
 			row.Team = t.Name

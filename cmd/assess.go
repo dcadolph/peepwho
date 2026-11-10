@@ -373,7 +373,7 @@ func renderAssessment(ix *index.Index, res *assessment, outDir string, now time.
 	del.json("crossings.json", "crossings", res.Spans)
 	del.json("joined-work.json", "joined work", res.Regions)
 	del.json("identity.json", "identity", identityRecord{
-		People: len(ix.Graph.People), Merged: ix.Joins(), Split: res.Split,
+		People: model.PeopleCount(ix.Graph.People), Merged: ix.Joins(), Split: res.Split,
 		Suggested: res.Aliases,
 	})
 	if len(res.Aliases) > 0 {
@@ -604,7 +604,7 @@ func reportAssess(
 	fmt.Fprintf(log,
 		"assess: %d %s across %v; %d subjects scored, %d critical, "+
 			"%d with one person in the record; departure view for %d %s\n",
-		len(ix.Graph.People), people(len(ix.Graph.People)), ix.SourceNames(),
+		model.PeopleCount(ix.Graph.People), people(model.PeopleCount(ix.Graph.People)), ix.SourceNames(),
 		len(findings), critical, sole, len(departures), people(len(departures)))
 	if len(split) > 0 {
 		names := make([]string, 0, len(split))

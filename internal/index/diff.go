@@ -120,7 +120,7 @@ func missingPeople(a, b map[model.ID]*model.Person) []string {
 	bKeys := identityKeys(b)
 	var out []string
 	for id, p := range a {
-		if _, ok := b[id]; ok {
+		if _, ok := b[id]; ok || id.IsTeam() {
 			continue
 		}
 		if rekeyed(id, p, bKeys) {

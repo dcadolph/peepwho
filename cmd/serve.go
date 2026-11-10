@@ -21,6 +21,7 @@ import (
 	"github.com/dcadolph/whotoask/internal/feedback"
 	"github.com/dcadolph/whotoask/internal/httputil"
 	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
 	"github.com/dcadolph/whotoask/internal/policy"
 	"github.com/dcadolph/whotoask/internal/recall"
 	"github.com/dcadolph/whotoask/internal/render"
@@ -271,7 +272,7 @@ func webBriefFn(ix *index.Index, opts *options) web.BriefFunc {
 		exposed := report.Exposures(all)
 		return report.Brief{
 			Generated: opts.now(),
-			People:    len(ix.Graph.People),
+			People:    model.PeopleCount(ix.Graph.People),
 			Scored:    len(all),
 			Sources:   ix.SourceNames(),
 			Risks:     all,

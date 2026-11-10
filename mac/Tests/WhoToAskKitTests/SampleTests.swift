@@ -43,12 +43,12 @@ struct SampleTests {
         #expect(settings.summary.hasSuffix("or load the sample company to look around."))
 
         await settings.loadSample()
-        #expect(settings.lines == ["Loaded the sample company: 223 people from 8 sources. Clear Index removes it."])
+        #expect(settings.lines == ["Loaded the sample company: 220 people from 8 sources. Clear Index removes it."])
         let status = try #require(settings.status)
         #expect(status.sample)
-        #expect(status.people == 223)
+        #expect(status.people == 220)
         #expect(settings.canLoadSample)
-        #expect(settings.summary.hasPrefix("Sample company, not real people. 223 people,"))
+        #expect(settings.summary.hasPrefix("Sample company, not real people. 220 people,"))
         #expect(settings.summary.contains("Loaded just now."))
         #expect(heard.last == true)
         #expect(settings.sourceAges.count == 8)
@@ -70,7 +70,7 @@ struct SampleTests {
         #expect(search.detail?.name == "Erin Hale")
 
         let changes = try await settings.core?.changes(since: Date(timeIntervalSince1970: 0))
-        #expect(changes?.changes.peopleJoined?.count == 223)
+        #expect(changes?.changes.peopleJoined?.count == 220)
 
         let weekLater = Date().addingTimeInterval(7 * 86400)
         #expect(await settings.refreshIfStale(now: weekLater) == false)
