@@ -79,9 +79,14 @@ Start with the org chart, then merge everything else onto it:
 }
 
 // runIndex reads one source and folds it into the index through the engine,
-// recording the flags it ran with so a refresh can replay them. A run reading
-// standard input is not recorded, since a refresh could not supply it.
+// recording the flags it ran with so a refresh can replay them. A relative path
+// in the flags becomes absolute first, so the record names the same place from
+// whatever directory a refresh starts in. A run reading standard input is not
+// recorded, since a refresh could not supply it.
 func runIndex(cmd *cobra.Command, opts *options, req *engine.IndexRequest) error {
+	if err := engine.AbsPathFlags(cmd.Flags()); err != nil {
+		return fmt.Errorf("index: %w", err)
+	}
 	x := opts.indexer(cmd)
 	x.Record = func(source, scope string) error {
 		if engine.ReadsStdin(source, req.File) {

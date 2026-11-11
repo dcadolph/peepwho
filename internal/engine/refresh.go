@@ -241,9 +241,12 @@ var replaySkipFlags = map[string]bool{
 // command line run may carry. --json and --human change nothing, since an
 // index run prints no result. A refresh replays recorded lists through the
 // same parse, so an app indexing through it and a refresh cannot read a flag
-// differently. A bare argument that is not a flag is refused.
+// differently. A relative path in a path flag comes back absolute, in the
+// request and in the replay list, so the run is recorded under a place a
+// refresh finds from any directory. A bare argument that is not a flag is
+// refused.
 func IndexFromFlags(source string, args []string) (IndexRun, error) {
-	run, rest, err := parseIndexFlags(source, args, "flags")
+	run, rest, err := parseIndexFlags(source, args, "flags", true)
 	if err != nil {
 		return IndexRun{}, err
 	}
@@ -254,12 +257,20 @@ func IndexFromFlags(source string, args []string) (IndexRun, error) {
 }
 
 // parseIndexFlags parses args for source and returns the run and any bare
-// arguments left over. label names the list in a parse error.
-func parseIndexFlags(source string, args []string, label string) (IndexRun, []string, error) {
+// arguments left over. label names the list in a parse error. abs makes the
+// relative paths in the list absolute before the replay list is taken, which a
+// run about to be recorded needs. A recorded list is parsed without it, so it
+// replays with the paths it was recorded with.
+func parseIndexFlags(source string, args []string, label string, abs bool) (IndexRun, []string, error) {
 	run := IndexRun{Request: IndexRequest{Source: source}}
 	fs := indexFlagSet(&run)
 	if err := fs.Parse(args); err != nil {
 		return IndexRun{}, nil, fmt.Errorf("%w: %s: %w", ErrBadArgs, label, err)
+	}
+	if abs {
+		if err := AbsPathFlags(fs); err != nil {
+			return IndexRun{}, nil, fmt.Errorf("%s: %w", label, err)
+		}
 	}
 	run.Replay = ReplayFlags(fs)
 	return run, fs.Args(), nil
@@ -304,9 +315,10 @@ func ReplayFlags(fs *pflag.FlagSet) []string {
 // replay parses one recorded flag list and indexes the source with it as a
 // merge, and returns what the run read. The recorded --policy, or its absence,
 // picks the policy through PolicyFor, as it did when each scope ran as its own
-// process. Outcome still hears the run.
+// process. A recorded path is used as recorded, so a git scope keeps reading
+// from the position saved under that path. Outcome still hears the run.
 func (x *Indexer) replay(ctx context.Context, source string, args []string) (Outcome, error) {
-	parsed, _, err := parseIndexFlags(source, args, "recorded flags")
+	parsed, _, err := parseIndexFlags(source, args, "recorded flags", false)
 	if err != nil {
 		return Outcome{}, err
 	}

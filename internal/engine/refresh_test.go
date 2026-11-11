@@ -498,6 +498,53 @@ func TestReplayFlags(t *testing.T) {
 	}
 }
 
+// TestIndexFromFlagsAbsolutePaths verifies a flag list handed over for a new run
+// comes back with its relative paths made absolute, in the scope the run is
+// recorded under and in the list a refresh replays.
+func TestIndexFromFlagsAbsolutePaths(t *testing.T) {
+	t.Parallel()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	people, aliases := filepath.Join(wd, "people.csv"), filepath.Join(wd, "aliases.json")
+	a, b := filepath.Join(wd, "a"), filepath.Join(wd, "b")
+	tests := []struct {
+		WantScope  string
+		WantReplay []string
+		Source     string
+		Args       []string
+	}{{ // Test 0: A file source is keyed and replayed by the absolute file.
+		Source: "org-csv", Args: []string{"--file=people.csv"},
+		WantScope: "file:" + people, WantReplay: []string{"--file=" + people},
+	}, { // Test 1: A git run is keyed and replayed by its absolute repositories.
+		Source:     "git",
+		Args:       []string{"--repo-path", "b", "--repo-path", "a", "--aliases", "aliases.json"},
+		WantScope:  "repo:" + a + "," + b,
+		WantReplay: []string{"--aliases=" + aliases, "--repo-path", b, "--repo-path", a},
+	}, { // Test 2: An absolute file comes back as given.
+		Source: "org-csv", Args: []string{"--file", people},
+		WantScope: "file:" + people, WantReplay: []string{"--file=" + people},
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			run, err := IndexFromFlags(test.Source, test.Args)
+			if err != nil {
+				t.Fatalf("IndexFromFlags(%q): %v", test.Args, err)
+			}
+			req := run.Request
+			scope := RefreshScope(req.Source, "", req.File, req.RepoPaths)
+			if scope != test.WantScope {
+				t.Errorf("scope = %q, want %q", scope, test.WantScope)
+			}
+			if diff := cmp.Diff(test.WantReplay, run.Replay); diff != "" {
+				t.Errorf("replay list mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 // TestDropScopes verifies only the source's other scopes go, a source left with none goes too,
 // and with nothing to drop the file is not touched.
 func TestDropScopes(t *testing.T) {

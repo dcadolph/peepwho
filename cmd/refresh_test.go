@@ -74,6 +74,43 @@ func TestIndexRecordsEveryScope(t *testing.T) {
 	}
 }
 
+// TestRefreshFromAnotherDirectory verifies an index run given a relative path
+// records it as an absolute one, so a refresh started in another directory
+// still finds the file. It changes directory, so it does not run in parallel.
+func TestRefreshFromAnotherDirectory(t *testing.T) {
+	people, err := os.ReadFile("../examples/people.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir, work := t.TempDir(), t.TempDir()
+	if err := os.WriteFile(filepath.Join(work, "people.csv"), people, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(work)
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	abs := filepath.Join(wd, "people.csv")
+	args := []string{"index", "--source", "org-csv", "--file", "people.csv", "--data-dir", dir}
+	if _, errOut, err := runCmd(t, args...); err != nil {
+		t.Fatalf("index: %v\n%s", err, errOut)
+	}
+	got, err := engine.NewStore(engine.Dir(dir), nil).LoadInvocations()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	want := engine.Invocations{"org-csv": {"file:" + abs: {Flags: []string{"--file=" + abs}}}}
+	times := cmpopts.IgnoreFields(engine.Run{}, "RanAt", "AttemptedAt")
+	if diff := cmp.Diff(want, got, times); diff != "" {
+		t.Errorf("recorded run mismatch (-want +got):\n%s", diff)
+	}
+	t.Chdir(t.TempDir())
+	if _, errOut, err := runCmd(t, "refresh", "--data-dir", dir); err != nil {
+		t.Errorf("refresh from another directory: %v\n%s", err, errOut)
+	}
+}
+
 // TestRecordedPolicy verifies a refreshed scope runs under the --policy it was
 // recorded with, or the flag's default when none was, and never under the
 // --policy the refresh itself was given.

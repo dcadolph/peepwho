@@ -1,6 +1,11 @@
 package engine
 
-import "github.com/spf13/pflag"
+import (
+	"fmt"
+	"path/filepath"
+
+	"github.com/spf13/pflag"
+)
 
 // IndexArgs holds the values of every index flag except --source, so the
 // command line and a refresh replaying recorded flags parse them the same way.
@@ -131,4 +136,59 @@ func RegisterIndexFlags(fs *pflag.FlagSet, a *IndexArgs) {
 	fs.BoolVar(&a.ConfluenceServer, "confluence-server", false,
 		"Confluence is self-hosted Server or Data Center (REST at site root, bearer/anonymous auth), not Cloud.")
 	fs.IntVar(&a.MaxPages, "max-pages", 2000, "Cap Confluence pages read.")
+}
+
+// AbsPathFlags makes each relative path in the path flags of fs (--file,
+// --repo-path, --aliases, and --changes-file) absolute against the working
+// directory. An empty value, a path that is already absolute, and the "-" that
+// means standard input for --file stay as given. The values the flags are bound
+// to change with them, so a run, its refresh scope, and the flags a refresh
+// replays all name the same place whatever directory the refresh starts in.
+func AbsPathFlags(fs *pflag.FlagSet) error {
+	for _, name := range []string{"file", "repo-path", "aliases", "changes-file"} {
+		f := fs.Lookup(name)
+		if f == nil {
+			continue
+		}
+		if err := absFlag(f); err != nil {
+			return fmt.Errorf("resolve --%s: %w", name, err)
+		}
+	}
+	return nil
+}
+
+// absFlag makes every relative path f holds absolute. A value that needs no
+// change is left alone.
+func absFlag(f *pflag.Flag) error {
+	if sv, ok := f.Value.(pflag.SliceValue); ok {
+		paths := sv.GetSlice()
+		changed := false
+		for i, p := range paths {
+			abs, err := absPath(f.Name, p)
+			if err != nil {
+				return err
+			}
+			changed = changed || abs != p
+			paths[i] = abs
+		}
+		if !changed {
+			return nil
+		}
+		return sv.Replace(paths)
+	}
+	cur := f.Value.String()
+	abs, err := absPath(f.Name, cur)
+	if err != nil || abs == cur {
+		return err
+	}
+	return f.Value.Set(abs)
+}
+
+// absPath returns p as an absolute path for the flag called name. An empty
+// value, an absolute path, and the stdin marker of --file come back as given.
+func absPath(name, p string) (string, error) {
+	if p == "" || filepath.IsAbs(p) || (name == "file" && p == "-") {
+		return p, nil
+	}
+	return filepath.Abs(p)
 }

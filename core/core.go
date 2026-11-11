@@ -723,11 +723,12 @@ type indexView struct {
 // Index reads one source and merges it into the index at nowUnix, the host's
 // clock in seconds since the Unix epoch. flags holds the index flags the
 // command line takes, one argument per line, such as "--repo-path" and a path
-// on the next line, or "--file=/path/people.csv". The run is recorded the way
-// the command line records it, so Refresh replays it later. Every run merges,
-// so a second source adds to the first; to start over, Wipe then Index.
-// Credentials come from the handle's Secrets. --policy is refused, since the
-// core runs only under the strict policy.
+// on the next line, or "--file=/path/people.csv". A relative path is read
+// against the working directory and recorded as an absolute one. The run is
+// recorded the way the command line records it, so Refresh replays it later.
+// Every run merges, so a second source adds to the first; to start over, Wipe
+// then Index. Credentials come from the handle's Secrets. --policy is refused,
+// since the core runs only under the strict policy.
 func (h *Handle) Index(source, flags string, nowUnix int64) (out string, err error) {
 	defer rescue("index", &err)
 	if err := h.ready(); err != nil {

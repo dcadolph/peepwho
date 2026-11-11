@@ -610,6 +610,129 @@ func TestHandleIndexAndRefresh(t *testing.T) {
 	}
 }
 
+// TestHandleIndexRecordsAbsolutePath verifies Index reads a relative path
+// against the working directory and records it as an absolute one, so Refresh
+// replays the run after the working directory has changed. It changes
+// directory, so it does not run in parallel.
+func TestHandleIndexRecordsAbsolutePath(t *testing.T) {
+	people, err := os.ReadFile("../examples/people.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir, work := t.TempDir(), t.TempDir()
+	if err := os.WriteFile(filepath.Join(work, "people.csv"), people, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	h, err := Open(dir, testKeyB64)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Chdir(work)
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	abs := filepath.Join(wd, "people.csv")
+	scope := "file:" + abs
+	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	raw, err := h.Index("org-csv", "--file=people.csv\n", now.Unix())
+	if err != nil {
+		t.Fatalf("Index: %v", err)
+	}
+	var iv indexView
+	if err := json.Unmarshal([]byte(raw), &iv); err != nil {
+		t.Fatalf("unmarshal %s: %v", raw, err)
+	}
+	if iv.Scope != scope {
+		t.Errorf("index scope = %q, want %q", iv.Scope, scope)
+	}
+	inv, err := h.store.LoadInvocations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := &engine.Outcome{People: 7}
+	wantInv := engine.Invocations{"org-csv": {scope: {
+		Flags: []string{"--file=" + abs}, RanAt: now, AttemptedAt: now, Found: found,
+	}}}
+	if diff := cmp.Diff(wantInv, inv); diff != "" {
+		t.Errorf("recorded run mismatch (-want +got):\n%s", diff)
+	}
+	t.Chdir(t.TempDir())
+	later := now.Add(time.Hour)
+	raw, err = h.Refresh("", later.Unix())
+	if err != nil {
+		t.Fatalf("Refresh from another directory: %v", err)
+	}
+	var rv refreshView
+	if err := json.Unmarshal([]byte(raw), &rv); err != nil {
+		t.Fatalf("unmarshal %s: %v", raw, err)
+	}
+	wantResults := []refreshResult{{
+		Source: "org-csv", Scope: scope, RanAt: later.Format(time.RFC3339), OK: true, Found: found,
+	}}
+	if diff := cmp.Diff(wantResults, rv.Results); diff != "" || !rv.OK {
+		t.Errorf("refresh ok %v, results mismatch (-want +got):\n%s", rv.OK, diff)
+	}
+}
+
+// TestRefreshKeepsRecordedRelativePath verifies a git run recorded with a
+// relative path replays with that path, so the refresh resumes from the
+// position saved under it and starts no second position under the absolute
+// form. It changes directory, so it does not run in parallel.
+func TestRefreshKeepsRecordedRelativePath(t *testing.T) {
+	repo := newGitRepo(t)
+	rel := filepath.Base(repo)
+	t.Chdir(filepath.Dir(repo))
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	dir := t.TempDir()
+	store := engine.NewStore(engine.Dir(dir), testKeyCipher(t))
+	flags := []string{"--git-since-days=10000", "--repo-path", rel}
+	x := &engine.Indexer{
+		Dir: engine.Dir(dir), Codec: func() (vault.Codec, error) { return testKeyCipher(t), nil },
+		Policy: policy.Default(), Log: &strings.Builder{}, Now: func() time.Time { return now },
+		Record: func(source, scope string) error {
+			return store.RecordInvocation(source, scope, flags, now)
+		},
+	}
+	req := engine.IndexRequest{
+		Source:    "git",
+		IndexArgs: engine.IndexArgs{RepoPaths: []string{rel}, GitSinceDays: 10000},
+	}
+	if err := x.Index(context.Background(), req); err != nil {
+		t.Fatalf("engine Index: %v", err)
+	}
+	h, err := Open(dir, testKeyB64)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	later := now.Add(time.Hour)
+	raw, err := h.Refresh("", later.Unix())
+	if err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+	var rv refreshView
+	if err := json.Unmarshal([]byte(raw), &rv); err != nil {
+		t.Fatalf("unmarshal %s: %v", raw, err)
+	}
+	if !rv.OK || len(rv.Results) != 1 || rv.Results[0].Scope != "repo:"+rel {
+		t.Fatalf("refresh = %+v, want one good run under repo:%s", rv, rel)
+	}
+	st, err := h.store.LoadState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wm, ok := st.Get("git", "repo:"+rel); !ok || wm.Mark == "" || !wm.RanAt.Equal(later) {
+		t.Errorf("recorded position = %+v, found %t, want one the refresh wrote", wm, ok)
+	}
+	if wm, ok := st.Get("git", "repo:"+filepath.Join(wd, rel)); ok {
+		t.Errorf("the refresh started a second position under the absolute path: %+v", wm)
+	}
+}
+
 // TestStatusScopes verifies Status says when each recorded scope last worked and
 // how its last try went, in source then scope order, and leaves out a time it
 // does not know.
