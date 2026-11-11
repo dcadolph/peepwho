@@ -368,6 +368,14 @@ const minRankedToJudge = 4
 // SemanticPeople ranks people by cosine similarity to the query vector. The
 // similarity doubles as the strength, clamped at zero.
 func (ix *Index) SemanticPeople(query []float32, limit int) []model.Match {
+	people, _ := ix.SemanticPeopleSplit(query, limit)
+	return people
+}
+
+// SemanticPeopleSplit ranks people as SemanticPeople does and returns the
+// active and the deactivated apart, each cut to limit, so active people fill
+// the limit and a departed person is kept rather than dropped.
+func (ix *Index) SemanticPeopleSplit(query []float32, limit int) (people, departed []model.Match) {
 	// The field statistics come from the whole field, then the limit cuts the
 	// list. Measured against the truncated ranking, the same match reported a
 	// different strength at limit 5 than at limit 50, and strength must be a
@@ -376,9 +384,24 @@ func (ix *Index) SemanticPeople(query []float32, limit int) []model.Match {
 	// ranks the people exactly as an index without the teams would.
 	ranked := slices.DeleteFunc(rankByCosine(ix.personVecs, query), func(r scoredID) bool { return r.id.IsTeam() })
 	if !discriminating(ranked) {
-		return nil
+		return nil, nil
 	}
 	median, haveField := fieldMedian(ranked)
+	var active, gone []scoredID
+	for _, r := range ranked {
+		if p := ix.Graph.People[r.id]; p != nil && p.Deactivated() {
+			gone = append(gone, r)
+		} else {
+			active = append(active, r)
+		}
+	}
+	return ix.semanticMatches(active, limit, median, haveField),
+		ix.semanticMatches(gone, limit, median, haveField)
+}
+
+// semanticMatches turns the first limit entries of a cosine ranking into
+// matches, dropping any that do not stand out from the field.
+func (ix *Index) semanticMatches(ranked []scoredID, limit int, median float64, haveField bool) []model.Match {
 	if limit > 0 && len(ranked) > limit {
 		ranked = ranked[:limit]
 	}

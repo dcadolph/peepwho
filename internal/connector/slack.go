@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/model"
 	"github.com/dcadolph/whotoask/internal/slack"
 	"github.com/dcadolph/whotoask/internal/util"
 )
@@ -308,7 +309,17 @@ func personRecord(u slack.User, teamID string) Record {
 		Email:    u.Profile.Email,
 		Title:    u.Profile.Title,
 		Link:     dmLink(teamID, u.ID),
+		Account:  accountStatus(u),
 	}
+}
+
+// accountStatus reports a Slack account as active or deactivated. Slack lists
+// every member with this flag, so its status is always known.
+func accountStatus(u slack.User) model.AccountStatus {
+	if u.Deleted {
+		return model.AccountDeactivated
+	}
+	return model.AccountActive
 }
 
 // dmLink is the slack:// deep link that opens a direct message with userID in

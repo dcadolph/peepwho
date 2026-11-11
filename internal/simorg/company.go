@@ -108,6 +108,10 @@ func buildCompany(spec Spec) *company {
 	return c
 }
 
+// departedSubject is the subject, kafka lag, whose one backup expert has a
+// deactivated Slack account in the sample company.
+const departedSubject = 1
+
 // addSecondaryExperts gives some subjects a second or third fluent voice, so the
 // risk view shows a real spread of critical, elevated, and ok rather than every
 // topic sitting at bus factor one.
@@ -136,6 +140,11 @@ func (c *company) addSecondaryExperts(rng *rand.Rand) {
 				idx = (idx + 1) % len(c.people)
 			}
 			c.people[idx].topics = append(c.people[idx].topics, s)
+			// The kafka lag backup has left, so the sample shows a departed
+			// person who still knows a subject, ranked below the owner.
+			if s == departedSubject && k == 0 {
+				c.people[idx].deactivated = true
+			}
 			for range 5 {
 				ts += 600
 				c.history[channelID] = append(c.history[channelID],

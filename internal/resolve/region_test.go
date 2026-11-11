@@ -7,6 +7,7 @@ import (
 
 	"github.com/dcadolph/whotoask/internal/connector"
 	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // tied returns a record tying one subject to several others.
@@ -180,5 +181,41 @@ func TestRiskMarksAnExpertWhoHasMovedOn(t *testing.T) {
 	}
 	if ledger.Experts[0].Quiet {
 		t.Error("ledger's expert is still in it and was wrongly marked as gone")
+	}
+}
+
+// TestRiskMarksADeactivatedExpert checks that a subject held by somebody whose
+// account is deactivated reports them as gone, even when their last work on it
+// was recent, and still counts their share, since a departed sole expert is
+// the sharpest knowledge risk there is.
+func TestRiskMarksADeactivatedExpert(t *testing.T) {
+	t.Parallel()
+	ix := index.New()
+	ix.Build([]connector.Record{
+		{Kind: connector.KindPerson, Name: "Left", Email: "left@x.com", PersonID: "slack:u1",
+			Topics: []string{"billing", "billing"}, RecentTopics: []string{"billing", "billing"},
+			Source: "slack", Account: model.AccountDeactivated},
+		{Kind: connector.KindPerson, Name: "Here", Email: "here@x.com", PersonID: "slack:u2",
+			Topics: []string{"ledger", "ledger"}, RecentTopics: []string{"ledger", "ledger"},
+			Source: "slack", Account: model.AccountActive},
+	})
+	ix.Canonicalize()
+
+	byTopic := map[string]TopicRisk{}
+	for _, r := range Risk(ix, 0) {
+		byTopic[r.Topic] = r
+	}
+	billing, ok := byTopic["billing"]
+	if !ok || len(billing.Experts) == 0 {
+		t.Fatalf("billing was not scored: %+v", byTopic)
+	}
+	if !billing.Experts[0].Quiet || !billing.LeadQuiet() {
+		t.Error("billing rests on a deactivated account and is not reported as gone")
+	}
+	if billing.BusFactor != 1 {
+		t.Errorf("billing bus factor = %d, want 1: the departed expert still holds it alone", billing.BusFactor)
+	}
+	if ledger := byTopic["ledger"]; len(ledger.Experts) == 0 || ledger.Experts[0].Quiet {
+		t.Errorf("ledger = %+v, want its active expert not marked as gone", ledger)
 	}
 }

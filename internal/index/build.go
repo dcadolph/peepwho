@@ -257,6 +257,11 @@ func foldRecord(base, add connector.Record) connector.Record {
 	if base.Link == "" {
 		base.Link = add.Link
 	}
+	// A newer listing of the same account says what it is now: an account
+	// deactivated since the last run is deactivated, not joined with its past.
+	if add.Account != model.AccountUnknown {
+		base.Account = add.Account
+	}
 	// Keep the better display name rather than always taking the delta's, so an
 	// incremental record carrying a handle placeholder never overwrites a real
 	// name already held, matching how a full read resolves identity.
@@ -595,6 +600,7 @@ func fillIdentity(p *model.Person, rec connector.Record) {
 	if rec.Manager != "" {
 		p.ManagerID = model.ID(normalizeRef(rec.Manager))
 	}
+	p.Account = p.Account.Join(rec.Account)
 }
 
 // normalizeRef folds a reference to a person found inside another record, such

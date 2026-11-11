@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/dcadolph/whotoask/internal/model"
 	"github.com/dcadolph/whotoask/internal/slack"
 )
 
@@ -23,7 +24,8 @@ func TestSlackFetch(t *testing.T) {
 	const (
 		usersJSON = `{"ok":true,"members":[
 			{"id":"U1","profile":{"real_name":"Jane Roe","email":"jane@x.com","title":"Staff Engineer"}},
-			{"id":"U2","profile":{"real_name":"Bob Lee","email":"bob@x.com","title":"SRE"}}]}`
+			{"id":"U2","profile":{"real_name":"Bob Lee","email":"bob@x.com","title":"SRE"}},
+			{"id":"U3","deleted":true,"profile":{"real_name":"Lena Gone","email":"lena@x.com"}}]}`
 		channelsJSON = `{"ok":true,"channels":[
 			{"id":"C1","name":"billing","topic":{"value":"retries and dunning"},
 			 "purpose":{"value":"billing platform"}}]}`
@@ -93,6 +95,14 @@ func TestSlackFetch(t *testing.T) {
 	// which is what lets the bot tell who is asking.
 	if got := people["jane@x.com"].PersonID; got != "slack:U1" {
 		t.Errorf("jane person id = %q, want slack:U1", got)
+	}
+	// A deactivated member is still a person, marked so ranking can put them
+	// below everyone who can still be reached.
+	if got := people["lena@x.com"].Account; got != model.AccountDeactivated {
+		t.Errorf("lena account = %v, want deactivated", got)
+	}
+	if got := people["jane@x.com"].Account; got != model.AccountActive {
+		t.Errorf("jane account = %v, want active", got)
 	}
 	if !janeTalksRetries {
 		t.Error("expected a person record giving Jane retries affinity from her messages")

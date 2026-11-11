@@ -175,10 +175,21 @@ func coveredShare(matched map[string]bool, covers map[string][]string, originals
 // limit returns all matches. Teams are not people and never appear here: the
 // ranking reads only the people view, so scores, order, and strength are what
 // an index without the teams would give. SearchTeams answers for them.
+// Deactivated people never appear here either. SearchSplit returns them.
 func (ix *Index) Search(query string, limit int) []model.Match {
+	people, _ := ix.SearchSplit(query, limit)
+	return people
+}
+
+// SearchSplit ranks people for query and returns the active and the
+// deactivated apart, each cut to limit. The split happens before the cut, so
+// active people fill the limit whatever a departed person scored, and a
+// departed person who knew the subject is still returned, ranked among the
+// departed, rather than silently dropped.
+func (ix *Index) SearchSplit(query string, limit int) (people, departed []model.Match) {
 	terms, covers, asked := expandedQuery(query)
 	if len(terms) == 0 {
-		return nil
+		return nil, nil
 	}
 	terms = append(terms, ix.tieExpand(tokenize(query), covers, asked)...)
 	originals := 0
@@ -251,25 +262,46 @@ func (ix *Index) Search(query string, limit int) []model.Match {
 		}
 		return matches[i].Person.ID < matches[j].Person.ID
 	})
-	if limit > 0 && len(matches) > limit {
-		matches = matches[:limit]
+	people, departed = SplitDeparted(matches)
+	if limit > 0 {
+		people = people[:min(len(people), limit)]
+		departed = departed[:min(len(departed), limit)]
 	}
 	// Build the reasons and strength only for the people that survived the
 	// limit. Each reason stems the person's whole topic set against every query
 	// term, so doing it for every candidate before ranking was the query's cost,
 	// and only the returned people need it. Strength does not affect the
 	// ranking, which is by score, so deferring it changes no result.
-	for i := range matches {
-		pid := matches[i].Person.ID
-		reasons, evidence := ix.reasons(pid, matched[pid], resolved, asked)
-		if net := nets[pid]; net != 0 {
-			reasons = append(reasons, feedbackReason(net))
+	explain := func(list []model.Match) {
+		for i := range list {
+			pid := list[i].Person.ID
+			reasons, evidence := ix.reasons(pid, matched[pid], resolved, asked)
+			if net := nets[pid]; net != 0 {
+				reasons = append(reasons, feedbackReason(net))
+			}
+			list[i].Reasons = reasons
+			list[i].Strength = evidence * coveredShare(matched[pid], covers, originals)
+			list[i].Declared = evidence > evidenceTeam
 		}
-		matches[i].Reasons = reasons
-		matches[i].Strength = evidence * coveredShare(matched[pid], covers, originals)
-		matches[i].Declared = evidence > evidenceTeam
 	}
-	return matches
+	explain(people)
+	explain(departed)
+	return people, departed
+}
+
+// SplitDeparted separates matches into the people who can still be reached and
+// the deactivated, keeping the order of each. Matches without a person count as
+// active, so nothing is lost from either list.
+func SplitDeparted(matches []model.Match) (people, departed []model.Match) {
+	people = make([]model.Match, 0, len(matches))
+	for _, m := range matches {
+		if m.Person != nil && m.Person.Deactivated() {
+			departed = append(departed, m)
+		} else {
+			people = append(people, m)
+		}
+	}
+	return people, departed
 }
 
 // SearchChannels ranks channels for query and returns up to limit matches, each

@@ -358,6 +358,9 @@ type person struct {
 	// topics are the subject indices this person is an expert in. Set only by the
 	// demo company builder.
 	topics []int
+	// deactivated marks a Slack account the workspace has deactivated. Set only
+	// by the demo company builder.
+	deactivated bool
 }
 
 // canonical returns the identifier the index keys this person by.
@@ -688,7 +691,11 @@ func slackServerFor(
 ) *httptest.Server {
 	users := make([]map[string]any, 0, len(people))
 	for _, p := range people {
-		users = append(users, slackUser(p.id, p.name, p.email, p.title))
+		u := slackUser(p.id, p.name, p.email, p.title)
+		if p.deactivated {
+			u["deleted"] = true
+		}
+		users = append(users, u)
 	}
 	replies := make(map[string][]map[string]any, len(threads))
 	for _, t := range threads {

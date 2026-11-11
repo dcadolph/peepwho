@@ -343,10 +343,17 @@ func topicsByWeight(risks []TopicRisk) []string {
 
 // hasMovedOn reports whether somebody holds a subject but has stopped working
 // on it. A source that cannot say what was recent claims nothing either way,
-// which is why an absent record is not read as absence.
+// which is why an absent record is not read as absence. A deactivated person
+// has moved on from everything they hold.
 func hasMovedOn(ix *index.Index, id model.ID, topic model.ID) bool {
 	p := ix.Graph.People[ix.CanonicalID(id)]
-	if p == nil || len(p.Recent) == 0 {
+	if p == nil {
+		return false
+	}
+	if p.Deactivated() {
+		return p.Topics[topic] > 0
+	}
+	if len(p.Recent) == 0 {
 		return false
 	}
 	return p.Topics[topic] > 0 && p.Recent[topic] == 0

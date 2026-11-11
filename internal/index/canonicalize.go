@@ -104,6 +104,7 @@ func mergePerson(dst, src *model.Person) {
 	if dst.ManagerID == "" {
 		dst.ManagerID = src.ManagerID
 	}
+	dst.Account = dst.Account.Join(src.Account)
 	if dst.Topics == nil {
 		dst.Topics = make(map[model.ID]float64)
 	}

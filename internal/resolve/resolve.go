@@ -22,8 +22,13 @@ import (
 // Answer is a resolved response: ranked people, ranked channels, the teams of
 // record, and an optional written summary that the LLM resolver fills in.
 type Answer struct {
-	// People is the ranked list of people to talk to. It never holds a team.
+	// People is the ranked list of people to talk to. It never holds a team or
+	// a deactivated person.
 	People []model.Match
+	// Departed are the deactivated people who match, ranked among themselves and
+	// kept apart from People, so active people fill the limit and a departed
+	// expert is still named, at the bottom, rather than silently dropped.
+	Departed []model.Match
 	// Teams are the CODEOWNERS teams that own what was asked, ranked among
 	// themselves and kept apart from People, so a team never takes a person's
 	// place under the limit. Their members are not expanded: with an org chart
@@ -71,9 +76,12 @@ func NewKeyword(ix *index.Index) *Keyword {
 
 // Resolve ranks people and channels for query using the index.
 func (k *Keyword) Resolve(_ context.Context, query string, limit int) (Answer, error) {
-	people := withNamed(nameMatch(k.ix, query, limit), k.ix.Search(query, limit), limit)
+	named, namedGone := index.SplitDeparted(nameMatch(k.ix, query, limit))
+	found, gone := k.ix.SearchSplit(query, limit)
+	declared := func(m model.Match) bool { return m.Declared }
 	return Answer{
-		People:   withoutChatter(people, func(m model.Match) bool { return m.Declared }),
+		People:   withoutChatter(withNamed(named, found, limit), declared),
+		Departed: withoutChatter(withNamed(namedGone, gone, limit), declared),
 		Channels: withoutChatter(k.ix.SearchChannels(query, limit), func(m model.ChannelMatch) bool { return m.Declared }),
 		Teams:    teamsOfRecord(k.ix, query, limit),
 		ix:       k.ix,
@@ -239,10 +247,13 @@ func extractJSON(raw string) string {
 // model abstaining, not overridden with the full candidate list.
 func (l *LLM) Resolve(ctx context.Context, query string, limit int) (Answer, error) {
 	n := candidateN(limit)
-	people, channels := l.retrieve(ctx, query, n)
+	people, departed, channels := l.retrieve(ctx, query, n)
+	// The departed ride along in keyword order and never reach the model, so it
+	// ranks only people who can still be reached.
+	departed = Cap(departed, limit)
 	teams := teamsOfRecord(l.ix, query, limit)
 	if len(people) == 0 && len(channels) == 0 {
-		return Answer{Teams: teams}, nil
+		return Answer{Departed: departed, Teams: teams, Summary: localSummary(nil, departed, nil)}, nil
 	}
 
 	system, prompt := llmSystem, buildPrompt(query, people, channels)
@@ -258,11 +269,12 @@ func (l *LLM) Resolve(ctx context.Context, query string, limit int) (Answer, err
 	if jsonErr := json.Unmarshal([]byte(extractJSON(raw)), &out); jsonErr != nil {
 		// The reply was not usable JSON: keep keyword order rather than trusting
 		// unparsed prose, and write the summary from those grounded results.
-		answer := groundedAnswer(Cap(people, limit), Cap(channels, limit), teams)
+		answer := groundedAnswer(Cap(people, limit), departed, Cap(channels, limit), teams)
 		return answer, nil //nolint:nilerr // Unusable model output falls back to grounded results.
 	}
 	return groundedAnswer(
 		rankedPeople(people, out.People, limit),
+		departed,
 		rankedChannels(channels, out.Channels, limit),
 		teams,
 	), nil
@@ -271,13 +283,15 @@ func (l *LLM) Resolve(ctx context.Context, query string, limit int) (Answer, err
 // groundedAnswer assembles an Answer and writes its recommendation locally from
 // the top-ranked results, so the summary can never name a non-candidate. Teams
 // ride along unranked by the model and never reach the summary, which only
-// ever tells the asker to talk to a person.
-func groundedAnswer(people []model.Match, channels []model.ChannelMatch, teams []model.Match) Answer {
+// ever tells the asker to talk to a person. The departed ride along the same
+// way and reach the summary only when no active person matched.
+func groundedAnswer(people, departed []model.Match, channels []model.ChannelMatch, teams []model.Match) Answer {
 	return Answer{
 		People:   people,
+		Departed: departed,
 		Channels: channels,
 		Teams:    teams,
-		Summary:  localSummary(people, channels),
+		Summary:  localSummary(people, departed, channels),
 	}
 }
 
@@ -303,13 +317,17 @@ func rankedChannels(cands []model.ChannelMatch, order []rankToken, limit int) []
 // retrieve gets candidate people and channels, semantically when an embedder is
 // configured and the index has vectors, otherwise by keyword. A failed query
 // embedding falls back to keyword retrieval.
-func (l *LLM) retrieve(ctx context.Context, query string, n int) ([]model.Match, []model.ChannelMatch) {
+func (l *LLM) retrieve(
+	ctx context.Context, query string, n int,
+) (people, departed []model.Match, channels []model.ChannelMatch) {
 	if l.embedder != nil && l.ix.HasEmbeddings() {
 		if vec, err := l.embedder.Embed(ctx, query); err == nil {
-			return l.ix.SemanticPeople(vec, n), l.ix.SemanticChannels(vec, n)
+			people, departed = l.ix.SemanticPeopleSplit(vec, n)
+			return people, departed, l.ix.SemanticChannels(vec, n)
 		}
 	}
-	return l.ix.Search(query, n), l.ix.SearchChannels(query, n)
+	people, departed = l.ix.SearchSplit(query, n)
+	return people, departed, l.ix.SearchChannels(query, n)
 }
 
 // candidateN returns how many candidates to retrieve for the model, a small
@@ -389,17 +407,30 @@ func buildRedactedPrompt(query string, people []model.Match, channels []model.Ch
 }
 
 // localSummary writes a one-line recommendation from the top-ranked results,
-// so redacted mode never needs the model to see or produce a name.
-func localSummary(people []model.Match, channels []model.ChannelMatch) string {
+// so redacted mode never needs the model to see or produce a name. It names an
+// active person when there is one, and a departed one, marked, only when no
+// active person matched, so the summary never disagrees with the list.
+func localSummary(people, departed []model.Match, channels []model.ChannelMatch) string {
 	var parts []string
-	if len(people) > 0 {
-		p := people[0].Person
+	top, gone := people, false
+	if len(top) == 0 {
+		top, gone = departed, true
+	}
+	if len(top) > 0 {
+		p := top[0].Person
 		who := p.Name
 		if who == "" {
 			who = p.Email
 		}
+		var notes []string
 		if p.Title != "" {
-			who += " (" + p.Title + ")"
+			notes = append(notes, p.Title)
+		}
+		if gone {
+			notes = append(notes, "deactivated")
+		}
+		if len(notes) > 0 {
+			who += " (" + strings.Join(notes, ", ") + ")"
 		}
 		parts = append(parts, "Talk to "+who)
 	}
@@ -514,11 +545,20 @@ func (s *Semantic) Resolve(ctx context.Context, query string, limit int) (Answer
 	if limit > 0 {
 		pool = max(limit*3, 15)
 	}
-	people := withNamed(nameMatch(s.ix, query, limit),
-		fusePeople(s.ix.Search(query, pool),
-			s.ix.SemanticPeople(vec, pool), s.topicPeople(vec, pool), limit), limit)
+	named, namedGone := index.SplitDeparted(nameMatch(s.ix, query, limit))
+	words, wordsGone := s.ix.SearchSplit(query, pool)
+	meaning, meaningGone := s.ix.SemanticPeopleSplit(vec, pool)
+	subjects, subjectsGone := index.SplitDeparted(s.topicPeople(vec, pool))
+	people := withNamed(named, fusePeople(words, meaning, subjects, limit), limit)
+	departed := withNamed(namedGone, fusePeople(wordsGone, meaningGone, subjectsGone, limit), limit)
 	channels := fuseChannels(s.ix.SearchChannels(query, pool), s.ix.SemanticChannels(vec, pool), limit)
-	return Answer{People: people, Channels: channels, Teams: teamsOfRecord(s.ix, query, limit), ix: s.ix}, nil
+	return Answer{
+		People:   people,
+		Departed: departed,
+		Channels: channels,
+		Teams:    teamsOfRecord(s.ix, query, limit),
+		ix:       s.ix,
+	}, nil
 }
 
 // topicSubjects is how many subjects a question is matched against, and

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // Record is one normalized observation from a source. A KindPerson record
@@ -68,6 +69,9 @@ type Record struct {
 	// KindChannel record, or a deep link that starts a direct message with the
 	// person on a KindPerson record.
 	Link string
+	// Account is whether the person's account in this source is active or
+	// deactivated, left unknown by sources that do not report it.
+	Account model.AccountStatus
 	// Text is free-form text attributed to the person or channel, mined for
 	// topics. It is readable message content and is never written to disk: the
 	// index persists only the stemmed Terms derived from it, so a stored index

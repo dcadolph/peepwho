@@ -158,3 +158,36 @@ func TestPeopleCount(t *testing.T) {
 		})
 	}
 }
+
+// TestAccountStatusJoin checks that one active account keeps a person active
+// and that an unknown status never overrides a known one, in either order.
+func TestAccountStatusJoin(t *testing.T) {
+	t.Parallel()
+	u, a, d := AccountUnknown, AccountActive, AccountDeactivated
+	tests := []struct {
+		WantResult AccountStatus
+		A, B       AccountStatus
+	}{
+		{A: u, B: u, WantResult: u}, // Test 0: Nothing known.
+		{A: u, B: a, WantResult: a}, // Test 1: Unknown and active.
+		{A: u, B: d, WantResult: d}, // Test 2: Unknown never hides a deactivation.
+		{A: a, B: d, WantResult: a}, // Test 3: One active account keeps them active.
+		{A: d, B: d, WantResult: d}, // Test 4: Every account deactivated.
+		{A: a, B: a, WantResult: a}, // Test 5: Both active.
+	}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			if diff := cmp.Diff(test.WantResult, test.A.Join(test.B)); diff != "" {
+				t.Errorf("join mismatch (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(test.WantResult, test.B.Join(test.A)); diff != "" {
+				t.Errorf("reversed join mismatch (-want +got):\n%s", diff)
+			}
+			p := &Person{Account: test.WantResult}
+			if diff := cmp.Diff(test.WantResult == d, p.Deactivated()); diff != "" {
+				t.Errorf("deactivated mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}

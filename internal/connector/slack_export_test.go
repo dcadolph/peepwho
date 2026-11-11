@@ -14,6 +14,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/dcadolph/whotoask/internal/episode"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // exportFixture is the captured real-format Slack export: nested top folder,
@@ -55,6 +56,12 @@ func TestSlackExportPeople(t *testing.T) {
 	}
 	if dee := people["slack:U01DDD444"]; dee.Email != "dee@corp.com" {
 		t.Errorf("deactivated user = %+v, want kept with email; leavers are who recall is for", dee)
+	}
+	if got := people["slack:U01DDD444"].Account; got != model.AccountDeactivated {
+		t.Errorf("deactivated user account = %v, want deactivated", got)
+	}
+	if got := alice.Account; got != model.AccountActive {
+		t.Errorf("alice account = %v, want active", got)
 	}
 	// Carol has no email and the bot has no email; both are counted, and the
 	// operator hears it once with the reason exports omit emails.

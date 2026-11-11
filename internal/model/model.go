@@ -83,6 +83,42 @@ type Person struct {
 	// working in it. Without it, indexing a CODEOWNERS file makes every owner
 	// look active in everything they own.
 	Stated map[ID]float64
+	// Account is what the sources that know account status say about the
+	// person's accounts, joined so one active account keeps them active.
+	Account AccountStatus `json:"Account,omitempty"`
+}
+
+// Deactivated reports whether every account a status-aware source knows for
+// the person is deactivated. They stay in the graph, since what they knew is
+// still on record, and rank below everyone who can still be reached.
+func (p *Person) Deactivated() bool { return p.Account == AccountDeactivated }
+
+// AccountStatus is what a source says about a person's account.
+type AccountStatus int
+
+const (
+	// AccountUnknown means the source does not report account status. It is the
+	// zero value, so records and indexes from before status existed read as it.
+	AccountUnknown AccountStatus = iota
+	// AccountActive is an account that can still be reached.
+	AccountActive
+	// AccountDeactivated is an account the workspace has deactivated.
+	AccountDeactivated
+)
+
+// Join combines the status of two accounts of one person. Any active account
+// makes the person active, since one real person can hold several accounts and
+// only some of them may be closed. Unknown never overrides a known status, so a
+// source that cannot see accounts does not hide a deactivation another reports.
+func (s AccountStatus) Join(o AccountStatus) AccountStatus {
+	switch {
+	case s == AccountActive || o == AccountActive:
+		return AccountActive
+	case s == AccountDeactivated || o == AccountDeactivated:
+		return AccountDeactivated
+	default:
+		return AccountUnknown
+	}
 }
 
 // Reach is the sum of the person's topic weights: how much of everything their
