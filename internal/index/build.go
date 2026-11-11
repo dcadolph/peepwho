@@ -233,12 +233,14 @@ func foldKey(rec connector.Record) string {
 	}
 }
 
-// foldRecord sums add into base: it concatenates the topic and term lists that
-// rebuild turns into weight, unions channel members, advances the time to the
-// most recent activity, and fills any identity field base is missing.
+// foldRecord sums add into base: it concatenates every topic list and the term
+// list that rebuild turns into weight, unions channel members, advances the time
+// to the most recent activity, and fills any identity field base is missing.
 func foldRecord(base, add connector.Record) connector.Record {
 	base.Topics = append(base.Topics, add.Topics...)
 	base.RecentTopics = append(base.RecentTopics, add.RecentTopics...)
+	base.DirectTopics = append(base.DirectTopics, add.DirectTopics...)
+	base.WeakTopics = append(base.WeakTopics, add.WeakTopics...)
 	base.Terms = append(base.Terms, add.Terms...)
 	base.Links = foldLinks(base.Links, add.Links)
 	for _, m := range add.Members {
