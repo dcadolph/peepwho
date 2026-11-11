@@ -31,7 +31,6 @@ import (
 	"github.com/dcadolph/whotoask/internal/engine"
 	"github.com/dcadolph/whotoask/internal/episode"
 	"github.com/dcadolph/whotoask/internal/index"
-	"github.com/dcadolph/whotoask/internal/model"
 	"github.com/dcadolph/whotoask/internal/policy"
 	"github.com/dcadolph/whotoask/internal/recall"
 	"github.com/dcadolph/whotoask/internal/vault"
@@ -956,7 +955,7 @@ func (h *Handle) ImportSample(dir string, nowUnix int64) (out string, err error)
 	if err := h.store.SaveSample(now); err != nil {
 		return "", fmt.Errorf("core: load sample: %w", err)
 	}
-	if err := h.saveSample(ix, eps, old, now); err != nil {
+	if err := h.saveSample(ix, eps, old != nil, now); err != nil {
 		return "", fmt.Errorf("core: load sample: %w", err)
 	}
 	if err := h.reload(); err != nil {
@@ -969,28 +968,33 @@ func (h *Handle) ImportSample(dir string, nowUnix int64) (out string, err error)
 	})
 }
 
-// saveSample writes the sample under the handle's key and logs who it adds beside
-// old, the sample it replaces, nil when there was none.
-func (h *Handle) saveSample(ix *index.Index, eps *episode.Store, old *loaded, now time.Time) error {
+// saveSample writes the sample under the handle's key and replaces the change
+// log with the one entry a load into an empty directory records, so a record an
+// earlier build or an earlier sample wrote never outlives the load. A reload over
+// an earlier sample keeps that entry's time, so the same sample loaded again
+// shows nothing new since the last look.
+func (h *Handle) saveSample(ix *index.Index, eps *episode.Store, reload bool, now time.Time) error {
 	if err := h.store.SaveIndex(ix); err != nil {
 		return err
 	}
 	if err := h.store.SaveEpisodes(eps); err != nil {
 		return err
 	}
-	var prev *model.Graph
-	if old != nil {
-		prev = old.eng.Index().Graph
+	at := now
+	if reload {
+		entries, err := h.store.LoadChanges()
+		if err != nil {
+			return err
+		}
+		if len(entries) > 0 {
+			at = entries[0].At
+		}
 	}
-	changes := index.Diff(prev, ix.Graph)
-	if changes.Empty() {
-		return nil
+	var log []engine.ChangeEntry
+	if changes := index.Diff(nil, ix.Graph); !changes.Empty() {
+		log = []engine.ChangeEntry{{At: at, Changes: changes}}
 	}
-	entries, err := h.store.LoadChanges()
-	if err != nil {
-		return err
-	}
-	return h.store.SaveChanges(append(entries, engine.ChangeEntry{At: now, Changes: changes}))
+	return h.store.SaveChanges(log)
 }
 
 // wipeView is the JSON shape Wipe returns.

@@ -806,6 +806,70 @@ func TestImportSample(t *testing.T) {
 	}
 }
 
+// TestImportSampleReplacesChanges verifies a sample load replaces any change
+// record already on disk with the one entry the sample adds, and a reload keeps
+// the first load's time.
+func TestImportSampleReplacesChanges(t *testing.T) {
+	t.Parallel()
+	bundled := t.TempDir()
+	copySample(t, engine.Dir(newTestDataDir(t, nil)), bundled)
+	first := time.Date(2026, 11, 10, 10, 5, 0, 0, time.UTC)
+	later := first.Add(9 * time.Hour)
+	stale := engine.ChangeEntry{At: first.Add(time.Hour), Changes: index.Changes{
+		PeopleJoined: []string{"@simcorp/legal-squad"},
+	}}
+	tests := []struct {
+		WantAt time.Time
+		Reload bool
+	}{{ // Test 0: A record left in an empty directory gives way to the sample's entry.
+		WantAt: later, Reload: false,
+	}, { // Test 1: A record written after a first load gives way on reload, at the first load's time.
+		WantAt: first, Reload: true,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			dir := filepath.Join(t.TempDir(), "data")
+			if err := os.MkdirAll(dir, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			h, err := Open(dir, testKeyB64)
+			if err != nil {
+				t.Fatalf("Open: %v", err)
+			}
+			if test.Reload {
+				if _, err := h.ImportSample(bundled, first.Unix()); err != nil {
+					t.Fatalf("first ImportSample: %v", err)
+				}
+			}
+			entries, err := h.store.LoadChanges()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := h.store.SaveChanges(append(entries, stale)); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := h.ImportSample(bundled, later.Unix()); err != nil {
+				t.Fatalf("ImportSample: %v", err)
+			}
+			got, err := h.store.LoadChanges()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(got) != 1 {
+				t.Fatalf("change log holds %d entries, want 1: %+v", len(got), got)
+			}
+			if diff := cmp.Diff(test.WantAt, got[0].At.UTC()); diff != "" {
+				t.Errorf("entry time mismatch (-want +got):\n%s", diff)
+			}
+			joined := got[0].Changes.PeopleJoined
+			if len(joined) != 12 || slices.Contains(joined, "@simcorp/legal-squad") {
+				t.Errorf("people joined = %v, want the sample's 12 people and no stale handle", joined)
+			}
+		})
+	}
+}
+
 // TestImportSampleRefused verifies a load over real data or from a missing sample
 // fails and changes nothing, and a real index reads as no sample.
 func TestImportSampleRefused(t *testing.T) {
