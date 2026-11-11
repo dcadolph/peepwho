@@ -145,6 +145,74 @@ struct SearchTests {
         #expect(opened.urls.map(\.absoluteString) == [want])
         #expect(model.detail?.id == carol.id)
     }
+
+    // Test 6: The arrow keys mark a row and stop at both ends, Enter opens the marked person and
+    // not the first, the hint names whom Enter reaches, and a new answer marks the first row
+    // again. Billing kafka ranks four people, the first and the third with a Slack link each.
+    @Test func arrowsMarkWhoEnterOpens() async throws {
+        let dir = try demoDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let opened = Opened()
+        let core = try Core.open(dir: dir, key: "", secrets: KeychainSecrets())
+        let model = SearchModel(core: core, delay: .milliseconds(1), opener: opened.open)
+        #expect(model.selected == nil)
+        model.moveDown()
+        #expect(model.selected == nil)
+        model.query = "billing kafka"
+        await model.ask(model.query)
+        try #require(model.people.count == 4)
+        #expect(model.selected == 0)
+        model.moveUp()
+        #expect(model.selected == 0)
+        #expect(model.enterHint == "Enter messages the first person.")
+        model.moveDown()
+        model.moveDown()
+        #expect(model.selected == 2)
+        let third = model.people[2]
+        #expect(model.enterHint == "Enter messages \(third.name).")
+        let want = try #require(try await core.person(third.id).links?.first)
+        let first = try #require(try await core.person(model.people[0].id).links?.first)
+        try #require(want != first)
+        await model.submit()
+        #expect(opened.urls.map(\.absoluteString) == [want])
+        #expect(model.detail == nil)
+        model.moveDown()
+        model.moveDown()
+        #expect(model.selected == 3)
+        model.moveUp()
+        #expect(model.selected == 2)
+        model.query = "terraform"
+        await model.ask(model.query)
+        #expect(model.selected == 0)
+        #expect(model.enterHint == "Enter messages the first person.")
+    }
+
+    // Test 7: Command-Return shows the marked person, the arrows leave the mark alone on a person
+    // page, Escape there goes back to the results with the same row marked, and Escape on the
+    // results changes nothing.
+    @Test func escapeLeavesPerson() async throws {
+        let dir = try demoDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let opened = Opened()
+        let core = try Core.open(dir: dir, key: "", secrets: KeychainSecrets())
+        let model = SearchModel(core: core, delay: .milliseconds(1), opener: opened.open)
+        model.query = "billing"
+        await model.ask(model.query)
+        try #require(model.people.count == 3)
+        model.moveDown()
+        let second = model.people[1]
+        await model.showMarked()
+        #expect(model.detail?.id == second.id)
+        model.moveDown()
+        #expect(model.selected == 1)
+        #expect(model.escape())
+        #expect(model.detail == nil)
+        #expect(model.selected == 1)
+        #expect(!model.escape())
+        #expect(model.detail == nil)
+        #expect(model.selected == 1)
+        #expect(opened.urls.isEmpty)
+    }
 }
 
 // SearchStateTests check that the window never shows or opens what it moved on from.
@@ -191,12 +259,14 @@ struct SearchStateTests {
         try #require(!model.changes.isEmpty)
         await model.ask("ledger")
         try #require(!model.people.isEmpty)
+        try #require(model.selected == 0)
 
         model.query = "retries"
         model.typed("retries")
         model.use(core)
         #expect(model.query.isEmpty)
         #expect(model.people.isEmpty)
+        #expect(model.selected == nil)
         #expect(model.changes.isEmpty)
         try await Task.sleep(for: .milliseconds(500))
         #expect(model.people.isEmpty)

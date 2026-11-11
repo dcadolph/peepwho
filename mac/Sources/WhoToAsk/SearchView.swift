@@ -23,6 +23,20 @@ struct SearchView: View {
                 .focused($focused)
                 .onSubmit { Task { await model.submit() } }
                 .onChange(of: model.query) { _, text in model.typed(text) }
+                .onKeyPress(.downArrow) {
+                    model.moveDown()
+                    return .handled
+                }
+                .onKeyPress(.upArrow) {
+                    model.moveUp()
+                    return .handled
+                }
+                .onKeyPress(.escape) { model.escape() ? .handled : .ignored }
+                .onKeyPress(keys: [.return]) { press in
+                    guard press.modifiers.contains(.command) else { return .ignored }
+                    Task { await model.showMarked() }
+                    return .handled
+                }
             if model.sample {
                 Text("Sample company").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             }
@@ -99,11 +113,18 @@ struct ResultsView: View {
             if let message = model.message {
                 Text(message).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
-            ForEach(model.people) { person in
+            ForEach(Array(model.people.enumerated()), id: \.element.id) { index, person in
                 Button { Task { await model.select(person.id) } } label: {
                     PersonRow(person: person)
                 }
                 .buttonStyle(.plain)
+                // The marked row gets a quiet background drawn past its edges, so marking it
+                // changes nothing about its size.
+                .background {
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(model.selected == index ? Color.primary.opacity(0.08) : .clear)
+                        .padding(.horizontal, -4)
+                }
             }
             if !model.channels.isEmpty {
                 Text("Ask in").font(.caption).foregroundStyle(.secondary).padding(.top, 4)

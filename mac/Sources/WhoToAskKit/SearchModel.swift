@@ -1,7 +1,8 @@
 import Foundation
 
 // SearchModel drives the menu bar search: typing asks who to talk to, a row shows that person,
-// and Enter opens a conversation with the first person in their own app.
+// the arrow keys mark a row, and Enter opens a conversation with the marked person in their own
+// app.
 @MainActor
 public final class SearchModel: ObservableObject {
     // query is the text in the search field.
@@ -15,6 +16,9 @@ public final class SearchModel: ObservableObject {
     @Published public private(set) var teams: [AskTeam] = []
     // detail is the person shown in place of the results, nil while the results show.
     @Published public private(set) var detail: PersonDetail?
+    // selected is the index into people of the row the arrow keys mark, nil when there is no one.
+    // A new answer marks the first row.
+    @Published public private(set) var selected: Int?
     // message says why there is nothing to show, such as an index not built yet.
     @Published public private(set) var message: String?
     // changes say who and what joined or left since the menu last closed.
@@ -69,6 +73,7 @@ public final class SearchModel: ObservableObject {
         channels = []
         teams = []
         detail = nil
+        selected = nil
         changes = []
         answered = ""
         message = core == nil ? (openError ?? "The index is not open.") : nil
@@ -138,7 +143,7 @@ public final class SearchModel: ObservableObject {
 
     // submit acts on the person shown, if the field still holds the question that led there, by
     // opening their first contact link, and does nothing when they have none. Otherwise it
-    // answers the field if its results are stale, then opens the first person's first link,
+    // answers the field if its results are stale, then opens the marked person's first link,
     // showing that person when there is no link. A team is never the target: with no person in
     // the answer, Enter does nothing.
     public func submit() async {
@@ -153,15 +158,54 @@ public final class SearchModel: ObservableObject {
         if answered != query {
             await ask(query)
         }
-        guard let first = people.first else { return }
-        await open(first.id)
+        guard let target = marked else { return }
+        await open(target.id)
+    }
+
+    // marked is the person the marked row shows, nil when there is no one to mark.
+    public var marked: AskPerson? {
+        guard let selected, people.indices.contains(selected) else { return nil }
+        return people[selected]
+    }
+
+    // moveDown marks the next row, and stays on the last one.
+    public func moveDown() {
+        guard detail == nil, let selected else { return }
+        self.selected = min(selected + 1, people.count - 1)
+    }
+
+    // moveUp marks the row before, and stays on the first one.
+    public func moveUp() {
+        guard detail == nil, let selected else { return }
+        self.selected = max(selected - 1, 0)
+    }
+
+    // showMarked shows the marked person in place of the results, which Command-Return does.
+    public func showMarked() async {
+        guard detail == nil, let target = marked else { return }
+        await select(target.id)
+    }
+
+    // escape goes back from a person to the results and reports whether it did, so the key does
+    // whatever it did before everywhere else.
+    public func escape() -> Bool {
+        guard detail != nil else { return false }
+        back()
+        return true
     }
 
     // enterHint says what Enter does in the window as it stands, nil when it does nothing.
     public var enterHint: String? {
         guard let detail else {
             let nobody = query.isEmpty || (answered == query && people.isEmpty)
-            return nobody ? nil : "Enter messages the first person."
+            if nobody {
+                return nil
+            }
+            // Stale results are answered again on Enter, which marks the first row anew.
+            guard answered == query, let selected, selected > 0, let target = marked else {
+                return "Enter messages the first person."
+            }
+            return "Enter messages \(target.name)."
         }
         let links = Self.contactLinks(detail.links ?? [], deactivated: detail.isDeactivated)
         return links.isEmpty ? nil : "Enter messages this person."
@@ -254,6 +298,7 @@ public final class SearchModel: ObservableObject {
         self.channels = channels
         self.teams = teams
         self.message = message
+        selected = people.isEmpty ? nil : 0
         answered = text
     }
 
