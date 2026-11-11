@@ -85,8 +85,8 @@ func (k *Keyword) Resolve(_ context.Context, query string, limit int) (Answer, e
 	if limit > 0 {
 		depth = max(limit, index.EvidenceWindow)
 	}
-	named, namedGone := index.SplitDeparted(nameMatch(k.ix, query, depth))
 	found, gone := k.ix.SearchSplit(query, depth)
+	named, namedGone := index.SplitDeparted(nameMatch(k.ix, query, depth, found, gone))
 	people, departed, channels := trimChatter(
 		withNamed(named, found, depth), withNamed(namedGone, gone, depth),
 		k.ix.SearchChannels(query, depth), limit)
@@ -603,8 +603,8 @@ func (s *Semantic) Resolve(ctx context.Context, query string, limit int) (Answer
 	if limit > 0 {
 		pool = max(limit*3, 15)
 	}
-	named, namedGone := index.SplitDeparted(nameMatch(s.ix, query, limit))
 	words, wordsGone := s.ix.SearchSplit(query, pool)
+	named, namedGone := index.SplitDeparted(nameMatch(s.ix, query, limit, words, wordsGone))
 	meaning, meaningGone := s.ix.SemanticPeopleSplit(vec, pool)
 	subjects, subjectsGone := index.SplitDeparted(s.topicPeople(vec, pool))
 	people := withNamed(named, fusePeople(words, meaning, subjects, limit), limit)

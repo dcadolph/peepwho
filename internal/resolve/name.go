@@ -1,6 +1,7 @@
 package resolve
 
 import (
+	"slices"
 	"sort"
 	"strings"
 
@@ -8,6 +9,7 @@ import (
 
 	"github.com/dcadolph/whotoask/internal/index"
 	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/text"
 	"github.com/dcadolph/whotoask/internal/util"
 )
 
@@ -41,7 +43,10 @@ const nameTypoLen = 4
 // the whole question naming the whole person counts: their exact name, their
 // email, or every word of a multi-word question matching a part of their name,
 // which is what lets a typo through without opening the door to single words.
-func nameMatch(ix *index.Index, query string, limit int) []model.Match {
+// That last form needs one word to be a part of the name exactly, and it stands
+// aside when the question is a subject that somebody in ranked, the answer the
+// word search gave, already states.
+func nameMatch(ix *index.Index, query string, limit int, ranked ...[]model.Match) []model.Match {
 	q := strings.ToLower(strings.TrimSpace(query))
 	q = strings.TrimRight(q, "?!. ")
 	for _, p := range namePrefixes {
@@ -60,6 +65,10 @@ func nameMatch(ix *index.Index, query string, limit int) []model.Match {
 		return nil
 	}
 	asked := strings.Fields(q)
+	// A question that is itself a subject somebody states is about the subject,
+	// so a name that only resembles it does not answer.
+	stated := namesASubject(ix, text.Slug(q)) && statesSubject(ranked...)
+	byParts := len(asked) > 1 && !stated
 
 	type scored struct {
 		person *model.Person
@@ -86,7 +95,7 @@ func nameMatch(ix *index.Index, query string, limit int) []model.Match {
 			// those as "the person you mean" put a mailbox above everybody who
 			// actually works on the thing being asked about.
 			hits = append(hits, scored{p, 0.95})
-		case len(asked) > 1 && nameCoversAll(name, asked):
+		case byParts && nameCoversAll(name, asked):
 			hits = append(hits, scored{p, 0.9})
 		}
 	}
@@ -125,27 +134,35 @@ func nameMatch(ix *index.Index, query string, limit int) []model.Match {
 }
 
 // nameCoversAll reports whether every word of the question matches a part of
-// the name, allowing one edit on the longer words so a misspelled colleague is
-// still found. Requiring every word is what keeps a question about a subject
-// from matching somebody whose surname happens to look like it.
+// the name and at least one of them is a part exactly. One edit is allowed on
+// the longer words so a misspelled colleague is still found, and the last word
+// may be the opening letters of a part, since it is the one still being typed.
+// Requiring every word, and one of them exact, is what keeps a question about a
+// subject from matching somebody whose name happens to look like it.
 func nameCoversAll(name string, asked []string) bool {
 	if name == "" {
 		return false
 	}
 	parts := strings.Fields(name)
-	for _, word := range asked {
-		if !nameHasPart(parts, word) {
+	exact := false
+	for i, word := range asked {
+		if slices.Contains(parts, word) {
+			exact = true
+			continue
+		}
+		if !nameHasPart(parts, word, i == len(asked)-1) {
 			return false
 		}
 	}
-	return true
+	return exact
 }
 
-// nameHasPart reports whether one word of a question matches one part of a
-// name, exactly or within a single edit.
-func nameHasPart(parts []string, word string) bool {
+// nameHasPart reports whether one word of a question loosely matches one part
+// of a name: within a single edit, or as its opening letters when prefix is
+// set.
+func nameHasPart(parts []string, word string, prefix bool) bool {
 	for _, part := range parts {
-		if part == word || strings.HasPrefix(part, word) {
+		if prefix && strings.HasPrefix(part, word) {
 			return true
 		}
 		if len(word) >= nameTypoLen && len(part) >= nameTypoLen &&
@@ -177,6 +194,19 @@ func withNamed(named, ranked []model.Match, limit int) []model.Match {
 		out = out[:limit]
 	}
 	return out
+}
+
+// statesSubject reports whether any ranked list holds a match that rests on a
+// stated topic, title, or name for a word the question asked.
+func statesSubject(ranked ...[]model.Match) bool {
+	for _, list := range ranked {
+		if slices.ContainsFunc(list, func(m model.Match) bool {
+			return personClass(m) == classDirect
+		}) {
+			return true
+		}
+	}
+	return false
 }
 
 // namesASubject reports whether the question is the name of a subject the graph
