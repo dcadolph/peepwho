@@ -9,8 +9,9 @@ import (
 
 // tieFixture builds an index where billing-retries and kafka-lag travel
 // together in the work, billing-retries has its own expert, and kafka-lag is
-// held by somebody the question never names.
-func tieFixture(t *testing.T) *Index {
+// held by somebody the question never names. Extra records join the build as
+// given.
+func tieFixture(t *testing.T, extra ...connector.Record) *Index {
 	t.Helper()
 	ix := New()
 	var recs []connector.Record
@@ -29,6 +30,7 @@ func tieFixture(t *testing.T) *Index {
 		connector.Record{Kind: connector.KindTopic, Name: "billing-retries", Source: "git",
 			Links: []connector.TopicLink{{To: "kafka-lag", Weight: 0.3, Witnesses: 1, Sole: "cross@corp.com"}}},
 	)
+	recs = append(recs, extra...)
 	ix.Build(recs)
 	ix.Canonicalize()
 	return ix

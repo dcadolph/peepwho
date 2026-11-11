@@ -126,6 +126,20 @@ func mergeReach(
 	}
 }
 
+// typedTerms returns the terms the person typed, leaving out every term the
+// query grew by a synonym or a tie. Coverage is counted over these, and a
+// feedback vote fires only on these, so a vote on one question never reaches
+// another through a word nobody asked.
+func typedTerms(terms []string, asked map[string]string) []string {
+	typed := make([]string, 0, len(terms))
+	for _, t := range terms {
+		if _, isExp := asked[t]; !isExp {
+			typed = append(typed, t)
+		}
+	}
+	return typed
+}
+
 // matchedOriginal reports whether the candidate matched any term the person
 // actually typed, as opposed to only terms the query grew by expansion. The
 // initial ranking places every expansion-only candidate after every candidate
@@ -193,12 +207,8 @@ func (ix *Index) SearchSplit(query string, limit int) (people, departed []model.
 		return nil, nil
 	}
 	terms = append(terms, ix.tieExpand(tokenize(query), covers, asked)...)
-	originals := 0
-	for _, t := range terms {
-		if _, isExp := asked[t]; !isExp {
-			originals++
-		}
-	}
+	typed := typedTerms(terms, asked)
+	originals := len(typed)
 	resolved := resolveTerms(ix.peoplePostings, ix.personVocab, terms)
 	applyExpansionPenalty(resolved, asked)
 	baseTerms, tieTerms := splitTieTerms(terms, asked)
@@ -207,7 +217,7 @@ func (ix *Index) SearchSplit(query string, limit int) (people, departed []model.
 		tieScores, tieMatched := scoreByTerms(ix.peoplePostings, tieTerms, resolved, ix.peopleN, ix.personLens)
 		mergeReach(scores, matched, tieScores, tieMatched)
 	}
-	nets := ix.feedbackNets(terms, false)
+	nets := ix.feedbackNets(typed, false)
 
 	matches := make([]model.Match, 0, len(scores))
 	for pid, sc := range scores {
@@ -329,12 +339,8 @@ func (ix *Index) SearchChannels(query string, limit int) []model.ChannelMatch {
 		return nil
 	}
 	terms = append(terms, ix.tieExpand(tokenize(query), covers, asked)...)
-	originals := 0
-	for _, t := range terms {
-		if _, isExp := asked[t]; !isExp {
-			originals++
-		}
-	}
+	typed := typedTerms(terms, asked)
+	originals := len(typed)
 	resolved := resolveTerms(ix.channelPostings, ix.channelVocab, terms)
 	applyExpansionPenalty(resolved, asked)
 	baseTerms, tieTerms := splitTieTerms(terms, asked)
@@ -345,7 +351,7 @@ func (ix *Index) SearchChannels(query string, limit int) []model.ChannelMatch {
 			ix.channelPostings, tieTerms, resolved, len(ix.Graph.Channels), ix.channelLens)
 		mergeReach(scores, matched, tieScores, tieMatched)
 	}
-	nets := ix.feedbackNets(terms, true)
+	nets := ix.feedbackNets(typed, true)
 
 	matches := make([]model.ChannelMatch, 0, len(scores))
 	for cid, sc := range scores {

@@ -69,7 +69,8 @@ func (ix *Index) SetFeedback(entries []feedback.Entry) {
 
 // feedbackNets sums the votes that apply to the current query, per entity,
 // clamped to maxFeedbackNet in either direction. A vote applies when every
-// term of its recorded query appears in the current one.
+// term of its recorded query appears in the current one. The caller passes the
+// terms the person typed, never the synonyms or ties the query grew by.
 func (ix *Index) feedbackNets(queryTerms []string, channel bool) map[model.ID]int {
 	step, maxNet := ix.feedbackStrength()
 	if step <= 1 || maxNet <= 0 {
