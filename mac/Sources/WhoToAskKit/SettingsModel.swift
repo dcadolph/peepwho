@@ -387,8 +387,10 @@ public final class SettingsModel: ObservableObject {
     }
 
     // reset forgets every token, site address, scope, and picked place while the core is open,
-    // then deletes the data directory and opens a fresh, empty one, so WhoToAsk is back to the way
-    // it was when first installed. Nothing is touched when the index is not open or a run is going.
+    // then deletes the data directory and its key and opens a fresh, empty one under a new key, so
+    // WhoToAsk is back to the way it was when first installed. The key stays when the delete
+    // fails, since the files it seals are still there. Nothing is touched when the index is not
+    // open or a run is going.
     public func reset() async {
         guard refuseWhileBusy() else { return }
         guard let core else {
@@ -408,6 +410,7 @@ public final class SettingsModel: ObservableObject {
                 secrets.delete(name)
             }
             scopes = Scopes()
+            secrets.delete(SecretName.scopes)
             readSaved()
         } catch {
             lines = [SearchModel.describe(error)]
@@ -415,6 +418,7 @@ public final class SettingsModel: ObservableObject {
             return
         }
         if wipeIndex() != nil {
+            secrets.delete(SecretName.indexKey)
             lines = ["Reset. Nothing is kept."]
         }
         reopen()

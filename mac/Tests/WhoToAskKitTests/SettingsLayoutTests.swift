@@ -72,7 +72,8 @@ struct SettingsLayoutTests {
         #expect(open.privacy.hasPrefix(sealed ? "The index is encrypted on disk." : "The index is not encrypted on disk."))
     }
 
-    // Test 4: Reset deletes every token, scope, place, and the index, and refuses while a run is going.
+    // Test 4: Reset deletes every token, scope, place, the index, and its key, and refuses while a
+    // run is going.
     @Test func reset() async throws {
         let repo = try gitRepo()
         let dir = tempDir("whotoask-data")
@@ -100,9 +101,12 @@ struct SettingsLayoutTests {
             model.saveSecret(name, "value")
         }
         model.scopes.jiraProjects = "KAFKA"
+        secrets.values[SecretName.indexKey] = "old key"
         #expect(model.saved == Set(SourceCard.entered))
         await model.reset()
         #expect(model.lines == ["Reset. Nothing is kept."])
+        #expect(secrets.values[SecretName.indexKey] == nil)
+        #expect(secrets.values[SecretName.scopes] == nil)
         #expect(model.saved.isEmpty)
         #expect(model.placeNames.isEmpty)
         #expect(BookmarkSlot.allCases.allSatisfy { !places.has($0) })
