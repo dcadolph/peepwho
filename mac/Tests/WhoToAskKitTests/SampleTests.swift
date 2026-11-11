@@ -118,4 +118,23 @@ struct SampleTests {
         #expect(!settings.canLoadSample)
         #expect(settings.summary == "Nothing indexed yet. Pick a folder or add a token, then Index Now.")
     }
+
+    // Test 3: Enter on the departed kafka lag backup opens nothing and keeps showing them, since
+    // a message can no longer reach them.
+    @Test func enterOnDepartedOpensNothing() async throws {
+        let dir = tempDir("whotoask-data")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let settings = try model(dir)
+        await settings.loadSample()
+        let opened = Opened()
+        let search = SearchModel(core: settings.core, opener: opened.open)
+        search.query = "kafka lag"
+        await search.ask(search.query)
+        let departed = try #require(search.people.last)
+        try #require(departed.isDeactivated)
+        await search.select(departed.id)
+        await search.submit()
+        #expect(opened.urls.isEmpty)
+        #expect(search.detail?.id == departed.id)
+    }
 }

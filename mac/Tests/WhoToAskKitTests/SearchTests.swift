@@ -118,6 +118,25 @@ struct SearchTests {
         #expect(model.message == "Index key: wrong key.")
         #expect(opened.urls.isEmpty)
     }
+
+    // Test 5: Enter on a person shown from the results opens that person, not the first one.
+    // Deploy ranks Grace Kim first and Carol Lee, the one with a Slack link, below her.
+    @Test func enterOpensShownPerson() async throws {
+        let dir = try demoDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let opened = Opened()
+        let core = try Core.open(dir: dir, key: "", secrets: KeychainSecrets())
+        let model = SearchModel(core: core, delay: .milliseconds(1), opener: opened.open)
+        model.query = "deploy"
+        await model.ask(model.query)
+        try #require(model.people.first?.name != "Carol Lee")
+        let carol = try #require(model.people.first { $0.name == "Carol Lee" })
+        let want = try #require(try await core.person(carol.id).links?.first)
+        await model.select(carol.id)
+        await model.submit()
+        #expect(opened.urls.map(\.absoluteString) == [want])
+        #expect(model.detail?.id == carol.id)
+    }
 }
 
 // SearchStateTests check that the window never shows or opens what it moved on from.

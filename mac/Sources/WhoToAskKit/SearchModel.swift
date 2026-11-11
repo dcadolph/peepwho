@@ -136,11 +136,20 @@ public final class SearchModel: ObservableObject {
         }
     }
 
-    // submit answers the field if its results are stale, then opens the first person's first
-    // link. With no link it shows that person instead. A team is never the target: with no
-    // person in the answer, Enter does nothing.
+    // submit acts on the person shown, if the field still holds the question that led there, by
+    // opening their first contact link, and does nothing when they have none. Otherwise it
+    // answers the field if its results are stale, then opens the first person's first link,
+    // showing that person when there is no link. A team is never the target: with no person in
+    // the answer, Enter does nothing.
     public func submit() async {
         pending?.cancel()
+        if let detail, answered == query {
+            let links = Self.contactLinks(detail.links ?? [], deactivated: detail.isDeactivated)
+            if let link = links.first {
+                openLink(link)
+            }
+            return
+        }
         if answered != query {
             await ask(query)
         }
