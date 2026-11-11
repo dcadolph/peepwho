@@ -2,6 +2,7 @@ package keyring
 
 import (
 	"encoding/base64"
+	"fmt"
 	"testing"
 
 	"github.com/dcadolph/whotoask/internal/vault"
@@ -77,6 +78,56 @@ func TestFromEnvNone(t *testing.T) {
 	}
 	if Source() != "" {
 		t.Errorf("Source = %q, want empty", Source())
+	}
+}
+
+// TestSourceAgreesWithFromEnv verifies Source names a variable only when FromEnv
+// builds a codec from it, so status never reports a key that encrypts nothing.
+// The cases run in sequence because each one sets the environment.
+func TestSourceAgreesWithFromEnv(t *testing.T) {
+	key, err := GenerateKey()
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+	tests := []struct {
+		Key        string
+		Passphrase string
+		WantSource string
+		WantCodec  bool
+	}{{ // Test 0: Nothing set.
+		Key: "", Passphrase: "",
+	}, { // Test 1: A passphrase of only spaces counts as unset.
+		Passphrase: "   ",
+	}, { // Test 2: A passphrase of tabs and a newline counts as unset.
+		Passphrase: "\t \n",
+	}, { // Test 3: A real passphrase is reported.
+		Passphrase: "hunter2", WantSource: EnvPassphrase, WantCodec: true,
+	}, { // Test 4: A padded passphrase is reported.
+		Passphrase: "  hunter2  ", WantSource: EnvPassphrase, WantCodec: true,
+	}, { // Test 5: A key of only spaces counts as unset.
+		Key: "   ",
+	}, { // Test 6: A blank key falls through to the passphrase.
+		Key: "  ", Passphrase: "hunter2", WantSource: EnvPassphrase, WantCodec: true,
+	}, { // Test 7: A key wins over a passphrase.
+		Key: key, Passphrase: "hunter2", WantSource: EnvKey, WantCodec: true,
+	}, { // Test 8: A key beside a blank passphrase is reported as the key.
+		Key: key, Passphrase: "   ", WantSource: EnvKey, WantCodec: true,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Setenv(EnvKey, test.Key)
+			t.Setenv(EnvPassphrase, test.Passphrase)
+			c, err := FromEnv()
+			if err != nil {
+				t.Fatalf("FromEnv: %v", err)
+			}
+			if got := c != nil; got != test.WantCodec {
+				t.Errorf("codec present = %v, want %v", got, test.WantCodec)
+			}
+			if got := Source(); got != test.WantSource {
+				t.Errorf("Source = %q, want %q", got, test.WantSource)
+			}
+		})
 	}
 }
 

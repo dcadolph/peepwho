@@ -48,12 +48,14 @@ func FromEnv() (vault.Codec, error) {
 	return nil, nil
 }
 
-// Source names where the configured key comes from, for status reporting.
+// Source names where the configured key comes from, for status reporting. It
+// trims each variable the way FromEnv does, so it names a variable only when
+// FromEnv builds a codec from it.
 func Source() string {
 	switch {
 	case strings.TrimSpace(os.Getenv(EnvKey)) != "":
 		return EnvKey
-	case os.Getenv(EnvPassphrase) != "":
+	case strings.TrimSpace(os.Getenv(EnvPassphrase)) != "":
 		return EnvPassphrase
 	default:
 		return ""
