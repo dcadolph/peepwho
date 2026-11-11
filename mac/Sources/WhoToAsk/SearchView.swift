@@ -148,12 +148,12 @@ struct PersonRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             HStack {
-                Text(person.name).font(.body.weight(.medium))
+                NameText(name: person.name, deactivated: person.isDeactivated).font(.body.weight(.medium))
                 Spacer()
                 StrengthBar(strength: person.strength)
             }
-            if let role = person.role.nonEmpty {
-                Text(role).font(.caption).foregroundStyle(.secondary)
+            if !person.role.isEmpty {
+                RoleText(line: person.role, deactivated: person.isDeactivated).font(.caption)
             }
             if let reasons = person.reasons?.joined(separator: ", ").nonEmpty {
                 Text(reasons).font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
@@ -161,6 +161,39 @@ struct PersonRow: View {
         }
         .padding(.vertical, 3)
         .contentShape(Rectangle())
+    }
+}
+
+// NameText is a person's name, crossed out and dimmed when they can no longer be reached.
+struct NameText: View {
+    // name is the person's name.
+    let name: String
+    // deactivated reports whether the person can no longer be reached.
+    let deactivated: Bool
+
+    // body draws the name, struck through in gray for a deactivated person.
+    var body: some View {
+        Text(name).strikethrough(deactivated).foregroundStyle(deactivated ? .secondary : .primary)
+    }
+}
+
+// RoleText is the line under a person's name, gray, with the Deactivated mark in orange so a
+// person who can no longer be reached stands out.
+struct RoleText: View {
+    // line is the person's role line, led by the mark when deactivated.
+    let line: String
+    // deactivated reports whether the person can no longer be reached.
+    let deactivated: Bool
+
+    // body draws the mark in semibold orange and the rest of the line in gray.
+    var body: some View {
+        let parts = Role.split(line, deactivated: deactivated)
+        let rest = Text(parts.rest).foregroundStyle(.secondary)
+        if let mark = parts.mark {
+            Text(mark).fontWeight(.semibold).foregroundStyle(.orange) + rest
+        } else {
+            rest
+        }
     }
 }
 

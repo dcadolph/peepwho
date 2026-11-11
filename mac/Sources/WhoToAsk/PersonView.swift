@@ -13,9 +13,9 @@ struct PersonView: View {
         VStack(alignment: .leading, spacing: 6) {
             Button { model.back() } label: { Label("Results", systemImage: "chevron.left") }
                 .buttonStyle(.link)
-            Text(person.name).font(.title3.weight(.semibold))
-            if let role = person.role.nonEmpty {
-                Text(role).foregroundStyle(.secondary)
+            NameText(name: person.name, deactivated: person.isDeactivated).font(.title3.weight(.semibold))
+            if !person.role.isEmpty {
+                RoleText(line: person.role, deactivated: person.isDeactivated)
             }
             if let email = person.email {
                 Text(email).font(.caption).textSelection(.enabled)

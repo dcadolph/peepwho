@@ -104,11 +104,21 @@ public struct AskPerson: Codable, Hashable, Sendable, Identifiable {
 
 // Role builds the line under a person's name.
 public enum Role {
-    // line joins title and team, led by Deactivated for a person who can no longer be reached so
-    // a narrow window cuts the role and never the mark. It is empty when none of those apply.
+    // mark is the word that leads the line for a person who can no longer be reached.
+    public static let mark = "Deactivated"
+
+    // line joins title and team, led by mark for a person who can no longer be reached so a
+    // narrow window cuts the role and never the mark. It is empty when none of those apply.
     public static func line(title: String?, team: String?, deactivated: Bool) -> String {
-        [deactivated ? "Deactivated" : nil, title, team].compactMap { $0 }.filter { !$0.isEmpty }
+        [deactivated ? mark : nil, title, team].compactMap { $0 }.filter { !$0.isEmpty }
             .joined(separator: ", ")
+    }
+
+    // split returns the mark apart from the rest of line, so the window can color the mark. The
+    // mark is nil and rest is all of line when the person is active.
+    public static func split(_ line: String, deactivated: Bool) -> (mark: String?, rest: String) {
+        guard deactivated, line.hasPrefix(mark) else { return (nil, line) }
+        return (mark, String(line.dropFirst(mark.count)))
     }
 }
 

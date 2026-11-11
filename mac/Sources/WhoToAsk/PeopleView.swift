@@ -44,9 +44,9 @@ struct PeopleView: View {
     private func row(_ person: ListedPerson) -> some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(person.name)
+                NameText(name: person.name, deactivated: person.isDeactivated)
                 if !person.role.isEmpty {
-                    Text(person.role).font(.caption).foregroundStyle(.secondary)
+                    RoleText(line: person.role, deactivated: person.isDeactivated).font(.caption)
                 }
             }
             Spacer()

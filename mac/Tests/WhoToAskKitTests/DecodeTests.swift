@@ -91,6 +91,18 @@ struct DecodeTests {
         #expect(Role.line(title: test.Title, team: test.Team, deactivated: test.Deactivated) == test.WantRole)
     }
 
+    // roleSplit hands back the mark apart from the rest, so only the mark is colored.
+    @Test func roleSplit() {
+        // Test 0: Deactivated with a role.
+        #expect(Role.split("Deactivated, Staff Engineer, Data", deactivated: true) == ("Deactivated", ", Staff Engineer, Data"))
+        // Test 1: Deactivated with nothing else known.
+        #expect(Role.split("Deactivated", deactivated: true) == ("Deactivated", ""))
+        // Test 2: Active keeps the whole line, even one that starts with the same word.
+        #expect(Role.split("Deactivated Systems Lead", deactivated: false) == (nil, "Deactivated Systems Lead"))
+        // Test 3: Active with nothing to show.
+        #expect(Role.split("", deactivated: false) == (nil, ""))
+    }
+
     // peopleDeparted decodes the mark on the People sheet and writes it into the role line.
     @Test func peopleDeparted() throws {
         let got: PeopleList = try Core.decode(fixture("people_departed"))
