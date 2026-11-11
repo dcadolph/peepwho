@@ -2,14 +2,20 @@ package confluence
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 // TestSearchCQLStopsARunawayServer verifies an uncapped search cannot be held
@@ -209,8 +215,8 @@ func TestNewServerBearerToken(t *testing.T) {
 // TestSearchCQLPermissionFilteredPages verifies pagination survives the pages
 // permission filtering shortens: a short page in the middle of the results,
 // with a next link present, must not end the read, and the window advances by
-// what was requested rather than by the filtered size. Server and Data Center
-// hit this on any instance with restricted spaces.
+// the window the server used rather than by the filtered size. Server and Data
+// Center hit this on any instance with restricted spaces.
 func TestSearchCQLPermissionFilteredPages(t *testing.T) {
 	t.Parallel()
 	var starts []string
@@ -220,17 +226,17 @@ func TestSearchCQLPermissionFilteredPages(t *testing.T) {
 		starts = append(starts, start)
 		switch start {
 		case "0":
-			// 100 requested, 1 visible after filtering, more exist.
+			// 50 requested, 1 visible after filtering, more exist.
 			io.WriteString(w, `{"results":[{"id":"1","title":"visible one"}],`+
-				`"size":1,"limit":100,"_links":{"next":"/rest/api/content/search?start=100"}}`)
-		case "100":
+				`"size":1,"limit":50,"_links":{"next":"/rest/api/content/search?start=50"}}`)
+		case "50":
 			// Empty window entirely filtered away, but still not the end.
-			io.WriteString(w, `{"results":[],"size":0,"limit":100,`+
-				`"_links":{"next":"/rest/api/content/search?start=200"}}`)
+			io.WriteString(w, `{"results":[],"size":0,"limit":50,`+
+				`"_links":{"next":"/rest/api/content/search?start=100"}}`)
 		default:
 			// The real last page: short and no next link.
 			io.WriteString(w, `{"results":[{"id":"3","title":"visible two"}],`+
-				`"size":1,"limit":100,"_links":{}}`)
+				`"size":1,"limit":50,"_links":{}}`)
 		}
 	})
 	srv := httptest.NewServer(mux)
@@ -243,8 +249,79 @@ func TestSearchCQLPermissionFilteredPages(t *testing.T) {
 	if len(pages) != 2 {
 		t.Fatalf("pages = %d, want both visible pages despite the filtered windows", len(pages))
 	}
-	if want := []string{"0", "100", "200"}; !slices.Equal(starts, want) {
-		t.Errorf("start params = %v, want %v: the window advances by the requested limit", starts, want)
+	if want := []string{"0", "50", "100"}; !slices.Equal(starts, want) {
+		t.Errorf("start params = %v, want %v: the window advances by the server's window", starts, want)
+	}
+}
+
+// TestSearchCQLServerShrinksWindow verifies a read loses no page when the
+// server serves a smaller window than it was asked for. The window must
+// advance by the window the server used, and a full window from a server that
+// sends no next link must not be taken for the last one. Advancing by the
+// window asked for skipped every row between the two with no warning.
+func TestSearchCQLServerShrinksWindow(t *testing.T) {
+	t.Parallel()
+	const total = 230
+	titles := make([]string, total)
+	for i := range titles {
+		titles[i] = fmt.Sprintf("page %03d", i)
+	}
+	tests := []struct {
+		Want      error
+		Window    int
+		Max       int
+		WantCount int
+		Links     bool
+		EchoAsked bool
+	}{{ // Test 0: A capped server that links the next window.
+		Window: 25, Links: true, WantCount: total,
+	}, { // Test 1: A capped server old enough to send no next link.
+		Window: 25, WantCount: total,
+	}, { // Test 2: The documented body cap, on a server that reports the window asked for.
+		Window: 50, Links: true, EchoAsked: true, WantCount: total,
+	}, { // Test 3: A capped read stops at its cap holding every page before it.
+		Window: 25, Links: true, Max: 120, WantCount: 120, Want: ErrTruncated,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				q := r.URL.Query()
+				start, _ := strconv.Atoi(q.Get("start"))
+				asked, _ := strconv.Atoi(q.Get("limit"))
+				used := min(asked, test.Window)
+				end := min(start+used, total)
+				results := make([]map[string]string, 0, used)
+				for i := min(start, total); i < end; i++ {
+					results = append(results, map[string]string{"title": titles[i]})
+				}
+				reported := used
+				if test.EchoAsked {
+					reported = asked
+				}
+				links := map[string]string{}
+				if test.Links && end < total {
+					links["next"] = "/rest/api/content/search?start=" + strconv.Itoa(end)
+				}
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"results": results, "size": len(results), "limit": reported, "_links": links,
+				})
+			}))
+			t.Cleanup(srv.Close)
+
+			c := NewServer(srv.URL, "token")
+			pages, err := c.searchCQL(context.Background(), "type = page", test.Max)
+			if !errors.Is(err, test.Want) {
+				t.Fatalf("searchCQL err = %v, want %v", err, test.Want)
+			}
+			got := make([]string, len(pages))
+			for i, p := range pages {
+				got[i] = p.Title
+			}
+			if diff := cmp.Diff(titles[:test.WantCount], got, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("titles mismatch (-want +got):\n%s", diff)
+			}
+		})
 	}
 }
 

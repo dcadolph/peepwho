@@ -742,21 +742,34 @@ func (c *Confluence) Server() *httptest.Server {
 	return httptest.NewServer(mux)
 }
 
+// confluenceBodyWindow is the widest result window a real Confluence serves
+// when a search expands a page body.
+const confluenceBodyWindow = 50
+
 // handleV1Search answers the Server content search, withholding anything the
-// client did not name in expand.
+// client did not name in expand. A search that expands a page body is served
+// in windows of at most confluenceBodyWindow however many it asked for, with
+// no error and with the window it used in the reply, as the real API does. A
+// client that advances by the window it asked for skips rows here exactly as
+// it would against a real site.
 func (c *Confluence) handleV1Search(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	c.Queries = append(c.Queries, r.URL.RawQuery)
 	expanded := make(map[string]bool)
+	expandsBody := false
 	for _, name := range strings.Split(q.Get("expand"), ",") {
 		if name = strings.TrimSpace(name); name != "" {
 			expanded[name] = true
+			expandsBody = expandsBody || name == "body" || strings.HasPrefix(name, "body.")
 		}
 	}
 	start, _ := strconv.Atoi(q.Get("start"))
 	limit, err := strconv.Atoi(q.Get("limit"))
 	if err != nil || limit <= 0 {
 		limit = 25
+	}
+	if expandsBody && limit > confluenceBodyWindow {
+		limit = confluenceBodyWindow
 	}
 	if start > len(c.Pages) {
 		start = len(c.Pages)

@@ -358,7 +358,8 @@ type searchResponse struct {
 	Results []Page `json:"results"`
 	// Size is the number returned in this page.
 	Size int `json:"size"`
-	// Limit is the requested page size.
+	// Limit is the window the server used, which a server that caps its
+	// windows reports smaller than the window it was asked for.
 	Limit int `json:"limit"`
 	// Links carries the cursor to the next page. Its presence, not the page
 	// size, is what says whether more results exist: permission filtering
@@ -370,26 +371,32 @@ type searchResponse struct {
 	} `json:"_links"`
 }
 
+// searchWindow is the result window the content search is asked for. Confluence
+// serves at most fifty results per window once a page body is expanded and cuts
+// a wider request down without an error, so the search asks for the widest
+// window it can count on getting.
+const searchWindow = 50
+
 // maxSearchRequests bounds how many result windows one search may walk when no
 // caller cap applies, so a server that keeps promising another page cannot
-// hold the read in a loop forever. At a hundred results per window it allows a
+// hold the read in a loop forever. At fifty results per window it allows a
 // hundred thousand pages, far past any real read, and hitting it is reported
 // as a truncation rather than passed off as completion.
-const maxSearchRequests = 1000
+const maxSearchRequests = 2000
 
-// searchCQL reads pages through the v1 content search, paginating in pages of
-// 100. A non-positive max returns all matches. It expands the space, labels,
-// creator, and last editor inline, which is what the v2 path reassembles by
-// hand from separate endpoints. A read cut short by max or by the request
-// bound returns what it has alongside ErrTruncated, so the caller can warn
-// rather than index a partial wiki as whole.
+// searchCQL reads pages through the v1 content search, paginating in windows
+// of searchWindow. A non-positive max returns all matches. It expands the
+// space, labels, creator, and last editor inline, which is what the v2 path
+// reassembles by hand from separate endpoints. A read cut short by max or by
+// the request bound returns what it has alongside ErrTruncated, so the caller
+// can warn rather than index a partial wiki as whole.
 func (c *Client) searchCQL(ctx context.Context, cql string, max int) ([]Page, error) {
 	var all []Page
 	for start, requests := 0, 0; ; requests++ {
 		if requests >= maxSearchRequests {
 			return all, fmt.Errorf("%w after %d result windows", ErrTruncated, requests)
 		}
-		limit := 100
+		limit := searchWindow
 		if max > 0 && max-len(all) < limit {
 			limit = max - len(all)
 		}
@@ -408,14 +415,21 @@ func (c *Client) searchCQL(ctx context.Context, cql string, max int) ([]Page, er
 		}
 		all = append(all, resp.Results...)
 		c.progress.Report(len(all))
-		// The window advances by what was asked for, not by what came back:
-		// permission filtering shrinks a page after the window is cut, so a
-		// short page does not mean the results are over, and advancing by the
-		// filtered size would re-read rows. The server says whether more exist
-		// through the next link; a response without one falls back to the size
-		// heuristic for servers old enough to omit it.
-		start += limit
-		if resp.Links.Next == "" && (resp.Size == 0 || resp.Size < limit) {
+		// The window advances by the window the server used, not by what came
+		// back: permission filtering shrinks a page after the window is cut, so
+		// a short page does not mean the results are over, and advancing by the
+		// filtered size would re-read rows. A server that caps its windows
+		// serves a smaller one than it was asked for and reports the one it
+		// used, and advancing by the wider request would skip every row
+		// between the two. The server says whether more exist through the next
+		// link; a response without one falls back to the size heuristic for
+		// servers old enough to omit it.
+		step := limit
+		if resp.Limit > 0 && resp.Limit < limit {
+			step = resp.Limit
+		}
+		start += step
+		if resp.Links.Next == "" && (resp.Size == 0 || resp.Size < step) {
 			break
 		}
 		if max > 0 && len(all) >= max {

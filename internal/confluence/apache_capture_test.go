@@ -8,17 +8,18 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 )
 
 // newApacheReplay serves the content search responses captured from Apache's
-// public Confluence Server (cwiki.apache.org, space KAFKA, two pages of 25).
-// The client pages by the limit it asked for while the capture's pages hold
-// 25 each, which is itself real behavior: servers cap page sizes below what
-// clients request, and the next link, not the page size, says whether more
-// results exist.
+// public Confluence Server (cwiki.apache.org, space KAFKA, two windows of 25).
+// Each capture is served at the start it was captured from and nothing is
+// served anywhere else, as the real server does. The captured windows hold 25
+// rows each while the client asks for more, which is itself real behavior:
+// servers cap their windows below what clients request, so a client that
+// advances by the window it asked for lands past the second capture and loses
+// it. The next link, not the window size, says whether more results exist.
 func newApacheReplay(t *testing.T) *httptest.Server {
 	t.Helper()
 	read := func(name string) []byte {
@@ -30,20 +31,19 @@ func newApacheReplay(t *testing.T) *httptest.Server {
 		return data
 	}
 	page1, page2 := read("apache_search_page1.json"), read("apache_search_page2.json")
-	var served atomic.Int64
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasSuffix(r.URL.Path, "/content/search") {
 			http.NotFound(w, r)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		switch served.Add(1) {
-		case 1:
+		switch r.URL.Query().Get("start") {
+		case "", "0":
 			_, _ = w.Write(page1)
-		case 2:
+		case "25":
 			_, _ = w.Write(page2)
 		default:
-			_, _ = w.Write([]byte(`{"results":[],"size":0,"limit":100,"_links":{}}`))
+			_, _ = w.Write([]byte(`{"results":[],"size":0,"limit":25,"_links":{}}`))
 		}
 	}))
 }

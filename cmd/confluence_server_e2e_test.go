@@ -41,6 +41,12 @@ func TestConfluenceServerEndToEnd(t *testing.T) {
 	if !strings.Contains(string(stderr), "fetched") {
 		t.Errorf("no progress shown during a 120-page fetch:\n%s", stderr)
 	}
+	// The fake serves a body search in windows of fifty, as a real site does,
+	// so a read that advances by a wider window than the server used comes
+	// back short.
+	if !strings.Contains(string(stderr), "confluence: 120 pages") {
+		t.Errorf("index did not read all 120 pages:\n%s", stderr)
+	}
 
 	out, _, err := runCmd(t, "ask", "--data-dir", dir, "kraft quorum controller", "--limit", "3")
 	if err != nil {
