@@ -58,6 +58,8 @@ struct SettingsView: View {
     @State private var confirmingReset = false
     // showingPeople shows the People sheet.
     @State private var showingPeople = false
+    // sourceTitle is the title of the card the Sources tab shows, the first card until one is picked.
+    @State private var sourceTitle = SourceCard.all[0].title
 
     // body lays the tabs out above the activity strip every tab shares.
     var body: some View {
@@ -131,10 +133,18 @@ struct SettingsView: View {
         .formStyle(.grouped)
     }
 
-    // sources shows one card per source with its fields and whether it is set up.
+    // sources shows a button per source across the top and, under it, the picked card with its
+    // fields and whether it is set up.
     private var sources: some View {
-        Form {
-            ForEach(SourceCard.all) { card in
+        let card = SourceCard.pick(sourceTitle)
+        return VStack(spacing: 0) {
+            Picker("Source", selection: $sourceTitle) {
+                ForEach(SourceCard.all) { Text($0.title).tag($0.title) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding([.horizontal, .top], 20)
+            Form {
                 Section {
                     fields(card)
                 } header: {
@@ -144,9 +154,10 @@ struct SettingsView: View {
                         badge(card.connected(saved: model.saved, placed: Set(model.placeNames.keys)))
                     }
                 }
+                .id(card.id)
             }
+            .formStyle(.grouped)
         }
-        .formStyle(.grouped)
     }
 
     // fields are the rows of card: its places, its secrets, then what its source reads.

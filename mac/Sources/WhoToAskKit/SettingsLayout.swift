@@ -51,8 +51,10 @@ public struct SourceCard: Identifiable, Equatable, Sendable {
     // id names the card.
     public var id: String { title }
 
-    // all lists every card in the order the tab shows them.
+    // all lists every card in the order the tab shows them. Folders and files leads because it needs no
+    // token, so it is where every first run starts.
     public static let all: [SourceCard] = [
+        SourceCard(title: "Folders and files", symbol: "folder", source: "", secrets: [], slots: [.git, .csv, .codeowners]),
         SourceCard(title: "Slack", symbol: "number", source: "slack", secrets: [SecretName.slackToken], slots: []),
         SourceCard(title: "GitHub", symbol: "chevron.left.forwardslash.chevron.right", source: "github",
                    secrets: [SecretName.githubToken], slots: []),
@@ -61,8 +63,12 @@ public struct SourceCard: Identifiable, Equatable, Sendable {
         SourceCard(title: "Confluence", symbol: "doc.text", source: "confluence",
                    secrets: [SecretName.confluenceURL, SecretName.confluenceEmail, SecretName.confluenceToken], slots: []),
         SourceCard(title: "PagerDuty", symbol: "bell", source: "pagerduty", secrets: [SecretName.pagerdutyToken], slots: []),
-        SourceCard(title: "Folders and files", symbol: "folder", source: "", secrets: [], slots: [.git, .csv, .codeowners]),
     ]
+
+    // pick returns the card titled title, or the first card when no card has that title.
+    public static func pick(_ title: String?) -> SourceCard {
+        all.first { $0.title == title } ?? all[0]
+    }
 
     // entered lists every secret a person types into a card.
     public static var entered: [String] { all.flatMap(\.secrets) }

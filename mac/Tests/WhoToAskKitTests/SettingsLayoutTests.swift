@@ -21,7 +21,7 @@ struct SettingsLayoutTests {
     // sits on the card of the source that needs it, and the cards show in the agreed order.
     @Test func sourceCards() {
         let cards = SourceCard.all
-        #expect(cards.map(\.title) == ["Slack", "GitHub", "Jira", "Confluence", "PagerDuty", "Folders and files"])
+        #expect(cards.map(\.title) == ["Folders and files", "Slack", "GitHub", "Jira", "Confluence", "PagerDuty"])
         #expect(Set(cards.map(\.id)).count == cards.count)
         var everything = Scopes()
         everything.githubRepos = "o/a"
@@ -48,7 +48,7 @@ struct SettingsLayoutTests {
         let slack = try #require(SourceCard.all.first { $0.source == "slack" })
         #expect(!slack.connected(saved: [SecretName.githubToken], placed: [.git]))
         #expect(slack.connected(saved: [SecretName.slackToken], placed: []))
-        let places = try #require(SourceCard.all.last)
+        let places = try #require(SourceCard.all.first { !$0.slots.isEmpty })
         #expect(!places.connected(saved: Set(SourceCard.entered), placed: []))
         for slot in BookmarkSlot.allCases {
             #expect(places.connected(saved: [], placed: [slot]))
@@ -120,5 +120,16 @@ struct SettingsLayoutTests {
         #expect(places.open == 0)
         await model.refresh()
         #expect(model.lines == ["Nothing to refresh yet. Index something first."])
+    }
+
+    // Test 5: A button's title picks its card, and a title no card has, or none, picks the first.
+    @Test func pick() {
+        #expect(SourceCard.pick("Jira").title == "Jira")
+        #expect(SourceCard.pick("PagerDuty").title == "PagerDuty")
+        #expect(SourceCard.pick("nope").title == "Folders and files")
+        #expect(SourceCard.pick(nil).title == "Folders and files")
+        for card in SourceCard.all {
+            #expect(SourceCard.pick(card.title) == card)
+        }
     }
 }
