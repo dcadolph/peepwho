@@ -10,6 +10,8 @@ struct SearchView: View {
     var onOpen: () async -> Void = {}
     // focused keeps the cursor in the field whenever the window opens.
     @FocusState private var focused: Bool
+    // height is the content's height, which the window is sized to.
+    @State private var height: CGFloat = 0
     // openSettings opens the settings scene.
     @Environment(\.openSettings) private var openSettings
 
@@ -58,6 +60,8 @@ struct SearchView: View {
         .padding(12)
         .fixedSize(horizontal: false, vertical: true)
         .frame(width: 360, alignment: .top)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+        .background(WindowFitter(height: height))
         .onAppear {
             focused = true
             Task {
@@ -66,6 +70,21 @@ struct SearchView: View {
             }
         }
         .onDisappear { model.closed() }
+    }
+}
+
+// WindowFitter sizes the window it sits in to height whenever height changes.
+struct WindowFitter: NSViewRepresentable {
+    // height is the content height the window should have.
+    let height: CGFloat
+
+    // makeNSView returns an empty view, used only to reach its window.
+    func makeNSView(context: Context) -> NSView { NSView() }
+
+    // updateNSView resizes the window after the current layout pass finishes.
+    func updateNSView(_ view: NSView, context: Context) {
+        let height = height
+        DispatchQueue.main.async { WindowFit.apply(view.window, height: height) }
     }
 }
 
