@@ -40,6 +40,8 @@ struct DecodeTests {
         #expect(got.people?.first?.isDeactivated == false)
         #expect(got.departed?.map(\.name) == ["Lena Gone"])
         #expect(got.departed?.first?.isDeactivated == true)
+        #expect(got.departed?.first?.role.hasPrefix("Deactivated, ") == true)
+        #expect(got.people?.first?.role.contains("Deactivated") == false)
         let plain: AskAnswer = try Core.decode(fixture("ask"))
         #expect(plain.departed == nil)
         #expect(plain.people?.contains { $0.isDeactivated } == false)
@@ -50,6 +52,7 @@ struct DecodeTests {
     @Test @MainActor func personDeparted() throws {
         let got: PersonDetail = try Core.decode(fixture("person_departed"))
         #expect(got.isDeactivated)
+        #expect(got.role.hasPrefix("Deactivated, "))
         #expect(got.links?.contains { $0.hasPrefix("slack:") } == true)
         #expect(SearchModel.contactLinks(got.links ?? [], deactivated: got.isDeactivated).isEmpty)
         #expect(SearchModel.contactLinks(got.links ?? [], deactivated: false) == got.links)
@@ -57,12 +60,43 @@ struct DecodeTests {
         #expect(!plain.isDeactivated)
     }
 
+    // RoleCase is one role line built from a title, a team, and the deactivated mark.
+    struct RoleCase: Sendable {
+        // Title is the job title, nil when not known.
+        let Title: String?
+        // Team is the team, nil when not known.
+        let Team: String?
+        // Deactivated marks a person who can no longer be reached.
+        let Deactivated: Bool
+        // WantRole is the expected line.
+        let WantRole: String
+    }
+
+    // roleLine leads with Deactivated so a narrow window never cuts the mark, and skips what
+    // is missing or empty.
+    @Test(arguments: [
+        // Test 0: Active with title and team.
+        RoleCase(Title: "Staff Engineer", Team: "Payments", Deactivated: false, WantRole: "Staff Engineer, Payments"),
+        // Test 1: Deactivated leads.
+        RoleCase(Title: "Senior Software Engineer", Team: "Data", Deactivated: true,
+                 WantRole: "Deactivated, Senior Software Engineer, Data"),
+        // Test 2: Deactivated with nothing else known.
+        RoleCase(Title: nil, Team: "", Deactivated: true, WantRole: "Deactivated"),
+        // Test 3: Empty title skipped.
+        RoleCase(Title: "", Team: "Payments", Deactivated: false, WantRole: "Payments"),
+        // Test 4: Nothing to show.
+        RoleCase(Title: nil, Team: nil, Deactivated: false, WantRole: ""),
+    ])
+    func roleLine(test: RoleCase) {
+        #expect(Role.line(title: test.Title, team: test.Team, deactivated: test.Deactivated) == test.WantRole)
+    }
+
     // peopleDeparted decodes the mark on the People sheet and writes it into the role line.
     @Test func peopleDeparted() throws {
         let got: PeopleList = try Core.decode(fixture("people_departed"))
         let lena = try #require(got.people.first { $0.name == "Lena Gone" })
         let nora = try #require(got.people.first { $0.name == "Nora Here" })
-        #expect(lena.isDeactivated && lena.role.hasSuffix("Deactivated"))
+        #expect(lena.isDeactivated && lena.role.hasPrefix("Deactivated, "))
         #expect(!nora.isDeactivated && !nora.role.contains("Deactivated"))
     }
 

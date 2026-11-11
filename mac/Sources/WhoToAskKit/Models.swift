@@ -97,6 +97,19 @@ public struct AskPerson: Codable, Hashable, Sendable, Identifiable {
 
     // isDeactivated reports whether the person can no longer be reached.
     public var isDeactivated: Bool { deactivated ?? false }
+
+    // role is the person's role line, empty when there is nothing to show.
+    public var role: String { Role.line(title: title, team: team, deactivated: isDeactivated) }
+}
+
+// Role builds the line under a person's name.
+public enum Role {
+    // line joins title and team, led by Deactivated for a person who can no longer be reached so
+    // a narrow window cuts the role and never the mark. It is empty when none of those apply.
+    public static func line(title: String?, team: String?, deactivated: Bool) -> String {
+        [deactivated ? "Deactivated" : nil, title, team].compactMap { $0 }.filter { !$0.isEmpty }
+            .joined(separator: ", ")
+    }
 }
 
 // AskChannel is one channel an Ask answer suggests asking in.
@@ -210,6 +223,9 @@ public struct PersonDetail: Codable, Sendable, Identifiable {
 
     // isDeactivated reports whether the person can no longer be reached.
     public var isDeactivated: Bool { deactivated ?? false }
+
+    // role is the person's role line, empty when there is nothing to show.
+    public var role: String { Role.line(title: title, team: team, deactivated: isDeactivated) }
 }
 
 // ListedPerson is one person in the list of everyone the index holds.
@@ -231,11 +247,8 @@ public struct ListedPerson: Codable, Hashable, Sendable, Identifiable {
     // isDeactivated reports whether the person can no longer be reached.
     public var isDeactivated: Bool { deactivated ?? false }
 
-    // role is the title and team joined, with Deactivated after them for a person who can no
-    // longer be reached, empty when none of those apply.
-    public var role: String {
-        [title, team, isDeactivated ? "Deactivated" : ""].filter { !$0.isEmpty }.joined(separator: ", ")
-    }
+    // role is the person's role line, empty when there is nothing to show.
+    public var role: String { Role.line(title: title, team: team, deactivated: isDeactivated) }
 
     // matches reports whether text is in the name, title, or team, ignoring case. Empty text
     // matches everyone.

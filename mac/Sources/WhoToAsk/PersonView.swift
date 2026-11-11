@@ -14,8 +14,7 @@ struct PersonView: View {
             Button { model.back() } label: { Label("Results", systemImage: "chevron.left") }
                 .buttonStyle(.link)
             Text(person.name).font(.title3.weight(.semibold))
-            if let role = [person.title, person.team, person.isDeactivated ? "Deactivated" : nil]
-                .compactMap({ $0 }).joined(separator: ", ").nonEmpty {
+            if let role = person.role.nonEmpty {
                 Text(role).foregroundStyle(.secondary)
             }
             if let email = person.email {
