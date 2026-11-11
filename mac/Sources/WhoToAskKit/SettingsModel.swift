@@ -509,8 +509,14 @@ public final class SettingsModel: ObservableObject {
         return stored > 0 ? stored : Self.defaultInterval
     }
 
-    // refreshNote says what the two buttons do and how often a refresh runs on its own.
+    // refreshNote says what the two buttons do and how often a refresh runs on its own, or why
+    // they are off while the sample company is loaded.
     public var refreshNote: String {
+        if status?.sample == true {
+            return "Index Now and Refresh Now read your own sources, so they stay off while the "
+                + "sample company is loaded. Clear Index on the Privacy tab removes it, then set up "
+                + "a source in Sources."
+        }
         let minutes = Int(refreshInterval / 60)
         let every = minutes % 60 == 0
             ? Count.words(minutes / 60, "hour", "hours") : Count.words(minutes, "minute", "minutes")

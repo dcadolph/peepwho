@@ -56,6 +56,9 @@ struct SampleTests {
         #expect(settings.summary.contains("Loaded just now."))
         #expect(heard.last == true)
         #expect(empty.last == false)
+        #expect(settings.refreshNote == "Index Now and Refresh Now read your own sources, so they stay off "
+            + "while the sample company is loaded. Clear Index on the Privacy tab removes it, then set up a "
+            + "source in Sources.")
         #expect(settings.sourceAges.count == 8)
         #expect(settings.sourceAges.allSatisfy { $0.detail == "Loaded just now." })
 
@@ -88,6 +91,7 @@ struct SampleTests {
         #expect(settings.canLoadSample)
         #expect(heard.last == false)
         #expect(empty.last == true)
+        #expect(settings.refreshNote.hasPrefix("Index Now reads every source from the start."))
     }
 
     // Test 1: The control is gone once real data is indexed, and a load is refused anyway.
