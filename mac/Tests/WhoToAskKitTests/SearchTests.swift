@@ -120,13 +120,19 @@ struct SearchTests {
     }
 
     // Test 5: Enter on a person shown from the results opens that person, not the first one.
-    // Deploy ranks Grace Kim first and Carol Lee, the one with a Slack link, below her.
+    // Deploy ranks Grace Kim first and Carol Lee, the one with a Slack link, below her. The footer
+    // offers Enter only when there is someone for it to reach.
     @Test func enterOpensShownPerson() async throws {
         let dir = try demoDir()
         defer { try? FileManager.default.removeItem(at: dir) }
         let opened = Opened()
         let core = try Core.open(dir: dir, key: "", secrets: KeychainSecrets())
         let model = SearchModel(core: core, delay: .milliseconds(1), opener: opened.open)
+        #expect(model.enterHint == nil)
+        model.query = "zzqx"
+        await model.ask(model.query)
+        try #require(model.people.isEmpty)
+        #expect(model.enterHint == nil)
         model.query = "deploy"
         await model.ask(model.query)
         try #require(model.people.first?.name != "Carol Lee")

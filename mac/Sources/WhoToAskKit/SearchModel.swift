@@ -159,7 +159,10 @@ public final class SearchModel: ObservableObject {
 
     // enterHint says what Enter does in the window as it stands, nil when it does nothing.
     public var enterHint: String? {
-        guard let detail else { return "Enter messages the first person." }
+        guard let detail else {
+            let nobody = query.isEmpty || (answered == query && people.isEmpty)
+            return nobody ? nil : "Enter messages the first person."
+        }
         let links = Self.contactLinks(detail.links ?? [], deactivated: detail.isDeactivated)
         return links.isEmpty ? nil : "Enter messages this person."
     }
