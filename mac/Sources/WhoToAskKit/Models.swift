@@ -91,6 +91,12 @@ public struct AskPerson: Codable, Hashable, Sendable, Identifiable {
     public let score: Double
     // strength is the score relative to the best answer, zero to one.
     public let strength: Double
+    // deactivated is true when every account the index knows for the person is deactivated,
+    // absent otherwise.
+    public var deactivated: Bool? = nil
+
+    // isDeactivated reports whether the person can no longer be reached.
+    public var isDeactivated: Bool { deactivated ?? false }
 }
 
 // AskChannel is one channel an Ask answer suggests asking in.
@@ -134,8 +140,12 @@ public struct AskTeam: Codable, Hashable, Sendable, Identifiable {
 public struct AskAnswer: Codable, Sendable {
     // query is the question as asked.
     public let query: String
-    // people are the people to talk to, best first. They never include a team.
+    // people are the people to talk to, best first. They never include a team or a
+    // deactivated person.
     public let people: [AskPerson]?
+    // departed are the deactivated people who match, ranked among themselves and shown below
+    // the people.
+    public let departed: [AskPerson]?
     // channels are the channels to ask in, best first.
     public let channels: [AskChannel]?
     // teams are the owners of record, ranked apart from the people.
@@ -194,6 +204,12 @@ public struct PersonDetail: Codable, Sendable, Identifiable {
     public let identities: [String]?
     // links open a conversation with the person in a source's own app, such as slack://user.
     public let links: [String]?
+    // deactivated is true when every account the index knows for the person is deactivated,
+    // absent otherwise.
+    public var deactivated: Bool? = nil
+
+    // isDeactivated reports whether the person can no longer be reached.
+    public var isDeactivated: Bool { deactivated ?? false }
 }
 
 // ListedPerson is one person in the list of everyone the index holds.
@@ -208,10 +224,17 @@ public struct ListedPerson: Codable, Hashable, Sendable, Identifiable {
     public let team: String
     // links open a conversation with the person in a source's own app.
     public let links: [String]
+    // deactivated is true when every account the index knows for the person is deactivated,
+    // absent otherwise.
+    public var deactivated: Bool? = nil
 
-    // role is the title and team joined, empty when neither is known.
+    // isDeactivated reports whether the person can no longer be reached.
+    public var isDeactivated: Bool { deactivated ?? false }
+
+    // role is the title and team joined, with Deactivated after them for a person who can no
+    // longer be reached, empty when none of those apply.
     public var role: String {
-        [title, team].filter { !$0.isEmpty }.joined(separator: ", ")
+        [title, team, isDeactivated ? "Deactivated" : ""].filter { !$0.isEmpty }.joined(separator: ", ")
     }
 
     // matches reports whether text is in the name, title, or team, ignoring case. Empty text
@@ -327,10 +350,14 @@ public struct IndexStatus: Codable, Sendable {
     public let sample: Bool
     // loadedAt is when the sample company was loaded, RFC 3339, absent when it was not.
     public let loadedAt: String?
+    // deactivated is how many of the people have every known account deactivated, absent
+    // when none do.
+    public let deactivated: Int?
 
     // CodingKeys maps the core's snake case names.
     enum CodingKeys: String, CodingKey {
         case people, teams, subjects, channels, words, conversations, sources, embeddings, sealed, scopes, sample
+        case deactivated
         case loadedAt = "loaded_at"
         case builtAt = "built_at"
         case ageSeconds = "age_seconds"

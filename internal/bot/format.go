@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/dcadolph/whotoask/internal/resolve"
@@ -10,7 +11,7 @@ import (
 // the graph is escaped, so text like <!channel> or <@Uxxx> renders as literal
 // characters rather than a workspace-wide broadcast or a mention.
 func Format(query string, ans resolve.Answer) string {
-	if len(ans.People) == 0 && len(ans.Channels) == 0 && len(ans.Teams) == 0 {
+	if len(ans.People) == 0 && len(ans.Departed) == 0 && len(ans.Channels) == 0 && len(ans.Teams) == 0 {
 		return "No matches for *" + escapeMrkdwn(query) + "*. Try different words."
 	}
 
@@ -20,9 +21,11 @@ func Format(query string, ans resolve.Answer) string {
 		b.WriteString("\n\n")
 	}
 
-	if len(ans.People) > 0 {
+	// The departed close the people list, marked, so the ranking reads as one
+	// list with them at the bottom.
+	if people := slices.Concat(ans.People, ans.Departed); len(people) > 0 {
 		b.WriteString("*People*\n")
-		for _, m := range ans.People {
+		for _, m := range people {
 			name := m.Person.Name
 			if name == "" {
 				name = m.Person.Email
@@ -33,6 +36,9 @@ func Format(query string, ans resolve.Answer) string {
 			}
 			if m.Team != nil && m.Team.Name != "" {
 				line += " (" + escapeMrkdwn(m.Team.Name) + ")"
+			}
+			if m.Person.Deactivated() {
+				line += " · _deactivated_"
 			}
 			if label := resolve.StrengthLabel(m.Strength); label != "" {
 				line += " · " + label + " match"

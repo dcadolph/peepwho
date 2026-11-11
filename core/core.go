@@ -370,6 +370,8 @@ type personRow struct {
 	Team string `json:"team"`
 	// Links are deep links that open a conversation with the person, empty when none.
 	Links []string `json:"links"`
+	// Deactivated marks a person whose every known account is deactivated.
+	Deactivated bool `json:"deactivated,omitempty"`
 }
 
 // People lists every person in the index sorted by name, with title, team name,
@@ -388,7 +390,7 @@ func (h *Handle) People(limit int) (out string, err error) {
 		if id.IsTeam() {
 			continue
 		}
-		row := personRow{ID: string(p.ID), Name: p.Name, Title: p.Title, Links: []string{}}
+		row := personRow{ID: string(p.ID), Name: p.Name, Title: p.Title, Links: []string{}, Deactivated: p.Deactivated()}
 		if t, ok := g.Teams[p.TeamID]; ok {
 			row.Team = t.Name
 		}
@@ -443,8 +445,10 @@ func (h *Handle) Recall(person, query string, limit int) (out string, err error)
 
 // statusView is the JSON shape Status returns.
 type statusView struct {
-	// People is the number of people indexed.
+	// People is the number of people indexed, deactivated people included.
 	People int `json:"people"`
+	// Deactivated is how many of People have every known account deactivated.
+	Deactivated int `json:"deactivated,omitempty"`
 	// Channels is the number of channels indexed.
 	Channels int `json:"channels"`
 	// Teams is the number of teams indexed.
@@ -545,6 +549,7 @@ func (h *Handle) Status(nowUnix int64) (out string, err error) {
 	}
 	st := l.eng.Status(now)
 	v.People, v.Channels, v.Teams, v.Subjects, v.Words = st.People, st.Channels, st.Teams, st.Subjects, st.Words
+	v.Deactivated = st.Deactivated
 	v.Sources, v.Embeddings, v.Conversations = st.Sources, st.Embeddings, l.episodes.Len()
 	if !st.BuiltAt.IsZero() {
 		v.BuiltAt = st.BuiltAt.UTC().Format(time.RFC3339)

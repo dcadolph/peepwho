@@ -1,0 +1,42 @@
+{
+  "departed": [
+    {
+      "deactivated": true,
+      "email": "lena@example.com",
+      "id": "lena@example.com",
+      "identities": [
+        "slack:u2"
+      ],
+      "name": "Lena Gone",
+      "reasons": [
+        "ledgers (topic)"
+      ],
+      "score": 2.2872750843706697,
+      "strength": 1,
+      "title": "Engineer",
+      "topics": [
+        "ledgers"
+      ]
+    }
+  ],
+  "people": [
+    {
+      "email": "nora@example.com",
+      "id": "nora@example.com",
+      "identities": [
+        "slack:u1"
+      ],
+      "name": "Nora Here",
+      "reasons": [
+        "ledgers (topic)"
+      ],
+      "score": 2.0428571428571427,
+      "strength": 1,
+      "title": "Engineer",
+      "topics": [
+        "ledgers"
+      ]
+    }
+  ],
+  "query": "ledgers"
+}

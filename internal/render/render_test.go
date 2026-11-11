@@ -148,6 +148,22 @@ func goldenCases() []goldenCase {
 				{ID: "codeowners:acme/default-maintainers", Name: "@acme/default-maintainers", Strength: 0.5},
 			}}, s)
 		}},
+		{"ask_departed", func(w io.Writer, s Style) {
+			RenderAsk(w, "ledgers", resolve.JSONAnswer{
+				People: []resolve.JSONPerson{{Name: "Nora Here", Title: "Engineer", Team: "Payments", Strength: 0.8,
+					Reasons: []string{"ledgers (topic)"}}},
+				Departed: []resolve.JSONPerson{{Name: "Lena Gone", Title: "Engineer", Deactivated: true, Strength: 1,
+					Reasons: []string{"ledgers (topic)"}}},
+			}, s)
+		}},
+		{"ask_departed_only", func(w io.Writer, s Style) {
+			RenderAsk(w, "ledgers", resolve.JSONAnswer{
+				Departed: []resolve.JSONPerson{{Name: "Lena Gone", Deactivated: true, Strength: 1}},
+			}, s)
+		}},
+		{"status_departed", func(w io.Writer, s Style) {
+			RenderStatus(w, map[string]any{"people": 220, "deactivated": 1, "teams": 13, "age": "0s"}, s)
+		}},
 		{"near", func(w io.Writer, s Style) {
 			RenderNear(w, "Kim Doe", []index.Adjacent{
 				{Name: "Lee Roe", Reasons: []string{"team Payments", "topic billing"}},
@@ -169,6 +185,12 @@ func goldenCases() []goldenCase {
 		{"directory", func(w io.Writer, s Style) { RenderDirectory(w, directory, "", s) }},
 		{"directory_teams", func(w io.Writer, s Style) { RenderDirectory(w, directory, "teams", s) }},
 		{"directory_empty", func(w io.Writer, s Style) { RenderDirectory(w, resolve.Directory{}, "", s) }},
+		{"directory_departed", func(w io.Writer, s Style) {
+			RenderDirectory(w, resolve.Directory{People: []resolve.DirectoryPerson{
+				{Name: "Dee Parted", Title: "Engineer", Deactivated: true},
+				{Name: "Nora Here", Title: "Engineer", Team: "Payments"},
+			}}, "people", s)
+		}},
 		{"feedback", func(w io.Writer, s Style) {
 			RenderFeedback(w, []feedback.Entry{
 				{Query: "who owns billing", Person: "Kim Doe", Vote: feedback.Helpful, Comment: "spot on"},

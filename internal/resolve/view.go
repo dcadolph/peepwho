@@ -93,6 +93,9 @@ type JSONAnswer struct {
 	Summary string `json:"summary,omitempty"`
 	// People is the ranked list of people to talk to. It never holds a team.
 	People []JSONPerson `json:"people"`
+	// Departed are the deactivated people who match, ranked apart from People
+	// and shown below them.
+	Departed []JSONPerson `json:"departed,omitempty"`
 	// Channels is the ranked list of places to ask.
 	Channels []JSONChannel `json:"channels,omitempty"`
 	// Teams are the owners of record, ranked apart from People.
@@ -130,6 +133,8 @@ type JSONPerson struct {
 	Title string `json:"title,omitempty"`
 	// Team is the person's team name.
 	Team string `json:"team,omitempty"`
+	// Deactivated marks a person whose every known account is deactivated.
+	Deactivated bool `json:"deactivated,omitempty"`
 	// Identities lists alternate identifiers merged into this person, such as
 	// a GitHub login joined to an email.
 	Identities []string `json:"identities,omitempty"`
@@ -200,6 +205,8 @@ type JSONProfile struct {
 	Team string `json:"team,omitempty"`
 	// Org is the person's organization name.
 	Org string `json:"org,omitempty"`
+	// Deactivated marks a person whose every known account is deactivated.
+	Deactivated bool `json:"deactivated,omitempty"`
 	// Manager is the person's manager, if known.
 	Manager *JSONMember `json:"manager,omitempty"`
 	// Identities lists alternate identifiers merged into this person.
@@ -220,12 +227,13 @@ type JSONProfile struct {
 // ProfileView renders a profile for the web and CLI.
 func ProfileView(ix *index.Index, p index.Profile) JSONProfile {
 	out := JSONProfile{
-		ID:     string(p.Person.ID),
-		Name:   p.Person.Name,
-		Email:  p.Person.Email,
-		Title:  p.Person.Title,
-		Links:  slices.Clone(p.Person.Links),
-		Topics: salientTopics(ix, p.Person.Topics, 32),
+		ID:          string(p.Person.ID),
+		Name:        p.Person.Name,
+		Email:       p.Person.Email,
+		Title:       p.Person.Title,
+		Deactivated: p.Person.Deactivated(),
+		Links:       slices.Clone(p.Person.Links),
+		Topics:      salientTopics(ix, p.Person.Topics, 32),
 	}
 	for _, id := range p.Person.Identities {
 		out.Identities = append(out.Identities, string(id))
@@ -248,6 +256,28 @@ func ProfileView(ix *index.Index, p index.Profile) JSONProfile {
 	return out
 }
 
+// personView renders one ranked person.
+func (a Answer) personView(m model.Match) JSONPerson {
+	jp := JSONPerson{
+		ID:          string(m.Person.ID),
+		Name:        m.Person.Name,
+		Email:       m.Person.Email,
+		Title:       m.Person.Title,
+		Deactivated: m.Person.Deactivated(),
+		Topics:      salientTopics(a.ix, m.Person.Topics, 8),
+		Score:       m.Score,
+		Strength:    roundStrength(m.Strength),
+		Reasons:     m.Reasons,
+	}
+	for _, id := range m.Person.Identities {
+		jp.Identities = append(jp.Identities, string(id))
+	}
+	if m.Team != nil {
+		jp.Team = m.Team.Name
+	}
+	return jp
+}
+
 // View renders the answer as a flat JSONAnswer for the given query.
 func (a Answer) View(query string) JSONAnswer {
 	out := JSONAnswer{
@@ -256,23 +286,10 @@ func (a Answer) View(query string) JSONAnswer {
 		People:  make([]JSONPerson, 0, len(a.People)),
 	}
 	for _, m := range a.People {
-		jp := JSONPerson{
-			ID:       string(m.Person.ID),
-			Name:     m.Person.Name,
-			Email:    m.Person.Email,
-			Title:    m.Person.Title,
-			Topics:   salientTopics(a.ix, m.Person.Topics, 8),
-			Score:    m.Score,
-			Strength: roundStrength(m.Strength),
-			Reasons:  m.Reasons,
-		}
-		for _, id := range m.Person.Identities {
-			jp.Identities = append(jp.Identities, string(id))
-		}
-		if m.Team != nil {
-			jp.Team = m.Team.Name
-		}
-		out.People = append(out.People, jp)
+		out.People = append(out.People, a.personView(m))
+	}
+	for _, m := range a.Departed {
+		out.Departed = append(out.Departed, a.personView(m))
 	}
 	for _, c := range a.Channels {
 		jc := JSONChannel{

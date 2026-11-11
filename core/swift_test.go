@@ -14,6 +14,7 @@ import (
 	"github.com/dcadolph/whotoask/internal/connector"
 	"github.com/dcadolph/whotoask/internal/engine"
 	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // updateSwift rewrites the fixtures the Swift decode tests read when set.
@@ -107,12 +108,20 @@ func TestSwiftFixtures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open teams: %v", err)
 	}
+	departed, err := Open(newDepartedDataDir(t), "")
+	if err != nil {
+		t.Fatalf("Open departed: %v", err)
+	}
 	calls := []struct {
 		Name string
 		Call func() (string, error)
 	}{
 		{"ask", func() (string, error) { return h.Ask("terraform", 3) }},
 		{"ask_teams", func() (string, error) { return teams.Ask("contracts", 3) }},
+		{"ask_departed", func() (string, error) { return departed.Ask("ledgers", 3) }},
+		{"person_departed", func() (string, error) { return departed.Person("lena@example.com") }},
+		{"people_departed", func() (string, error) { return departed.People(0) }},
+		{"status_departed", func() (string, error) { return departed.Status(now.Unix()) }},
 		{"search", func() (string, error) { return h.Search("angela", 3) }},
 		{"person", func() (string, error) { return h.Person("angela@example.com") }},
 		{"people", func() (string, error) { return h.People(3) }},
@@ -170,6 +179,28 @@ func newTeamsDataDir(t *testing.T) string {
 			Topics: []string{"contracts"}, Source: "git"},
 		{Kind: connector.KindPerson, Source: "codeowners", Weight: 1, Name: "@acme/legal-squad",
 			PersonID: "codeowners:acme/legal-squad", Topics: []string{"contracts"}},
+	})
+	ix.Canonicalize()
+	dir := t.TempDir()
+	if err := engine.NewStore(engine.Dir(dir), nil).SaveIndex(ix); err != nil {
+		t.Fatalf("SaveIndex: %v", err)
+	}
+	return dir
+}
+
+// newDepartedDataDir writes an index holding one active and one deactivated
+// person who both know ledgers, with a Slack link each, so the departed fixtures
+// carry the deactivated flag everywhere the app reads it.
+func newDepartedDataDir(t *testing.T) string {
+	t.Helper()
+	ix := index.New()
+	ix.Build([]connector.Record{
+		{Kind: connector.KindPerson, Source: "slack", PersonID: "slack:U1", Name: "Nora Here",
+			Email: "nora@example.com", Title: "Engineer", Topics: []string{"ledgers"},
+			Link: "slack://user?team=T1&id=U1", Account: model.AccountActive},
+		{Kind: connector.KindPerson, Source: "slack", PersonID: "slack:U2", Name: "Lena Gone",
+			Email: "lena@example.com", Title: "Engineer", Topics: []string{"ledgers", "ledgers"},
+			Link: "slack://user?team=T1&id=U2", Account: model.AccountDeactivated},
 	})
 	ix.Canonicalize()
 	dir := t.TempDir()

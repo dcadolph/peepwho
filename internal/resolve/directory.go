@@ -39,6 +39,8 @@ type DirectoryPerson struct {
 	Team string `json:"team,omitempty"`
 	// Org is the person's organization name.
 	Org string `json:"org,omitempty"`
+	// Deactivated marks a person whose every known account is deactivated.
+	Deactivated bool `json:"deactivated,omitempty"`
 	// Topics are the person's strongest expertise areas, strongest first.
 	Topics []string `json:"topics,omitempty"`
 	// Alone are the subjects this person is the only holder of. Those leave the
@@ -119,12 +121,13 @@ func BuildDirectory(ix *index.Index) Directory {
 			continue
 		}
 		row := DirectoryPerson{
-			ID:        string(p.ID),
-			Name:      p.Name,
-			Email:     p.Email,
-			Title:     p.Title,
-			Topics:    salientTopics(ix, p.Topics, 6),
-			ManagerID: string(p.ManagerID),
+			ID:          string(p.ID),
+			Name:        p.Name,
+			Email:       p.Email,
+			Title:       p.Title,
+			Deactivated: p.Deactivated(),
+			Topics:      salientTopics(ix, p.Topics, 6),
+			ManagerID:   string(p.ManagerID),
 		}
 		if row.Name == "" {
 			row.Name = row.ID

@@ -621,9 +621,14 @@ public final class SettingsModel: ObservableObject {
             let sample = canLoadSample ? ", or load the sample company to look around." : "."
             return "Nothing indexed yet. Pick a folder or add a token, then Index Now\(sample)"
         }
-        let parts = [
+        var parts = [
             (s.people, "person", "people"), (s.teams, "team", "teams"), (s.channels, "channel", "channels"),
         ].filter { $0.0 > 0 }.map { Count.words($0.0, $0.1, $0.2) }
+        // Deactivated people still count, since what they knew is still on record, and the
+        // sentence says how many of them there are.
+        if let gone = s.deactivated, gone > 0, s.people > 0 {
+            parts[0] += " including \(gone) deactivated"
+        }
         let counts = parts.isEmpty ? "No people yet." : "\(Count.list(parts))."
         let sealed = s.sealed ? " Encrypted on disk." : ""
         if s.sample {

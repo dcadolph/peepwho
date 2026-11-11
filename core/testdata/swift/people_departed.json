@@ -1,0 +1,23 @@
+{
+  "people": [
+    {
+      "deactivated": true,
+      "id": "lena@example.com",
+      "links": [
+        "slack://user?team=T1\u0026id=U2"
+      ],
+      "name": "Lena Gone",
+      "team": "",
+      "title": "Engineer"
+    },
+    {
+      "id": "nora@example.com",
+      "links": [
+        "slack://user?team=T1\u0026id=U1"
+      ],
+      "name": "Nora Here",
+      "team": "",
+      "title": "Engineer"
+    }
+  ]
+}

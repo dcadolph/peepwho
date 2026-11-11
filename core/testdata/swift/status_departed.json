@@ -1,0 +1,18 @@
+{
+  "age_seconds": -822376,
+  "built_at": "2026-11-11T00:26:16Z",
+  "channels": 0,
+  "conversations": 0,
+  "deactivated": 1,
+  "embeddings": false,
+  "people": 2,
+  "sample": false,
+  "scopes": [],
+  "sealed": false,
+  "sources": {
+    "slack": 2
+  },
+  "subjects": 1,
+  "teams": 0,
+  "words": 0
+}

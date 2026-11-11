@@ -50,7 +50,7 @@ struct PeopleView: View {
                 }
             }
             Spacer()
-            ForEach(person.links.filter { SearchModel.openable($0) != nil }, id: \.self) { link in
+            ForEach(SearchModel.contactLinks(person.links, deactivated: person.isDeactivated), id: \.self) { link in
                 Button(PersonView.title(link)) { open(link) }.controlSize(.small)
             }
         }

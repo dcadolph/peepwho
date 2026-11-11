@@ -42,6 +42,9 @@ embeddings, and whether a key is set to encrypt it at rest.`,
 				"embeddings":                st.Embeddings,
 				"encryption_key_configured": codec != nil,
 			}
+			if st.Deactivated > 0 {
+				view["deactivated"] = st.Deactivated
+			}
 			if !st.BuiltAt.IsZero() {
 				view["built_at"] = st.BuiltAt.Format(time.RFC3339)
 				view["age"] = st.Age.Round(time.Minute).String()

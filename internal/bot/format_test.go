@@ -87,3 +87,29 @@ func TestFormatTeams(t *testing.T) {
 		})
 	}
 }
+
+// TestFormatDeparted checks that deactivated people close the people list,
+// marked, and that an answer holding only them is still an answer.
+func TestFormatDeparted(t *testing.T) {
+	t.Parallel()
+	gone := model.Match{Person: &model.Person{Name: "Lena Gone", Account: model.AccountDeactivated}}
+	here := model.Match{Person: &model.Person{Name: "Nora Here", Account: model.AccountActive}}
+	tests := []struct {
+		WantResult string
+		Ans        resolve.Answer
+	}{{ // Test 0: The departed follow the people in one list, marked.
+		Ans:        resolve.Answer{People: []model.Match{here}, Departed: []model.Match{gone}},
+		WantResult: "*People*\n• Nora Here\n• Lena Gone · _deactivated_",
+	}, { // Test 1: Only the departed matched.
+		Ans:        resolve.Answer{Departed: []model.Match{gone}},
+		WantResult: "*People*\n• Lena Gone · _deactivated_",
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			if diff := cmp.Diff(test.WantResult, Format("ledgers", test.Ans)); diff != "" {
+				t.Errorf("Format mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}

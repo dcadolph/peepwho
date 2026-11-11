@@ -253,7 +253,9 @@ function render(data) {
     summaryEl.textContent = data.summary;
     summaryEl.hidden = false;
   }
-  const people = data.people || [];
+  // The departed close the people list, marked, rather than open a section of
+  // their own, so the ranking reads as one list with them at the bottom.
+  const people = (data.people || []).concat(data.departed || []);
   const channels = data.channels || [];
 
   people.forEach((p, i) => peopleEl.appendChild(personCard(p, data.query, i)));
@@ -355,7 +357,7 @@ function personCard(p, query, i) {
   const badge = strengthBadge(p.strength);
   if (badge) name.appendChild(badge);
   who.appendChild(name);
-  const sub = [p.title, p.team].filter(Boolean).join(" · ");
+  const sub = [p.title, p.team, p.deactivated ? "deactivated" : ""].filter(Boolean).join(" · ");
   if (sub) who.appendChild(el("div", "sub", sub));
   head.appendChild(who);
 

@@ -94,7 +94,7 @@ Examples:
 // stdout cannot tell them apart. An answer holding only teams of record is an
 // answer, the one a CODEOWNERS file of team handles gives.
 func warnEmptyAsk(cmd *cobra.Command, ix *index.Index, query string, ans resolve.Answer) {
-	if len(ans.People) > 0 || len(ans.Channels) > 0 || len(ans.Teams) > 0 {
+	if len(ans.People) > 0 || len(ans.Departed) > 0 || len(ans.Channels) > 0 || len(ans.Teams) > 0 {
 		return
 	}
 	w := cmd.ErrOrStderr()

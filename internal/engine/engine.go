@@ -111,8 +111,10 @@ func (e *Engine) Recaller(store *episode.Store) *recall.Resolver {
 
 // Status describes what the index holds and how fresh it is.
 type Status struct {
-	// People is the number of people indexed.
+	// People is the number of people indexed, deactivated people included.
 	People int
+	// Deactivated is how many of People have every known account deactivated.
+	Deactivated int
 	// Channels is the number of channels indexed.
 	Channels int
 	// Teams is the number of teams indexed.
@@ -148,14 +150,21 @@ func (e *Engine) Status(now time.Time) Status {
 	for _, name := range e.ix.SourceNames() {
 		sources[name] = e.ix.SourceSize(name)
 	}
+	deactivated := 0
+	for id, p := range e.ix.Graph.People {
+		if !id.IsTeam() && p.Deactivated() {
+			deactivated++
+		}
+	}
 	st := Status{
-		People:     model.PeopleCount(e.ix.Graph.People),
-		Channels:   len(e.ix.Graph.Channels),
-		Teams:      len(e.ix.Graph.Teams),
-		Subjects:   stated,
-		Words:      len(e.ix.Graph.Topics) - stated,
-		Sources:    sources,
-		Embeddings: e.ix.HasEmbeddings(),
+		People:      model.PeopleCount(e.ix.Graph.People),
+		Deactivated: deactivated,
+		Channels:    len(e.ix.Graph.Channels),
+		Teams:       len(e.ix.Graph.Teams),
+		Subjects:    stated,
+		Words:       len(e.ix.Graph.Topics) - stated,
+		Sources:     sources,
+		Embeddings:  e.ix.HasEmbeddings(),
 	}
 	if t := e.ix.BuiltAt(); !t.IsZero() {
 		st.BuiltAt = t

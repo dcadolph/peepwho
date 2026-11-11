@@ -1,0 +1,16 @@
+{
+  "deactivated": true,
+  "email": "lena@example.com",
+  "id": "lena@example.com",
+  "identities": [
+    "slack:u2"
+  ],
+  "links": [
+    "slack://user?team=T1\u0026id=U2"
+  ],
+  "name": "Lena Gone",
+  "title": "Engineer",
+  "topics": [
+    "ledgers"
+  ]
+}

@@ -251,14 +251,17 @@ struct SettingsTests {
     // Test 19: The summary is one sentence with singular and plural forms, zero counts left out.
     @Test func summaryWords() throws {
         func status(people: Int, teams: Int, channels: Int, sealed: Bool = true,
-                    sample: Bool = false) throws -> IndexStatus {
+                    sample: Bool = false, deactivated: Int = 0) throws -> IndexStatus {
             let json = """
             {"people":\(people),"teams":\(teams),"channels":\(channels),"subjects":0,"words":0,"conversations":0,
              "sources":{},"embeddings":false,"sealed":\(sealed),"built_at":"2026-11-01T12:00:00Z","age_seconds":10,
-             "scopes":[],"sample":\(sample)}
+             "scopes":[],"sample":\(sample),"deactivated":\(deactivated)}
             """
             return try Core.decode(json)
         }
+        #expect(SettingsModel.summary(try status(people: 6, teams: 2, channels: 1, deactivated: 1),
+                                      canLoadSample: false)
+            == "6 people including 1 deactivated, 2 teams, and 1 channel. Indexed just now. Encrypted on disk.")
         #expect(SettingsModel.summary(try status(people: 1, teams: 0, channels: 1), canLoadSample: false)
             == "1 person and 1 channel. Indexed just now. Encrypted on disk.")
         #expect(SettingsModel.summary(try status(people: 6, teams: 2, channels: 1), canLoadSample: false)

@@ -14,7 +14,8 @@ struct PersonView: View {
             Button { model.back() } label: { Label("Results", systemImage: "chevron.left") }
                 .buttonStyle(.link)
             Text(person.name).font(.title3.weight(.semibold))
-            if let role = [person.title, person.team].compactMap({ $0 }).joined(separator: ", ").nonEmpty {
+            if let role = [person.title, person.team, person.isDeactivated ? "Deactivated" : nil]
+                .compactMap({ $0 }).joined(separator: ", ").nonEmpty {
                 Text(role).foregroundStyle(.secondary)
             }
             if let email = person.email {
@@ -29,7 +30,8 @@ struct PersonView: View {
             if let channels = person.channels, !channels.isEmpty {
                 Field(label: "Active in", value: channels.prefix(6).map { "#\($0)" }.joined(separator: ", "))
             }
-            ForEach((person.links ?? []).filter { SearchModel.openable($0) != nil }, id: \.self) { link in
+            ForEach(SearchModel.contactLinks(person.links ?? [], deactivated: person.isDeactivated),
+                    id: \.self) { link in
                 Button(Self.title(link)) { model.openLink(link) }
             }
             if let message = model.message {

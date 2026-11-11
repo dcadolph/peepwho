@@ -6,7 +6,8 @@ import Foundation
 public final class SearchModel: ObservableObject {
     // query is the text in the search field.
     @Published public var query = ""
-    // people are the people the last answered query suggests, best first.
+    // people are the people the last answered query suggests, best first, with the deactivated
+    // ones last.
     @Published public private(set) var people: [AskPerson] = []
     // channels are the channels the last answered query suggests, best first.
     @Published public private(set) var channels: [AskChannel] = []
@@ -117,7 +118,9 @@ public final class SearchModel: ObservableObject {
         do {
             let answer = try await core.ask(trimmed, limit: 5)
             guard mine == generation else { return }
-            let people = answer.people ?? []
+            // The departed close the people list, so the ranking reads as one list with them at
+            // the bottom, each marked.
+            let people = (answer.people ?? []) + (answer.departed ?? [])
             let channels = answer.channels ?? []
             let teams = answer.teams ?? []
             let empty = people.isEmpty && channels.isEmpty && teams.isEmpty
@@ -146,7 +149,9 @@ public final class SearchModel: ObservableObject {
     public func open(_ id: String) async {
         let mine = nextGeneration()
         guard let person = await lookUp(id, mine), mine == generation else { return }
-        if let url = person.links?.lazy.compactMap(Self.openable).first, opener(url) {
+        // A deactivated person has no Slack link to follow, so they are shown instead.
+        let links = Self.contactLinks(person.links ?? [], deactivated: person.isDeactivated)
+        if let url = links.lazy.compactMap(Self.openable).first, opener(url) {
             return
         }
         show(person)
@@ -184,6 +189,14 @@ public final class SearchModel: ObservableObject {
         guard let url = URL(string: link), let scheme = url.scheme?.lowercased(),
               openableSchemes.contains(scheme) else { return nil }
         return url
+    }
+
+    // contactLinks returns the links worth a button: the ones the app opens, without any
+    // slack: link for a deactivated person, since a message there can no longer reach them.
+    public static func contactLinks(_ links: [String], deactivated: Bool) -> [String] {
+        links.filter { link in
+            openable(link) != nil && !(deactivated && link.lowercased().hasPrefix("slack:"))
+        }
     }
 
     // nextGeneration starts a new step in the window and returns its number.

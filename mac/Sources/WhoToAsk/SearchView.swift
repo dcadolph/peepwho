@@ -126,7 +126,8 @@ struct PersonRow: View {
                 Spacer()
                 StrengthBar(strength: person.strength)
             }
-            if let role = [person.title, person.team].compactMap({ $0 }).joined(separator: ", ").nonEmpty {
+            if let role = [person.title, person.team, person.isDeactivated ? "Deactivated" : nil]
+                .compactMap({ $0 }).joined(separator: ", ").nonEmpty {
                 Text(role).font(.caption).foregroundStyle(.secondary)
             }
             if let reasons = person.reasons?.joined(separator: ", ").nonEmpty {

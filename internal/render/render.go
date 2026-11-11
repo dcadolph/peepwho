@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -101,7 +102,7 @@ func RenderAsk(w io.Writer, query string, view resolve.JSONAnswer, s Style) {
 	if view.Summary != "" {
 		fmt.Fprintf(w, "%s\n", s.Dim(EscapeControls(view.Summary)))
 	}
-	if len(view.People) == 0 && len(view.Channels) == 0 && len(view.Teams) == 0 {
+	if len(view.People) == 0 && len(view.Departed) == 0 && len(view.Channels) == 0 && len(view.Teams) == 0 {
 		fmt.Fprintf(w, "\n  %s\n\n", s.Dim(
 			"Nothing matched. Try the words your team would use, or `whotoask directory` to see what is indexed."))
 		return
@@ -116,14 +117,19 @@ func RenderAsk(w io.Writer, query string, view resolve.JSONAnswer, s Style) {
 		}
 		fmt.Fprintf(w, "  %s\n\n", s.Dim(title))
 	}
-	if len(view.People) > 0 {
+	// The departed close the people list rather than open a section of their
+	// own, so the ranking reads as one list with them at the bottom.
+	if people := slices.Concat(view.People, view.Departed); len(people) > 0 {
 		section("PEOPLE")
-		width := nameWidth(view.People, func(p resolve.JSONPerson) string { return p.Name })
-		for i, p := range view.People {
+		width := nameWidth(people, func(p resolve.JSONPerson) string { return p.Name })
+		for i, p := range people {
 			name := EscapeControls(p.Name)
+			role := EscapeControls(joinRole(p.Title, p.Team))
+			if p.Deactivated {
+				role = joinRole(role, "deactivated")
+			}
 			fmt.Fprintf(w, "  %s  %s  %s\n",
-				s.Dim(rank(i+1)), pad(s.Bold(name), name, width),
-				s.Dim(EscapeControls(joinRole(p.Title, p.Team))))
+				s.Dim(rank(i+1)), pad(s.Bold(name), name, width), s.Dim(role))
 			fmt.Fprintf(w, "      %s %s   %s\n",
 				s.ConfBar(p.Strength), s.Accent(pct(p.Strength)),
 				s.Dim(strings.Join(EscapeControlsList(p.Reasons), " · ")))
@@ -193,7 +199,11 @@ func RenderStatus(w io.Writer, v map[string]any, s Style) {
 	line := func(label, val string) { fmt.Fprintf(w, "  %s  %s\n", pad(s.Dim(label), label, 8), val) }
 
 	fmt.Fprintf(w, "\n%s\n\n", s.Bold("whotoask index"))
-	line("People", s.Bold(fmt.Sprintf("%d", geti("people")))+"  "+
+	people := s.Bold(fmt.Sprintf("%d", geti("people")))
+	if n := geti("deactivated"); n > 0 {
+		people += s.Dim(fmt.Sprintf(" including %d deactivated", n))
+	}
+	line("People", people+"  "+
 		s.Dim(fmt.Sprintf("%d teams · %d subjects · %d channels",
 			geti("teams"), geti("subjects"), geti("channels"))))
 	if bt := gets("built_at"); bt != "" {
@@ -404,8 +414,11 @@ func RenderDirectory(w io.Writer, dir resolve.Directory, section string, s Style
 		}
 		for _, p := range dir.People {
 			name := EscapeControls(p.Name)
-			fmt.Fprintf(w, "  %s  %s\n", pad(s.Bold(name), name, width),
-				s.Dim(EscapeControls(joinRole(p.Title, p.Team))))
+			role := EscapeControls(joinRole(p.Title, p.Team))
+			if p.Deactivated {
+				role = joinRole(role, "deactivated")
+			}
+			fmt.Fprintf(w, "  %s  %s\n", pad(s.Bold(name), name, width), s.Dim(role))
 		}
 	}
 	if show("channels") && len(dir.Channels) > 0 {

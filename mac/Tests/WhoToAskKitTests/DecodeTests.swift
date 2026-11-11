@@ -32,6 +32,49 @@ struct DecodeTests {
         #expect(got.teams?.first?.reasons?.isEmpty == false)
     }
 
+    // askDeparted decodes the deactivated people apart from the people, each marked, and an
+    // active person carries no mark.
+    @Test func askDeparted() throws {
+        let got: AskAnswer = try Core.decode(fixture("ask_departed"))
+        #expect(got.people?.map(\.name) == ["Nora Here"])
+        #expect(got.people?.first?.isDeactivated == false)
+        #expect(got.departed?.map(\.name) == ["Lena Gone"])
+        #expect(got.departed?.first?.isDeactivated == true)
+        let plain: AskAnswer = try Core.decode(fixture("ask"))
+        #expect(plain.departed == nil)
+        #expect(plain.people?.contains { $0.isDeactivated } == false)
+    }
+
+    // personDeparted decodes the deactivated mark on a person and keeps their Slack link out of
+    // the contact buttons, while an active person keeps theirs.
+    @Test @MainActor func personDeparted() throws {
+        let got: PersonDetail = try Core.decode(fixture("person_departed"))
+        #expect(got.isDeactivated)
+        #expect(got.links?.contains { $0.hasPrefix("slack:") } == true)
+        #expect(SearchModel.contactLinks(got.links ?? [], deactivated: got.isDeactivated).isEmpty)
+        #expect(SearchModel.contactLinks(got.links ?? [], deactivated: false) == got.links)
+        let plain: PersonDetail = try Core.decode(fixture("person"))
+        #expect(!plain.isDeactivated)
+    }
+
+    // peopleDeparted decodes the mark on the People sheet and writes it into the role line.
+    @Test func peopleDeparted() throws {
+        let got: PeopleList = try Core.decode(fixture("people_departed"))
+        let lena = try #require(got.people.first { $0.name == "Lena Gone" })
+        let nora = try #require(got.people.first { $0.name == "Nora Here" })
+        #expect(lena.isDeactivated && lena.role.hasSuffix("Deactivated"))
+        #expect(!nora.isDeactivated && !nora.role.contains("Deactivated"))
+    }
+
+    // statusDeparted decodes the deactivated count, absent when nobody is.
+    @Test func statusDeparted() throws {
+        let got: IndexStatus = try Core.decode(fixture("status_departed"))
+        #expect(got.people == 2)
+        #expect(got.deactivated == 1)
+        let plain: IndexStatus = try Core.decode(fixture("status"))
+        #expect(plain.deactivated == nil)
+    }
+
     // search decodes matches with their kind.
     @Test func search() throws {
         let got: SearchAnswer = try Core.decode(fixture("search"))
