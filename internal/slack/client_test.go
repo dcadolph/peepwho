@@ -3,6 +3,7 @@ package slack
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -240,5 +241,138 @@ func TestReplies(t *testing.T) {
 
 	if msgs, err := c.Replies(context.Background(), "", "", 10); err != nil || msgs != nil {
 		t.Errorf("Replies with empty args = %v, %v, want nil, nil", msgs, err)
+	}
+}
+
+// scriptDoer replays a list of status codes in order, repeating the last one,
+// and counts the requests it served. A 200 carries a body every method accepts.
+type scriptDoer struct {
+	// each runs before every reply when set.
+	each func()
+	// retryAfter is the Retry-After value sent with every reply, empty for none.
+	retryAfter string
+	// statuses is the status code of each reply in order.
+	statuses []int
+	// calls is the number of requests served.
+	calls int
+}
+
+// Do serves the next scripted status.
+func (s *scriptDoer) Do(*http.Request) (*http.Response, error) {
+	if s.each != nil {
+		s.each()
+	}
+	status := s.statuses[min(s.calls, len(s.statuses)-1)]
+	s.calls++
+	header := make(http.Header)
+	if s.retryAfter != "" {
+		header.Set("Retry-After", s.retryAfter)
+	}
+	return &http.Response{
+		StatusCode: status,
+		Body:       io.NopCloser(strings.NewReader(`{"ok":true}`)),
+		Header:     header,
+	}, nil
+}
+
+// TestServerErrorRetry verifies which answers the client tries again and what
+// a status that outlasts the retry budget ends as. A server error on a call
+// that is safe to repeat is retried and never comes back as a rate limit, and a
+// message post is sent once, since a repeat could post twice.
+func TestServerErrorRetry(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	users := func(c *Client) error {
+		_, err := c.Users(ctx)
+		return err
+	}
+	history := func(c *Client) error {
+		_, err := c.History(ctx, "C1", "", 10)
+		return err
+	}
+	join := func(c *Client) error { return c.JoinChannel(ctx, "C1") }
+	post := func(c *Client) error { return c.PostMessage(ctx, "C1", "", "hi") }
+	whisper := func(c *Client) error { return c.PostEphemeral(ctx, "C1", "U1", "hi") }
+	tests := []struct {
+		Want       error
+		Call       func(*Client) error
+		Statuses   []int
+		WantCalls  int
+		WantStatus int
+	}{{ // Test 0: A 500 is tried again and the later answer wins.
+		Call: users, Statuses: []int{500, 200}, WantCalls: 2,
+	}, { // Test 1: A 502 is tried again.
+		Call: users, Statuses: []int{502, 200}, WantCalls: 2,
+	}, { // Test 2: A 503 is tried again.
+		Call: users, Statuses: []int{503, 200}, WantCalls: 2,
+	}, { // Test 3: A 504 is tried again.
+		Call: users, Statuses: []int{504, 200}, WantCalls: 2,
+	}, { // Test 4: A join does no harm twice, so it is tried again too.
+		Call: join, Statuses: []int{503, 200}, WantCalls: 2,
+	}, { // Test 5: A server error that outlasts the quick budget ends as its status.
+		Call: users, Statuses: []int{500}, WantCalls: 4, WantStatus: 500,
+	}, { // Test 6: History spends its larger budget before it gives up.
+		Call: history, Statuses: []int{502}, WantCalls: 11, WantStatus: 502,
+	}, { // Test 7: A 429 that outlasts the budget is still a rate limit.
+		Call: users, Statuses: []int{429}, WantCalls: 4, Want: ErrRateLimited,
+	}, { // Test 8: A server error followed by lasting 429s ends as a rate limit.
+		Call: users, Statuses: []int{503, 429}, WantCalls: 4, Want: ErrRateLimited,
+	}, { // Test 9: A 429 followed by lasting server errors ends as the status.
+		Call: users, Statuses: []int{429, 503}, WantCalls: 4, WantStatus: 503,
+	}, { // Test 10: A 501 is not a passing fault, so it is tried once.
+		Call: users, Statuses: []int{501, 200}, WantCalls: 1, WantStatus: 501,
+	}, { // Test 11: A 400 is tried once.
+		Call: users, Statuses: []int{400, 200}, WantCalls: 1, WantStatus: 400,
+	}, { // Test 12: A message post is tried once after a server error.
+		Call: post, Statuses: []int{503, 200}, WantCalls: 1, WantStatus: 503,
+	}, { // Test 13: An ephemeral post is tried once after a server error.
+		Call: whisper, Statuses: []int{502, 200}, WantCalls: 1, WantStatus: 502,
+	}, { // Test 14: A message post still waits out a rate limit.
+		Call: post, Statuses: []int{429, 200}, WantCalls: 2,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			d := &scriptDoer{statuses: test.Statuses, retryAfter: "0"}
+			err := test.Call(New("xoxb-test", WithHTTPClient(d)))
+			if d.calls != test.WantCalls {
+				t.Errorf("requests = %d, want %d", d.calls, test.WantCalls)
+			}
+			switch {
+			case test.WantStatus != 0:
+				want := fmt.Sprintf("unexpected status %d", test.WantStatus)
+				if err == nil || !strings.HasSuffix(err.Error(), want) {
+					t.Fatalf("err = %v, want one ending in %q", err, want)
+				}
+				if errors.Is(err, ErrRateLimited) || errors.Is(err, ErrAPI) {
+					t.Errorf("err = %v, want neither a rate limit nor an API error", err)
+				}
+			case test.Want != nil:
+				if !errors.Is(err, test.Want) {
+					t.Fatalf("err = %v, want %v", err, test.Want)
+				}
+			default:
+				if err != nil {
+					t.Fatalf("err = %v, want none", err)
+				}
+			}
+		})
+	}
+}
+
+// TestServerErrorRetryStopsOnCancel verifies a canceled context ends the wait
+// that follows a server error, so a stopped run does not sit out the rest of
+// the retry budget.
+func TestServerErrorRetryStopsOnCancel(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	d := &scriptDoer{statuses: []int{503}, each: cancel}
+	_, err := New("xoxb-test", WithHTTPClient(d)).Users(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+	if d.calls != 1 {
+		t.Errorf("requests = %d, want 1", d.calls)
 	}
 }

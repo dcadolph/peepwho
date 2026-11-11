@@ -27,9 +27,11 @@ type Client struct {
 	baseURL string
 	// http performs requests.
 	http httputil.Doer
-	// maxRetries bounds retries on HTTP 429 for the quick list and auth calls.
+	// maxRetries bounds retries for the quick list and auth calls. An HTTP 429
+	// is tried again, and so is a 500, 502, 503, or 504 on a method that is
+	// safe to repeat.
 	maxRetries int
-	// historyRetries bounds retries on HTTP 429 for conversations.history and
+	// historyRetries bounds the same retries for conversations.history and
 	// conversations.replies. Slack throttles these two methods harder than the
 	// rest, and since 2025 drops commercially distributed apps to roughly one
 	// call per minute. An app a workspace builds for itself keeps the higher
@@ -449,14 +451,28 @@ func (c *Client) Replies(ctx context.Context, channelID, threadTS string, limit 
 }
 
 // do calls a Slack Web API method with form params and decodes the result into
-// out. It retries on HTTP 429 up to maxRetries, honoring Retry-After.
+// out. It tries again after an HTTP 429 and, for a method that is safe to
+// repeat, after a 500, 502, 503, or 504, waiting for Retry-After or one second
+// between tries. The budget is maxRetries, or historyRetries for the two
+// history methods. A 429 that outlasts the budget comes back as ErrRateLimited.
+// A server error that outlasts it comes back as the unexpected status error a
+// single try would give, so a caller never mistakes an outage for a throttle.
 func (c *Client) do(ctx context.Context, method string, params url.Values, out response) error {
 	endpoint := c.baseURL + "/" + method
 	retries := c.maxRetries
 	if method == "conversations.history" || method == "conversations.replies" {
 		retries = c.historyRetries
 	}
-	resp, body, err := httputil.Do(ctx, c.http, retries, nil, func() (*http.Request, error) {
+	serverErrors := repeatable(method)
+	last := 0
+	retry := func(resp *http.Response) bool {
+		if !retryStatus(resp.StatusCode, serverErrors) {
+			return false
+		}
+		last = resp.StatusCode
+		return true
+	}
+	resp, body, err := httputil.Do(ctx, c.http, retries, retry, func() (*http.Request, error) {
 		req, err := http.NewRequestWithContext(
 			ctx, http.MethodPost, endpoint, strings.NewReader(params.Encode()))
 		if err != nil {
@@ -467,6 +483,9 @@ func (c *Client) do(ctx context.Context, method string, params url.Values, out r
 		return req, nil
 	})
 	if errors.Is(err, httputil.ErrRateLimited) {
+		if last != http.StatusTooManyRequests {
+			return fmt.Errorf("slack %s: unexpected status %d", method, last)
+		}
 		return fmt.Errorf("slack %s: %w", method, ErrRateLimited)
 	}
 	if err != nil {
@@ -482,4 +501,30 @@ func (c *Client) do(ctx context.Context, method string, params url.Values, out r
 		return fmt.Errorf("slack %s: %w: %s", method, ErrAPI, out.errMsg())
 	}
 	return nil
+}
+
+// repeatable reports whether a second try of method after a server error does
+// no harm. Reads, the join, the identity check, and the socket URL request
+// qualify. A message post does not: its first try may have gone through, and a
+// repeat would post the message twice.
+func repeatable(method string) bool {
+	switch method {
+	case "users.list", "conversations.list", "conversations.join", "conversations.history",
+		"conversations.replies", "auth.test", "apps.connections.open":
+		return true
+	}
+	return false
+}
+
+// retryStatus reports whether a response with this status code is tried again.
+// A 429 always is. A 500, 502, 503, or 504 is when serverErrors is set.
+func retryStatus(code int, serverErrors bool) bool {
+	switch code {
+	case http.StatusTooManyRequests:
+		return true
+	case http.StatusInternalServerError, http.StatusBadGateway,
+		http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return serverErrors
+	}
+	return false
 }
