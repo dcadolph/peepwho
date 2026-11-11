@@ -277,16 +277,27 @@ func readAssessSources(ctx context.Context, opts *options, a *assessArgs, log io
 		ix.Add(recs)
 	}
 	if a.SlackExport != "" {
-		se := connector.NewSlackExport(a.SlackExport, connector.SlackExportOptions{
-			IncludePrivate: true, SinceDays: 36500, Log: log,
-		})
-		recs, err := se.Fetch(ctx)
+		recs, err := assessSlackExport(opts, a.SlackExport, log).Fetch(ctx)
 		if err != nil {
 			return src, err
 		}
 		ix.Add(recs)
 	}
 	return src, nil
+}
+
+// assessSlackExport builds the export reader for an assessment. It reads the
+// export's private channels unless the policy denies them, and says so when the
+// policy keeps them out.
+func assessSlackExport(opts *options, path string, log io.Writer) *connector.SlackExport {
+	private := opts.pol.AllowPrivateChannels()
+	if !private {
+		fmt.Fprintln(log, "assess: org policy denies private channels, so none is read from "+
+			"the Slack export")
+	}
+	return connector.NewSlackExport(path, connector.SlackExportOptions{
+		IncludePrivate: private, SinceDays: 36500, Log: log,
+	})
 }
 
 // joinAssessIndex applies the alias file and the inferred joins, and refuses

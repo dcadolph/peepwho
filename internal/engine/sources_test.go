@@ -151,6 +151,21 @@ func TestSourceValidation(t *testing.T) {
 		Source: "git", WantMsg: "--repo-path is required for git", Want: ErrBadArgs,
 	}, { // Test 18: json with no file reads stdin.
 		Source: "json", Opts: SourceOptions{Stdin: strings.NewReader("[]")},
+	}, { // Test 19: slack-export private channels need the policy.
+		Source: "slack-export",
+		Opts: SourceOptions{
+			File:        "export.zip",
+			SlackExport: connector.SlackExportOptions{IncludePrivate: true},
+		},
+		WantMsg: "private-channel ingest is disabled by policy", Want: ErrBadArgs,
+	}, { // Test 20: slack-export private channels with the policy build.
+		Source: "slack-export",
+		Opts: SourceOptions{
+			File: "export.zip", AllowPrivateChannels: true,
+			SlackExport: connector.SlackExportOptions{IncludePrivate: true},
+		},
+	}, { // Test 21: slack-export without private channels needs no policy answer.
+		Source: "slack-export", Opts: SourceOptions{File: "export.zip"},
 	}}
 	for testNum, test := range tests {
 		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {

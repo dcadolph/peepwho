@@ -207,24 +207,38 @@ func newSlack(o SourceOptions) (connector.Source, error) {
 	if token == "" {
 		return nil, fmt.Errorf("%w: set %s", ErrBadArgs, SlackTokenEnv)
 	}
-	if o.Slack.IncludePrivate && !o.AllowPrivateChannels {
-		return nil, fmt.Errorf("%w: private-channel ingest is disabled by policy", ErrBadArgs)
+	if err := o.requirePrivateAllowed(o.Slack.IncludePrivate); err != nil {
+		return nil, err
 	}
 	so := o.Slack
 	so.Since, so.Log = o.Since, o.Log
 	return connector.NewSlack(token, so), nil
 }
 
-// newSlackExport builds the Slack export source.
+// newSlackExport builds the Slack export source, enforcing the private-channel
+// policy the way the live source does.
 func newSlackExport(o SourceOptions) (connector.Source, error) {
 	if o.File == "" {
 		return nil, fmt.Errorf(
 			"%w: --file (the export zip or its unzipped folder) is required for slack-export",
 			ErrBadArgs)
 	}
+	if err := o.requirePrivateAllowed(o.SlackExport.IncludePrivate); err != nil {
+		return nil, err
+	}
 	so := o.SlackExport
 	so.Since, so.Log = o.Since, o.Log
 	return connector.NewSlackExport(o.File, so), nil
+}
+
+// requirePrivateAllowed refuses a request for private Slack channels when the
+// policy denies them. Both Slack sources call it, so a live read and an export
+// answer to the same policy.
+func (o SourceOptions) requirePrivateAllowed(includePrivate bool) error {
+	if includePrivate && !o.AllowPrivateChannels {
+		return fmt.Errorf("%w: private-channel ingest is disabled by policy", ErrBadArgs)
+	}
+	return nil
 }
 
 // newGitHub builds the GitHub source from the configured repositories or org.

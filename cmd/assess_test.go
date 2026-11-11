@@ -1,14 +1,28 @@
 package cmd
 
 import (
+	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+
+	"github.com/dcadolph/whotoask/internal/connector"
+	"github.com/dcadolph/whotoask/internal/policy"
 )
+
+// assessPolicyLine is the line an assessment prints when the policy keeps an
+// export's private channels out.
+const assessPolicyLine = "assess: org policy denies private channels"
 
 // TestAssessProducesSealedDeliverable runs assess over the Slack export
 // fixture and an org CSV, then checks every file of the deliverable exists,
@@ -91,6 +105,73 @@ func TestAssessRequiresInput(t *testing.T) {
 	t.Parallel()
 	if _, _, err := runCmd(t, "assess", "--data-dir", t.TempDir()); err == nil {
 		t.Fatal("assess with no inputs: want error, got nil")
+	}
+}
+
+// TestAssessSlackExportFollowsPrivatePolicy verifies an assessment reads an
+// export's private channels only while the policy allows them, and names the
+// policy when it keeps them out.
+func TestAssessSlackExportFollowsPrivatePolicy(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		Pol            policy.Policy
+		WantChannels   []string
+		WantPolicyLine bool
+	}{{ // Test 0: The default policy reads the private channel.
+		Pol: policy.Default(), WantChannels: []string{"engineering", "general", "private-ops"},
+	}, { // Test 1: A policy that denies private channels leaves it out and says why.
+		Pol:          policy.Default().WithoutPrivateChannels(),
+		WantChannels: []string{"engineering", "general"}, WantPolicyLine: true,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			var log bytes.Buffer
+			src, err := readAssessSources(context.Background(), &options{pol: test.Pol},
+				&assessArgs{SlackExport: exportZip}, &log)
+			if err != nil {
+				t.Fatalf("read sources: %v", err)
+			}
+			var got []string
+			for _, rec := range src.Index.SourceRecords("slack") {
+				if rec.Kind == connector.KindChannel {
+					got = append(got, rec.Name)
+				}
+			}
+			sort.Strings(got)
+			if diff := cmp.Diff(test.WantChannels, got, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("channels read mismatch (-want +got):\n%s", diff)
+			}
+			if got := strings.Contains(log.String(), assessPolicyLine); got != test.WantPolicyLine {
+				t.Errorf("policy line printed = %v, want %v; log:\n%s",
+					got, test.WantPolicyLine, log.String())
+			}
+		})
+	}
+}
+
+// TestAssessUnderLockedDenyPolicy verifies the org policy file reaches an
+// assessment. Under a locked policy that denies private channels the run
+// succeeds, reads the export's public channels, leaves its private channel
+// unread, and names the policy as the reason. It points the policy variable at
+// a file, so it cannot run in parallel.
+func TestAssessUnderLockedDenyPolicy(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv(policyEnvVar, writePolicy(t, t.TempDir(), "policy.json",
+		`{"mode":"strict","locked":true,"private_channels":"deny"}`))
+	_, stderr, err := runCmd(t, "assess", "--data-dir", dir,
+		"--slack-export", exportZip, "--out", filepath.Join(dir, "assessment"))
+	if err != nil {
+		t.Fatalf("assess: %v\n%s", err, stderr)
+	}
+	logs := string(stderr)
+	if strings.Contains(logs, "indexed #private-ops") {
+		t.Errorf("assess read a private channel the policy denies; log:\n%s", logs)
+	}
+	for _, want := range []string{assessPolicyLine, "indexed #general", "#private-ops"} {
+		if !strings.Contains(logs, want) {
+			t.Errorf("assess log lacks %q; log:\n%s", want, logs)
+		}
 	}
 }
 
