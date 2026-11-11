@@ -73,7 +73,7 @@ Start with the org chart, then merge everything else onto it:
 	}
 	f := cmd.Flags()
 	f.Var(newOnceValue(&req.Source, "org-csv"), "source",
-		"Source type: org-csv, matters, slack, codeowners, github, jira, confluence, pagerduty, git, json, or graph.")
+		"Source type: "+engine.SourceNames()+".")
 	engine.RegisterIndexFlags(f, &req.IndexArgs)
 	return cmd
 }

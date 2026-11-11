@@ -88,7 +88,10 @@ type IndexArgs struct {
 
 // RegisterIndexFlags defines every index flag except --source on fs, bound to a.
 func RegisterIndexFlags(fs *pflag.FlagSet, a *IndexArgs) {
-	fs.StringVar(&a.File, "file", "", "Path to the source file: the CSV for org-csv, the CODEOWNERS file or repo root for codeowners, the JSON array for json (- for stdin).")
+	fs.StringVar(&a.File, "file", "",
+		"Path to the source file: the CSV for org-csv, the time-entry CSV for matters, "+
+			"the export zip or folder for slack-export, the CODEOWNERS file or repo root "+
+			"for codeowners, the JSON array for json (- for stdin).")
 	fs.BoolVar(&a.IncludePrivate, "include-private", false, "Ingest private Slack channels if policy allows.")
 	fs.BoolVar(&a.SlackJoin, "slack-join", false,
 		"Have the bot self-join public channels it is not in, so a workspace indexes without manual invites (needs channels:join; posts a join notice per channel).")

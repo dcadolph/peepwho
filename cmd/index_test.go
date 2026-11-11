@@ -88,3 +88,20 @@ func TestIndexSlackExportHonorsPrivatePolicy(t *testing.T) {
 		})
 	}
 }
+
+// TestIndexSourceHelpListsEverySource verifies the --source help lists every
+// registered source, so the help cannot fall behind the registry.
+func TestIndexSourceHelpListsEverySource(t *testing.T) {
+	t.Parallel()
+	usage := newIndexCmd(&options{}).Flags().Lookup("source").Usage
+	list := strings.TrimSuffix(strings.TrimPrefix(usage, "Source type: "), ".")
+	listed := make(map[string]bool)
+	for _, name := range strings.Split(list, ", ") {
+		listed[strings.TrimPrefix(name, "or ")] = true
+	}
+	for _, spec := range engine.Sources() {
+		if !listed[spec.Name] {
+			t.Errorf("--source help does not list %s: %q", spec.Name, usage)
+		}
+	}
+}

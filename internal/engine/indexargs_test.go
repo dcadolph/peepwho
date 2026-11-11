@@ -171,3 +171,20 @@ func TestAbsPathFlagsLostWorkingDirectory(t *testing.T) {
 		t.Errorf("IndexFromFlags = %v, want an error starting %q", err, "flags: resolve --file: ")
 	}
 }
+
+// TestFileHelpNamesEveryFileSource verifies the --file help says which file each
+// source that reads one expects, so a file source added to the registry cannot
+// be left out of the help.
+func TestFileHelpNamesEveryFileSource(t *testing.T) {
+	t.Parallel()
+	var run IndexRun
+	usage := indexFlagSet(&run).Lookup("file").Usage
+	for _, spec := range Sources() {
+		if !spec.FileKeyed {
+			continue
+		}
+		if !strings.Contains(usage, " for "+spec.Name) {
+			t.Errorf("--file help does not name %s: %q", spec.Name, usage)
+		}
+	}
+}
