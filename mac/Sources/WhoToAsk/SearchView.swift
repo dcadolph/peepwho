@@ -47,7 +47,9 @@ struct SearchView: View {
             }
             Divider()
             HStack {
-                Text("Enter messages the first person.").font(.caption).foregroundStyle(.secondary)
+                if let hint = model.enterHint {
+                    Text(hint).font(.caption).foregroundStyle(.secondary)
+                }
                 Spacer()
                 Button("Settings…") { SettingsWindow.open(openSettings) }.controlSize(.small)
                 Button("Quit") { NSApp.terminate(nil) }.controlSize(.small)

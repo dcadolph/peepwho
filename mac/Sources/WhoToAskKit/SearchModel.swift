@@ -157,6 +157,13 @@ public final class SearchModel: ObservableObject {
         await open(first.id)
     }
 
+    // enterHint says what Enter does in the window as it stands, nil when it does nothing.
+    public var enterHint: String? {
+        guard let detail else { return "Enter messages the first person." }
+        let links = Self.contactLinks(detail.links ?? [], deactivated: detail.isDeactivated)
+        return links.isEmpty ? nil : "Enter messages this person."
+    }
+
     // open looks up the person with id and opens their first link the app allows, showing them
     // when there is none or it does not open.
     public func open(_ id: String) async {

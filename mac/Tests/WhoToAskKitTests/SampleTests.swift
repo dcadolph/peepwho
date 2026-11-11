@@ -133,6 +133,7 @@ struct SampleTests {
         let departed = try #require(search.people.last)
         try #require(departed.isDeactivated)
         await search.select(departed.id)
+        #expect(search.enterHint == nil)
         await search.submit()
         #expect(opened.urls.isEmpty)
         #expect(search.detail?.id == departed.id)
