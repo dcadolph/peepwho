@@ -21,6 +21,8 @@ public final class SearchModel: ObservableObject {
     @Published public private(set) var changes: [String] = []
     // sample says the index holds the sample company, so the window can say so.
     @Published public var sample = false
+    // empty says the open index holds no one yet, so the window can point to Settings.
+    @Published public var empty = false
     // refreshFailure says which sources failed their last refresh, nil when none did.
     @Published public var refreshFailure: String?
 
@@ -55,12 +57,14 @@ public final class SearchModel: ObservableObject {
         }
     }
 
-    // use swaps in core, such as the fresh one a wipe opens, and clears what the old one answered.
+    // use swaps in core, such as the fresh one a wipe opens, and clears the field and what the
+    // old one answered, so no question shows without its answer.
     public func use(_ core: Core?, openError: String? = nil) {
         self.core = core
         pending?.cancel()
         pending = nil
         generation += 1
+        query = ""
         people = []
         channels = []
         teams = []
@@ -235,7 +239,7 @@ public final class SearchModel: ObservableObject {
     }
 
     // noIndex says where to go when nothing is indexed yet.
-    static let noIndex = "Nothing is indexed yet. Open Settings to pick a folder, add a token, or load the sample company."
+    public static let noIndex = "Nothing is indexed yet. Open Settings to pick a folder, add a token, or load the sample company."
 
     // describe turns a core error into a sentence for the window: no internal prefix, no path into
     // the app's container, a capital, and an ending. dataDir is where the app keeps its index.

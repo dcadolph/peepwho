@@ -39,6 +39,10 @@ struct SearchView: View {
             if let person = model.detail {
                 PersonView(person: person, model: model)
             } else {
+                if model.empty, model.query.isEmpty {
+                    Text(SearchModel.noIndex).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 ResultsView(model: model)
             }
             Divider()
@@ -50,7 +54,8 @@ struct SearchView: View {
             }
         }
         .padding(12)
-        .frame(width: 360)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: 360, alignment: .top)
         .onAppear {
             focused = true
             Task {

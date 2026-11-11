@@ -232,6 +232,8 @@ public final class SettingsModel: ObservableObject {
     public var onCore: ((Core?) -> Void)?
     // onSample hears whether the index holds the sample company after each status read.
     public var onSample: ((Bool) -> Void)?
+    // onEmpty hears whether the open index holds no one after each status read.
+    public var onEmpty: ((Bool) -> Void)?
     // onRefreshFailure hears refreshFailure after each status read.
     public var onRefreshFailure: ((String?) -> Void)?
 
@@ -576,6 +578,7 @@ public final class SettingsModel: ObservableObject {
         login = loginItem?.state
         guard let core else {
             status = nil
+            onEmpty?(false)
             onRefreshFailure?(nil)
             return
         }
@@ -587,6 +590,7 @@ public final class SettingsModel: ObservableObject {
             lines = [SearchModel.describe(error)]
         }
         onSample?(status?.sample == true)
+        onEmpty?(status?.people == 0)
         onRefreshFailure?(refreshFailure)
     }
 

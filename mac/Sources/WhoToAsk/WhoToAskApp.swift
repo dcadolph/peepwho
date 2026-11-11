@@ -53,6 +53,7 @@ final class AppModel: ObservableObject {
         search = SearchModel(core: settings.core, openError: settings.lines.first) { NSWorkspace.shared.open($0) }
         settings.onCore = { [weak search] core in search?.use(core) }
         settings.onSample = { [weak search] sample in search?.sample = sample }
+        settings.onEmpty = { [weak search] empty in search?.empty = empty }
         settings.onRefreshFailure = { [weak search] failure in search?.refreshFailure = failure }
         let tick = max(15, min(settings.refreshInterval / 4, 300))
         timer = Timer.scheduledTimer(withTimeInterval: tick, repeats: true) { [weak self] _ in

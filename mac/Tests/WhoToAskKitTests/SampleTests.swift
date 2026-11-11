@@ -37,8 +37,11 @@ struct SampleTests {
         defer { try? FileManager.default.removeItem(at: dir) }
         let settings = try model(dir)
         var heard: [Bool] = []
+        var empty: [Bool] = []
         settings.onSample = { heard.append($0) }
+        settings.onEmpty = { empty.append($0) }
         await settings.loadStatus()
+        #expect(empty == [true])
         #expect(settings.canLoadSample)
         #expect(settings.summary.hasSuffix("or load the sample company to look around."))
 
@@ -52,6 +55,7 @@ struct SampleTests {
         #expect(settings.summary.hasPrefix("Sample company, not real people. 220 people including 1 deactivated,"))
         #expect(settings.summary.contains("Loaded just now."))
         #expect(heard.last == true)
+        #expect(empty.last == false)
         #expect(settings.sourceAges.count == 8)
         #expect(settings.sourceAges.allSatisfy { $0.detail == "Loaded just now." })
 
@@ -83,6 +87,7 @@ struct SampleTests {
         #expect(settings.status?.sample == false)
         #expect(settings.canLoadSample)
         #expect(heard.last == false)
+        #expect(empty.last == true)
     }
 
     // Test 1: The control is gone once real data is indexed, and a load is refused anyway.

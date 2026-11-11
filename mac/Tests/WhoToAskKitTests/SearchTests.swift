@@ -137,7 +137,8 @@ struct SearchStateTests {
         #expect(text("") == "Something went wrong.")
     }
 
-    // Test 1: A new core drops what the old one answered, its changes, and any question waiting.
+    // Test 1: A new core drops the field, what the old one answered, its changes, and any
+    // question waiting.
     @Test func useClearsEverything() async throws {
         let dir = tempDir("whotoask-data")
         let csvDir = tempDir("whotoask-csv")
@@ -164,8 +165,10 @@ struct SearchStateTests {
         await model.ask("ledger")
         try #require(!model.people.isEmpty)
 
+        model.query = "retries"
         model.typed("retries")
         model.use(core)
+        #expect(model.query.isEmpty)
         #expect(model.people.isEmpty)
         #expect(model.changes.isEmpty)
         try await Task.sleep(for: .milliseconds(500))
