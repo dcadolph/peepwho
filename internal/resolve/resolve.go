@@ -74,18 +74,69 @@ func NewKeyword(ix *index.Index) *Keyword {
 	return &Keyword{ix: ix}
 }
 
-// Resolve ranks people and channels for query using the index.
+// Resolve ranks people and channels for query using the index. Each list is
+// read at least as deep as the evidence window, filtered for chatter, and only
+// then cut to limit, so a limit of n is the n best answers that pass the filter
+// and never fewer because chatter held a slot. Reading to the same depth for
+// every limit inside the window also makes a smaller answer a prefix of a
+// larger one.
 func (k *Keyword) Resolve(_ context.Context, query string, limit int) (Answer, error) {
-	named, namedGone := index.SplitDeparted(nameMatch(k.ix, query, limit))
-	found, gone := k.ix.SearchSplit(query, limit)
-	declared := func(m model.Match) bool { return m.Declared }
+	depth := limit
+	if limit > 0 {
+		depth = max(limit, index.EvidenceWindow)
+	}
+	named, namedGone := index.SplitDeparted(nameMatch(k.ix, query, depth))
+	found, gone := k.ix.SearchSplit(query, depth)
+	people, departed, channels := trimChatter(
+		withNamed(named, found, depth), withNamed(namedGone, gone, depth),
+		k.ix.SearchChannels(query, depth), limit)
 	return Answer{
-		People:   withoutChatter(withNamed(named, found, limit), declared),
-		Departed: withoutChatter(withNamed(namedGone, gone, limit), declared),
-		Channels: withoutChatter(k.ix.SearchChannels(query, limit), func(m model.ChannelMatch) bool { return m.Declared }),
+		People:   people,
+		Departed: departed,
+		Channels: channels,
 		Teams:    teamsOfRecord(k.ix, query, limit),
 		ix:       k.ix,
 	}, nil
+}
+
+// trimChatter filters each list against its own leader and only then cuts it
+// to limit. The departed are judged among themselves, since they are ranked
+// among themselves and a departed person who knew the subject is never
+// silently dropped for an active leader's sake.
+func trimChatter(
+	people, departed []model.Match, channels []model.ChannelMatch, limit int,
+) ([]model.Match, []model.Match, []model.ChannelMatch) {
+	return Cap(withoutChatter(people, personClass), limit),
+		Cap(withoutChatter(departed, personClass), limit),
+		Cap(withoutChatter(channels, channelClass), limit)
+}
+
+// personClass places a person match by the evidence it rests on.
+func personClass(m model.Match) int { return matchClass(m.Declared, m.Reach) }
+
+// channelClass places a channel match by the evidence it rests on.
+func channelClass(m model.ChannelMatch) int { return matchClass(m.Declared, m.Reach) }
+
+// Match classes, weakest first. A match on a word asked or its synonym that
+// rests on a stated topic, title, or name is direct. One that rests on a stated
+// subject that only travels with the one asked about is reach. Anything else,
+// passing mentions and team names, is chatter.
+const (
+	classChatter = iota
+	classReach
+	classDirect
+)
+
+// matchClass places a match by the evidence it rests on.
+func matchClass(declared, reach bool) int {
+	switch {
+	case !declared:
+		return classChatter
+	case reach:
+		return classReach
+	default:
+		return classDirect
+	}
 }
 
 // teamsOfRecord ranks the teams for query and labels each with the org chart
@@ -100,16 +151,23 @@ func teamsOfRecord(ix *index.Index, query string, limit int) []model.Match {
 	return teams
 }
 
-// withoutChatter drops the undeclared matches when the top match is declared,
-// rests on a stated topic, title, or name, so a clear answer is not padded out
-// to the limit with people and channels that only said the word. Only the top
-// match decides: a declared match further down while the leader rests on what
-// was said would otherwise discard the right person.
-func withoutChatter[T any](items []T, declared func(T) bool) []T {
-	if len(items) == 0 || !declared(items[0]) {
+// withoutChatter drops every match of a weaker class than the top match, so a
+// clear answer is not padded out to the limit with people and channels that
+// only said the word, or that only know a subject traveling with the one asked
+// about when somebody knows the one asked about. Only the top match decides: a
+// chatter leader keeps everything, since a stated match further down while the
+// leader rests on what was said would otherwise discard the right person, and a
+// reach leader means nobody matched the question directly, so reach is the
+// whole answer.
+func withoutChatter[T any](items []T, class func(T) int) []T {
+	if len(items) == 0 {
 		return items
 	}
-	return slices.DeleteFunc(items, func(m T) bool { return !declared(m) })
+	top := class(items[0])
+	if top == classChatter {
+		return items
+	}
+	return slices.DeleteFunc(items, func(m T) bool { return class(m) < top })
 }
 
 // Chatter sends a system and user prompt to a model and returns its reply. The

@@ -27,9 +27,10 @@ func evidenceBoost(evidence float64) float64 {
 	return 0.4 + 0.9*evidence
 }
 
-// boostWindowCap bounds how many leading candidates are re-ranked by evidence,
-// so an unlimited search does not pay the reason lookup for every match.
-const boostWindowCap = 64
+// EvidenceWindow bounds how many leading candidates are re-ranked by evidence,
+// so an unlimited search does not pay the reason lookup for every match. A
+// search cut anywhere inside the window returns a prefix of the same order.
+const EvidenceWindow = 64
 
 // expandedQuery grows the tokenized query with its synonyms and returns the
 // full term list, the per-term coverage back to the words actually asked, and
@@ -238,10 +239,21 @@ func (ix *Index) SearchSplit(query string, limit int) (people, departed []model.
 	// declared ownership outranks accumulated chatter no matter how the raw
 	// weights land. Only the window that could plausibly hold the answer is
 	// examined, since judging evidence means reading each candidate's fields.
-	window := min(len(matches), boostWindowCap)
+	window := min(len(matches), EvidenceWindow)
+	// explained is one window candidate's reasons and the evidence behind them.
+	type explained struct {
+		// reasons are the reason lines for the candidate's matched terms.
+		reasons []string
+		// evidence is the strongest field any matched term hit.
+		evidence float64
+	}
+	// Judging the window reads every reason, so they are kept for the people
+	// who survive the cut, and explaining a deep search costs no more than this.
+	seen := make(map[model.ID]explained, window)
 	for i := range window {
 		pid := matches[i].Person.ID
-		_, evidence := ix.reasons(pid, matched[pid], resolved, asked)
+		reasons, evidence := ix.reasons(pid, matched[pid], resolved, asked)
+		seen[pid] = explained{reasons: reasons, evidence: evidence}
 		matches[i].Score *= evidenceBoost(evidence)
 	}
 	// The boost never lifts tie reach above anyone the question or its synonyms
@@ -275,13 +287,18 @@ func (ix *Index) SearchSplit(query string, limit int) (people, departed []model.
 	explain := func(list []model.Match) {
 		for i := range list {
 			pid := list[i].Person.ID
-			reasons, evidence := ix.reasons(pid, matched[pid], resolved, asked)
+			e, ok := seen[pid]
+			if !ok {
+				e.reasons, e.evidence = ix.reasons(pid, matched[pid], resolved, asked)
+			}
+			reasons := e.reasons
 			if net := nets[pid]; net != 0 {
 				reasons = append(reasons, feedbackReason(net))
 			}
 			list[i].Reasons = reasons
-			list[i].Strength = evidence * coveredShare(matched[pid], covers, originals)
-			list[i].Declared = evidence > evidenceTeam
+			list[i].Strength = e.evidence * coveredShare(matched[pid], covers, originals)
+			list[i].Declared = e.evidence > evidenceTeam
+			list[i].Reach = !matchedBeyondTies(matched[pid], asked)
 		}
 	}
 	explain(people)
@@ -347,6 +364,7 @@ func (ix *Index) SearchChannels(query string, limit int) []model.ChannelMatch {
 			Score:    sc,
 			Strength: evidence * coverage,
 			Declared: evidence > evidenceTeam,
+			Reach:    !matchedBeyondTies(matched[cid], asked),
 			Reasons:  reasons,
 		})
 	}

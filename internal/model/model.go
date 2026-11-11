@@ -283,6 +283,9 @@ type Match struct {
 	// Team names are made of everyday words such as "people" and mentions are
 	// passing talk, so neither counts.
 	Declared bool
+	// Reach reports that the match rests only on subjects that travel with the
+	// one asked about, never on a word asked or a synonym of it.
+	Reach bool
 	// Reasons explains why the person matched, for transparency.
 	Reasons []string
 }
@@ -300,6 +303,9 @@ type ChannelMatch struct {
 	// Declared reports that the match rests on the channel's name, topic, or
 	// purpose rather than on passing mentions in its messages alone.
 	Declared bool
+	// Reach reports that the match rests only on subjects that travel with the
+	// one asked about, never on a word asked or a synonym of it.
+	Reach bool
 	// Reasons explains why the channel matched.
 	Reasons []string
 	// TopMembers are the most relevant active members, most relevant first.
