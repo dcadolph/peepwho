@@ -44,7 +44,7 @@ public final class SearchModel: ObservableObject {
     // pending is the debounced question waiting for typing to pause.
     private var pending: Task<Void, Never>?
     // answered is the query the shown results answer.
-    private var answered = ""
+    private(set) var answered = ""
     // generation counts questions asked and people looked up, so an older answer never replaces
     // what the window moved on to.
     private var generation = 0

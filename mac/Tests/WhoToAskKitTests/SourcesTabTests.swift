@@ -77,84 +77,88 @@ func views<T: NSView>(_ root: NSView, _ type: T.Type) -> [T] {
     return found
 }
 
-// SourcesTabTests check the Sources tab in the real settings window: the buttons, their check
-// marks, the Needs notes, and typed site addresses.
-@MainActor
-@Suite(.serialized)
-struct SourcesTabTests {
-    // Test 0: Every source button reads in full at the window's own width, Folders and files
-    // first, and nothing reaches the screen.
-    @Test func buttonsReadInFull() async throws {
-        let tab = try SourcesTab.open(MemorySecrets(), MemoryPlaces())
-        defer { tab.close() }
-        let titles = SourceCard.all.map(\.title)
-        #expect(titles.first == "Folders and files")
-        #expect(try tab.labels() == titles)
-        let lines = try await tab.hosted.read(until: "PagerDuty").map(\.text)
-        for title in titles {
-            #expect(lines.contains { $0.contains(title) }, "\(title) not read in full: \(lines)")
+extension ViewTests {
+    // SourcesTabTests check the Sources tab in the real settings window: the buttons, their check
+    // marks, the Needs notes, and typed site addresses.
+    @MainActor
+    @Suite
+    struct SourcesTabTests {
+        // Test 0: Every source button reads in full at the window's own width, Folders and files
+        // first, and nothing reaches the screen.
+        @Test func buttonsReadInFull() async throws {
+            let tab = try SourcesTab.open(MemorySecrets(), MemoryPlaces())
+            defer { tab.close() }
+            let titles = SourceCard.all.map(\.title)
+            #expect(titles.first == "Folders and files")
+            #expect(try tab.labels() == titles)
+            let lines = try await tab.hosted.read(until: "PagerDuty").map(\.text)
+            for title in titles {
+                let found = lines.contains { $0.contains(title) }
+                #expect(found, "\(title) not read in full: \(lines)")
+            }
+            #expect(tab.hosted.window.fenced == ["makeKeyAndOrderFront"])
+            #expect(!tab.hosted.window.isVisible)
+            #expect(!NSApp.isActive)
         }
-        #expect(tab.hosted.window.fenced == ["makeKeyAndOrderFront"])
-        #expect(!tab.hosted.window.isVisible)
-        #expect(!NSApp.isActive)
-    }
 
-    // Test 1: Set-up sources carry a check mark, and GitHub, Jira, and Confluence with their
-    // secrets and nothing to read carry none and show what they need until it is added.
-    @Test func checkMarksAndNeeds() async throws {
-        let secrets = MemorySecrets()
-        for name in SourceCard.entered where name != SecretName.pagerdutyToken {
-            secrets.values[name] = "value"
+        // Test 1: Set-up sources carry a check mark, and GitHub, Jira, and Confluence with their
+        // secrets and nothing to read carry none and show what they need until it is added.
+        @Test func checkMarksAndNeeds() async throws {
+            let secrets = MemorySecrets()
+            for name in SourceCard.entered where name != SecretName.pagerdutyToken {
+                secrets.values[name] = "value"
+            }
+            let places = MemoryPlaces()
+            places.urls[.csv] = URL(fileURLWithPath: "/nowhere/org.csv")
+            let tab = try SourcesTab.open(secrets, places)
+            defer { tab.close() }
+            #expect(try tab.labels() == [
+                "Folders and files ✓", "Slack ✓", "GitHub", "Jira", "Confluence", "PagerDuty",
+            ])
+            let wants = [
+                ("Folders and files", "Set up"), ("Slack", "Set up"),
+                ("GitHub", "Needs a repository"), ("Jira", "Needs a project"),
+                ("Confluence", "Needs a space"), ("PagerDuty", "Not set up"),
+            ]
+            for (title, badge) in wants {
+                try tab.pick(title)
+                let lines = try await tab.hosted.read(until: badge).map(\.text)
+                #expect(lines.contains { $0.contains(badge) }, "\(title) badge: \(lines)")
+            }
+            tab.model.scopes.githubRepos = "acme/billing"
+            tab.model.scopes.jiraProjects = "PAY"
+            tab.model.scopes.confluenceSpaces = "ENG"
+            settle(0.2)
+            #expect(try tab.labels() == [
+                "Folders and files ✓", "Slack ✓", "GitHub ✓", "Jira ✓", "Confluence ✓", "PagerDuty",
+            ])
+            try tab.pick("Jira")
+            let lines = try await tab.hosted.read(until: "Set up").map(\.text)
+            #expect(lines.contains { $0.contains("Set up") }, "Jira badge: \(lines)")
+            #expect(!lines.contains { $0.contains("Needs") }, "Jira still needs: \(lines)")
         }
-        let places = MemoryPlaces()
-        places.urls[.csv] = URL(fileURLWithPath: "/nowhere/org.csv")
-        let tab = try SourcesTab.open(secrets, places)
-        defer { tab.close() }
-        #expect(try tab.labels() == [
-            "Folders and files ✓", "Slack ✓", "GitHub", "Jira", "Confluence", "PagerDuty",
-        ])
-        let wants = [
-            ("Folders and files", "Set up"), ("Slack", "Set up"), ("GitHub", "Needs a repository"),
-            ("Jira", "Needs a project"), ("Confluence", "Needs a space"), ("PagerDuty", "Not set up"),
-        ]
-        for (title, badge) in wants {
-            try tab.pick(title)
-            let lines = try await tab.hosted.read(until: badge).map(\.text)
-            #expect(lines.contains { $0.contains(badge) }, "\(title) badge: \(lines)")
-        }
-        tab.model.scopes.githubRepos = "acme/billing"
-        tab.model.scopes.jiraProjects = "PAY"
-        tab.model.scopes.confluenceSpaces = "ENG"
-        settle(0.2)
-        #expect(try tab.labels() == [
-            "Folders and files ✓", "Slack ✓", "GitHub ✓", "Jira ✓", "Confluence ✓", "PagerDuty",
-        ])
-        try tab.pick("Jira")
-        let lines = try await tab.hosted.read(until: "Set up").map(\.text)
-        #expect(lines.contains { $0.contains("Set up") }, "Jira badge: \(lines)")
-        #expect(!lines.contains { $0.contains("Needs") }, "Jira still needs: \(lines)")
-    }
 
-    // Test 2: A site address typed and not saved is still there after switching to another source
-    // and back, and a typed token is not.
-    @Test func typedSiteAddressStays() async throws {
-        let tab = try SourcesTab.open(MemorySecrets(), MemoryPlaces())
-        defer { tab.close() }
-        #expect(SourceCard.pick("Jira").secrets.first == SecretName.jiraURL)
-        try tab.pick("Jira")
-        let site = try #require(tab.fields().first { !($0 is NSSecureTextField) })
-        #expect(tab.hosted.window.makeFirstResponder(site))
-        tab.hosted.type("acme.atlassian.net")
-        let token = try #require(tab.fields().first { $0 is NSSecureTextField })
-        #expect(tab.hosted.window.makeFirstResponder(token))
-        tab.hosted.type("secret")
-        try tab.pick("Slack")
-        try tab.pick("Jira")
-        let again = try #require(tab.fields().first { !($0 is NSSecureTextField) })
-        #expect(again.stringValue == "acme.atlassian.net")
-        #expect(tab.fields().first { $0 is NSSecureTextField }?.stringValue == "")
-        let lines = try await tab.hosted.read(until: "acme").map(\.text)
-        #expect(lines.contains { $0.contains("acme.atlassian.net") }, "read \(lines)")
-        #expect(tab.model.saved.isEmpty, "nothing is saved until Save")
+        // Test 2: A site address typed and not saved is still there after switching to another
+        // source and back, and a typed token is not.
+        @Test func typedSiteAddressStays() async throws {
+            let tab = try SourcesTab.open(MemorySecrets(), MemoryPlaces())
+            defer { tab.close() }
+            #expect(SourceCard.pick("Jira").secrets.first == SecretName.jiraURL)
+            try tab.pick("Jira")
+            let site = try #require(tab.fields().first { !($0 is NSSecureTextField) })
+            #expect(tab.hosted.window.makeFirstResponder(site))
+            tab.hosted.type("acme.atlassian.net")
+            let token = try #require(tab.fields().first { $0 is NSSecureTextField })
+            #expect(tab.hosted.window.makeFirstResponder(token))
+            tab.hosted.type("secret")
+            try tab.pick("Slack")
+            try tab.pick("Jira")
+            let again = try #require(tab.fields().first { !($0 is NSSecureTextField) })
+            #expect(again.stringValue == "acme.atlassian.net")
+            #expect(tab.fields().first { $0 is NSSecureTextField }?.stringValue == "")
+            let lines = try await tab.hosted.read(until: "acme").map(\.text)
+            #expect(lines.contains { $0.contains("acme.atlassian.net") }, "read \(lines)")
+            #expect(tab.model.saved.isEmpty, "nothing is saved until Save")
+        }
     }
 }

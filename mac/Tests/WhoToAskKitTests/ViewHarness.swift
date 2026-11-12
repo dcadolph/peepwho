@@ -152,6 +152,20 @@ struct Hosted<V: View> {
         return lines
     }
 
+    // steady waits until the window's frame and the view's fitting size hold for a fifth of a
+    // second, since the window fits itself to its content a beat after the content changes.
+    func steady(timeout: TimeInterval = 5) async {
+        let end = Date().addingTimeInterval(timeout)
+        var last = (window.frame, view.fittingSize)
+        while Date() < end {
+            settle(0.2)
+            await Task.yield()
+            let now = (window.frame, view.fittingSize)
+            if now == last { return }
+            last = now
+        }
+    }
+
     // expectUntouched checks that nothing reached the screen or took focus: the fence stopped
     // nothing, the window is out, and this process is neither active nor frontmost.
     func expectUntouched(sourceLocation: SourceLocation = #_sourceLocation) {
@@ -233,42 +247,50 @@ func recognize(_ rep: NSBitmapImageRep) throws -> [TextLine] {
     }
 }
 
-// ViewHarnessTests pin that the harness drives a real view and never touches the screen.
+// ViewTests runs every suite that hosts a view one test at a time, since two hosted windows that
+// both report key at once leave SwiftUI unsure which one the keys are for.
 @MainActor
 @Suite(.serialized)
-struct ViewHarnessTests {
-    // Test 0: Keys typed into the real search window answer, the answer reads back from the
-    // rendered window, and nothing reaches the screen.
-    @Test func searchAnswersTypedKeys() async throws {
-        let dir = try demoDir()
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let core = try Core.open(dir: dir, key: "", secrets: CoreMemorySecrets(MemorySecrets()))
-        let model = SearchModel(core: core, delay: .milliseconds(1), opener: Opened().open)
-        let hosted = host(SearchView(model: model), size: NSSize(width: 360, height: 500))
-        defer { hosted.window.close() }
-        hosted.type("terraform")
-        #expect(await waitFor { model.people.first?.name == "Carol Lee" })
-        let lines = try await hosted.read(until: "Carol Lee").map(\.text)
-        #expect(lines.contains { $0.contains("Carol Lee") }, "read \(lines)")
-        hosted.expectUntouched()
-    }
+enum ViewTests {}
 
-    // Test 1: The fence stops a view that tries to show its window or make it key.
-    @Test func fenceStopsShowing() {
-        let hosted = host(Text("Fenced"), size: NSSize(width: 100, height: 40))
-        defer { hosted.window.close() }
-        hosted.window.makeKeyAndOrderFront(nil)
-        hosted.window.orderFrontRegardless()
-        #expect(hosted.window.fenced == ["makeKeyAndOrderFront", "orderFrontRegardless"])
-        #expect(!hosted.window.isVisible)
-    }
+extension ViewTests {
+    // ViewHarnessTests pin that the harness drives a real view and never touches the screen.
+    @MainActor
+    @Suite
+    struct ViewHarnessTests {
+        // Test 0: Keys typed into the real search window answer, the answer reads back from the
+        // rendered window, and nothing reaches the screen.
+        @Test func searchAnswersTypedKeys() async throws {
+            let dir = try demoDir()
+            defer { try? FileManager.default.removeItem(at: dir) }
+            let core = try Core.open(dir: dir, key: "", secrets: CoreMemorySecrets(MemorySecrets()))
+            let model = SearchModel(core: core, delay: .milliseconds(1), opener: Opened().open)
+            let hosted = host(SearchView(model: model), size: NSSize(width: 360, height: 500))
+            defer { hosted.window.close() }
+            hosted.type("terraform")
+            #expect(await waitFor { model.people.first?.name == "Carol Lee" })
+            let lines = try await hosted.read(until: "Carol Lee").map(\.text)
+            #expect(lines.contains { $0.contains("Carol Lee") }, "read \(lines)")
+            hosted.expectUntouched()
+        }
 
-    // Test 2: The Quit button's request to quit is refused while views are hosted.
-    @Test func quitIsRefused() {
-        let hosted = host(Text("Guarded"), size: NSSize(width: 100, height: 40))
-        defer { hosted.window.close() }
-        let before = terminationGuard.asked
-        NSApp.terminate(nil)
-        #expect(terminationGuard.asked == before + 1)
+        // Test 1: The fence stops a view that tries to show its window or make it key.
+        @Test func fenceStopsShowing() {
+            let hosted = host(Text("Fenced"), size: NSSize(width: 100, height: 40))
+            defer { hosted.window.close() }
+            hosted.window.makeKeyAndOrderFront(nil)
+            hosted.window.orderFrontRegardless()
+            #expect(hosted.window.fenced == ["makeKeyAndOrderFront", "orderFrontRegardless"])
+            #expect(!hosted.window.isVisible)
+        }
+
+        // Test 2: The Quit button's request to quit is refused while views are hosted.
+        @Test func quitIsRefused() {
+            let hosted = host(Text("Guarded"), size: NSSize(width: 100, height: 40))
+            defer { hosted.window.close() }
+            let before = terminationGuard.asked
+            NSApp.terminate(nil)
+            #expect(terminationGuard.asked == before + 1)
+        }
     }
 }
