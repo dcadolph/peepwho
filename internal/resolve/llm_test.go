@@ -3,8 +3,13 @@ package resolve
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/dcadolph/whotoask/internal/connector"
 	"github.com/dcadolph/whotoask/internal/index"
@@ -128,12 +133,77 @@ func TestLLMGroundsToCandidates(t *testing.T) {
 	}
 }
 
-// TestLLMChatError verifies a chat failure propagates.
-func TestLLMChatError(t *testing.T) {
+// TestLLMChatFailure verifies a model failure costs the ranking and never the
+// answer: the keyword order comes back with a note and the failure attached,
+// and only a canceled ask returns the error.
+func TestLLMChatFailure(t *testing.T) {
 	t.Parallel()
-	chat := &fakeChat{err: errors.New("boom")}
-	if _, err := NewLLM(llmIndex(), chat, nil).Resolve(context.Background(), "retries", 5); err == nil {
-		t.Fatal("want error from chat failure, got nil")
+	errBoom := errors.New("boom")
+	live := func(*testing.T) context.Context { return context.Background() }
+	canceled := func(*testing.T) context.Context {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		return ctx
+	}
+	expired := func(t *testing.T) context.Context {
+		t.Helper()
+		ctx, cancel := context.WithDeadline(context.Background(), time.Unix(0, 0))
+		t.Cleanup(cancel)
+		return ctx
+	}
+	const summary = "Talk to Jane Roe (Engineer); ask in #billing."
+	tests := []struct {
+		Want         error
+		WantModelErr error
+		Ctx          func(*testing.T) context.Context
+		ChatErr      error
+		Reply        string
+		WantSummary  string
+		WantPeople   []string
+		WantChannels []string
+	}{{ // Test 0: A failed model keeps keyword order and says so.
+		Ctx: live, ChatErr: errBoom, WantModelErr: errBoom,
+		WantSummary: summary + " " + modelFailedNote,
+		WantPeople:  []string{"jane@x.com"}, WantChannels: []string{"billing"},
+	}, { // Test 1: A model that ran out the clock still yields the answer.
+		Ctx: expired, ChatErr: errBoom, WantModelErr: errBoom,
+		WantSummary: summary + " " + modelFailedNote,
+		WantPeople:  []string{"jane@x.com"}, WantChannels: []string{"billing"},
+	}, { // Test 2: A canceled ask returns the error and no answer.
+		Ctx: canceled, ChatErr: errBoom, Want: errBoom,
+	}, { // Test 3: A model that answers leaves no note and no failure.
+		Ctx: live, Reply: `{"people":["jane@x.com"],"channels":["billing"]}`,
+		WantSummary: summary,
+		WantPeople:  []string{"jane@x.com"}, WantChannels: []string{"billing"},
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			chat := &fakeChat{reply: test.Reply, err: test.ChatErr}
+			ans, err := NewLLM(llmIndex(), chat, nil).Resolve(test.Ctx(t), "retries", 5)
+			if !errors.Is(err, test.Want) {
+				t.Fatalf("error = %v, want %v", err, test.Want)
+			}
+			if !errors.Is(ans.ModelErr, test.WantModelErr) {
+				t.Errorf("model error = %v, want %v", ans.ModelErr, test.WantModelErr)
+			}
+			if diff := cmp.Diff(test.WantSummary, ans.Summary); diff != "" {
+				t.Errorf("summary mismatch (-want +got):\n%s", diff)
+			}
+			var people, channels []string
+			for _, p := range ans.People {
+				people = append(people, p.Person.Email)
+			}
+			for _, c := range ans.Channels {
+				channels = append(channels, c.Channel.Name)
+			}
+			if diff := cmp.Diff(test.WantPeople, people, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("people mismatch (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(test.WantChannels, channels, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("channels mismatch (-want +got):\n%s", diff)
+			}
+		})
 	}
 }
 

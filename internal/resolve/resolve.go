@@ -8,6 +8,7 @@ package resolve
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"sort"
@@ -38,6 +39,9 @@ type Answer struct {
 	Channels []model.ChannelMatch
 	// Summary is a short written recommendation; empty in keyword mode.
 	Summary string
+	// ModelErr is the model failure that left the LLM resolver ranking without
+	// it; nil when the model answered or was never asked.
+	ModelErr error
 	// ix is the index this answer came from, carried so the view can tell a
 	// real subject from a word mined out of prose when it lists what somebody
 	// knows. It is nil on an answer built without one, and the view falls back
@@ -304,10 +308,18 @@ func extractJSON(raw string) string {
 	return strings.TrimSpace(raw)
 }
 
+// modelFailedNote is appended to the summary of an answer the model failed to
+// rank, so the asker knows the order came from retrieval alone.
+const modelFailedNote = "The model did not answer, so these results are ranked without it."
+
 // Resolve retrieves candidates, asks the model to rank them, and returns the
 // grounded result with a locally written summary. If the model reply cannot be
-// parsed, it keeps keyword order. An explicit empty ranking is honored as the
-// model abstaining, not overridden with the full candidate list.
+// parsed, it keeps keyword order. If the model fails, it keeps keyword order
+// too, says so in the summary, and carries the failure on the answer, since a
+// model that is down or cut off costs the ranking and never the answer. Only a
+// caller that canceled the ask gets the error back. An explicit empty ranking
+// is honored as the model abstaining, not overridden with the full candidate
+// list.
 func (l *LLM) Resolve(ctx context.Context, query string, limit int) (Answer, error) {
 	n := candidateN(limit)
 	people, departed, channels := l.retrieve(ctx, query, n)
@@ -325,7 +337,13 @@ func (l *LLM) Resolve(ctx context.Context, query string, limit int) (Answer, err
 	}
 	raw, err := l.chat.Chat(ctx, system, prompt)
 	if err != nil {
-		return Answer{}, fmt.Errorf("llm resolve: %w", err)
+		if errors.Is(ctx.Err(), context.Canceled) {
+			return Answer{}, fmt.Errorf("llm resolve: %w", err)
+		}
+		answer := groundedAnswer(Cap(people, limit), departed, Cap(channels, limit), teams)
+		answer.Summary = strings.TrimSpace(answer.Summary + " " + modelFailedNote)
+		answer.ModelErr = fmt.Errorf("llm resolve: %w", err)
+		return answer, nil
 	}
 
 	var out llmResult
