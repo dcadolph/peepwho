@@ -24,7 +24,7 @@ let package = Package(
         ),
         .testTarget(
             name: "WhoToAskKitTests",
-            dependencies: ["WhoToAskKit"]
+            dependencies: ["WhoToAskKit", "WhoToAsk"]
         ),
     ],
     swiftLanguageModes: [.v5]
