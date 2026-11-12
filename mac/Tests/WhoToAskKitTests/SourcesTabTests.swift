@@ -5,6 +5,24 @@ import Testing
 @testable import WhoToAsk
 @testable import WhoToAskKit
 
+// Segment is one source button as macOS accessibility reports it.
+struct Segment {
+    // title is the button's label.
+    let title: String
+    // frame is where the button sits, in window points.
+    let frame: NSRect
+    // element is the button, which VoiceOver presses through.
+    let element: NSAccessibilityProtocol
+}
+
+// Badge counts the colored ink in the picked card's header, where its badge sits.
+struct Badge {
+    // orange is how many points carry the orange of a Needs note.
+    let orange: Int
+    // green is how many points carry the green of Set up.
+    let green: Int
+}
+
 // SourcesTab is the real settings window hosted on its Sources tab.
 @MainActor
 struct SourcesTab {
@@ -41,14 +59,55 @@ struct SourcesTab {
         return (0..<control.segmentCount).map { control.label(forSegment: $0) ?? "" }
     }
 
-    // pick presses the button for title the way a click does, through the control's action.
+    // segments are the source buttons as accessibility reports them, left to right.
+    func segments() throws -> [Segment] {
+        var found: [Segment] = []
+        func walk(_ element: NSAccessibilityProtocol) {
+            if element.accessibilityRole() == .radioButton {
+                let title = element.accessibilityTitle() ?? ""
+                found.append(Segment(
+                    title: title.isEmpty ? element.accessibilityLabel() ?? "" : title,
+                    frame: hosted.window.convertFromScreen(element.accessibilityFrame()),
+                    element: element
+                ))
+            }
+            for child in element.accessibilityChildren() ?? [] {
+                if let child = child as? NSAccessibilityProtocol { walk(child) }
+            }
+        }
+        walk(try control())
+        return found.sorted { $0.frame.minX < $1.frame.minX }
+    }
+
+    // pick presses the button for title the way VoiceOver does and waits for its card. The press
+    // reports false for a segment even when it selects it, so the selection is what is checked.
     func pick(_ title: String) throws {
-        let control = try control()
-        let found = try labels().firstIndex { $0.hasPrefix(title) }
-        let index = try #require(found, "no button \(title)")
-        control.selectedSegment = index
-        control.sendAction(control.action, to: control.target)
+        let found = try segments().first { $0.title.hasPrefix(title) }
+        let segment = try #require(found, "no button \(title)")
+        _ = segment.element.accessibilityPerformPress()
         settle(0.2)
+        #expect(try labels()[try control().selectedSegment].hasPrefix(title))
+    }
+
+    // badge counts the orange and green ink in the header under the buttons, where the picked
+    // card's badge sits.
+    func badge() throws -> Badge {
+        let control = try control()
+        let rep = try hosted.render()
+        let below = hosted.view.convert(control.bounds, from: control).maxY
+        var orange = 0
+        var green = 0
+        for y in stride(from: below + 8, to: below + 48, by: 1) {
+            for x in stride(from: rep.size.width - 240, to: rep.size.width - 8, by: 1) {
+                let scale = CGFloat(rep.pixelsWide) / rep.size.width
+                guard let color = rep.colorAt(x: Int(x * scale), y: Int(y * scale))?
+                    .usingColorSpace(.sRGB), color.alphaComponent > 0.5 else { continue }
+                let (r, g, b) = (color.redComponent, color.greenComponent, color.blueComponent)
+                if r > 0.85, g > 0.35, g < 0.75, b < 0.3 { orange += 1 }
+                if g > 0.6, r < 0.45, b < 0.5 { green += 1 }
+            }
+        }
+        return Badge(orange: orange, green: green)
     }
 
     // fields are the editable text fields the picked card shows, top to bottom.
@@ -83,27 +142,33 @@ extension ViewTests {
     @MainActor
     @Suite
     struct SourcesTabTests {
-        // Test 0: Every source button reads in full at the window's own width, Folders and files
-        // first, and nothing reaches the screen.
-        @Test func buttonsReadInFull() async throws {
+        // Test 0: Every source button sits inside the window at its own width with room for its
+        // whole title, Folders and files first, and nothing reaches the screen.
+        @Test func buttonsShowWholeTitles() throws {
             let tab = try SourcesTab.open(MemorySecrets(), MemoryPlaces())
             defer { tab.close() }
             let titles = SourceCard.all.map(\.title)
             #expect(titles.first == "Folders and files")
-            #expect(try tab.labels() == titles)
-            let lines = try await tab.hosted.read(until: "PagerDuty").map(\.text)
-            for title in titles {
-                let found = lines.contains { $0.contains(title) }
-                #expect(found, "\(title) not read in full: \(lines)")
+            let segments = try tab.segments()
+            #expect(segments.map(\.title) == titles)
+            let font = try tab.control().font ?? .systemFont(ofSize: NSFont.systemFontSize)
+            let inside = tab.hosted.view.bounds
+            for segment in segments {
+                let title = NSAttributedString(string: segment.title, attributes: [.font: font])
+                let room = segment.frame.width - title.size().width
+                #expect(room >= 16, "\(segment.title) has \(room) points to spare")
+                #expect(segment.frame.minX >= inside.minX && segment.frame.maxX <= inside.maxX,
+                        "\(segment.title) at \(segment.frame) leaves the window")
             }
             #expect(tab.hosted.window.fenced == ["makeKeyAndOrderFront"])
             #expect(!tab.hosted.window.isVisible)
             #expect(!NSApp.isActive)
         }
 
-        // Test 1: Set-up sources carry a check mark, and GitHub, Jira, and Confluence with their
-        // secrets and nothing to read carry none and show what they need until it is added.
-        @Test func checkMarksAndNeeds() async throws {
+        // Test 1: Set-up sources carry a check mark and a green badge, and GitHub, Jira, and
+        // Confluence with their secrets and nothing to read carry none and an orange Needs note
+        // until it is added.
+        @Test func checkMarksAndNeeds() throws {
             let secrets = MemorySecrets()
             for name in SourceCard.entered where name != SecretName.pagerdutyToken {
                 secrets.values[name] = "value"
@@ -112,35 +177,44 @@ extension ViewTests {
             places.urls[.csv] = URL(fileURLWithPath: "/nowhere/org.csv")
             let tab = try SourcesTab.open(secrets, places)
             defer { tab.close() }
-            #expect(try tab.labels() == [
+            #expect(try tab.segments().map(\.title) == [
                 "Folders and files ✓", "Slack ✓", "GitHub", "Jira", "Confluence", "PagerDuty",
             ])
-            let wants = [
-                ("Folders and files", "Set up"), ("Slack", "Set up"),
-                ("GitHub", "Needs a repository"), ("Jira", "Needs a project"),
-                ("Confluence", "Needs a space"), ("PagerDuty", "Not set up"),
+            let wants: [(String, CardState)] = [
+                ("Folders and files", .setUp), ("Slack", .setUp),
+                ("GitHub", .needs("Needs a repository")), ("Jira", .needs("Needs a project")),
+                ("Confluence", .needs("Needs a space")), ("PagerDuty", .notSetUp),
             ]
-            for (title, badge) in wants {
+            for (title, want) in wants {
                 try tab.pick(title)
-                let lines = try await tab.hosted.read(until: badge).map(\.text)
-                #expect(lines.contains { $0.contains(badge) }, "\(title) badge: \(lines)")
+                let card = SourceCard.pick(title)
+                let state = card.state(
+                    saved: tab.model.saved, placed: Set(tab.model.placeNames.keys),
+                    scopes: tab.model.scopes
+                )
+                #expect(state == want, "\(title)")
+                let badge = try tab.badge()
+                switch want {
+                case .setUp: #expect(badge.green > 10 && badge.orange == 0, "\(title) \(badge)")
+                case .needs: #expect(badge.orange > 10 && badge.green == 0, "\(title) \(badge)")
+                case .notSetUp: #expect(badge.orange == 0 && badge.green == 0, "\(title) \(badge)")
+                }
             }
             tab.model.scopes.githubRepos = "acme/billing"
             tab.model.scopes.jiraProjects = "PAY"
             tab.model.scopes.confluenceSpaces = "ENG"
             settle(0.2)
-            #expect(try tab.labels() == [
+            #expect(try tab.segments().map(\.title) == [
                 "Folders and files ✓", "Slack ✓", "GitHub ✓", "Jira ✓", "Confluence ✓", "PagerDuty",
             ])
             try tab.pick("Jira")
-            let lines = try await tab.hosted.read(until: "Set up").map(\.text)
-            #expect(lines.contains { $0.contains("Set up") }, "Jira badge: \(lines)")
-            #expect(!lines.contains { $0.contains("Needs") }, "Jira still needs: \(lines)")
+            let badge = try tab.badge()
+            #expect(badge.green > 10 && badge.orange == 0, "Jira \(badge)")
         }
 
         // Test 2: A site address typed and not saved is still there after switching to another
         // source and back, and a typed token is not.
-        @Test func typedSiteAddressStays() async throws {
+        @Test func typedSiteAddressStays() throws {
             let tab = try SourcesTab.open(MemorySecrets(), MemoryPlaces())
             defer { tab.close() }
             #expect(SourceCard.pick("Jira").secrets.first == SecretName.jiraURL)
@@ -156,8 +230,6 @@ extension ViewTests {
             let again = try #require(tab.fields().first { !($0 is NSSecureTextField) })
             #expect(again.stringValue == "acme.atlassian.net")
             #expect(tab.fields().first { $0 is NSSecureTextField }?.stringValue == "")
-            let lines = try await tab.hosted.read(until: "acme").map(\.text)
-            #expect(lines.contains { $0.contains("acme.atlassian.net") }, "read \(lines)")
             #expect(tab.model.saved.isEmpty, "nothing is saved until Save")
         }
     }

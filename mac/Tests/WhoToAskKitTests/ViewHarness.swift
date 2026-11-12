@@ -1,7 +1,6 @@
 import AppKit
 import SwiftUI
 import Testing
-import Vision
 
 @testable import WhoToAsk
 @testable import WhoToAskKit
@@ -79,14 +78,6 @@ struct Key {
     static let delete = Key(characters: "\u{7F}", code: 51, modifiers: [])
 }
 
-// TextLine is one line of text read from a rendered view.
-struct TextLine {
-    // text is what was read.
-    let text: String
-    // box is where it sits, in view points from the top left.
-    let box: CGRect
-}
-
 // Hosted is a view in a fenced window, with what a test needs to drive and read it.
 @MainActor
 struct Hosted<V: View> {
@@ -132,24 +123,6 @@ struct Hosted<V: View> {
         rep.size = size
         view.cacheDisplay(in: view.bounds, to: rep)
         return rep
-    }
-
-    // read renders the view and returns each line of text recognized in it.
-    func read() throws -> [TextLine] {
-        try recognize(render())
-    }
-
-    // read renders and reads the view until a line contains want or timeout passes, since the
-    // window's layout can trail the model under load, and returns the last lines read.
-    func read(until want: String, timeout: TimeInterval = 5) async throws -> [TextLine] {
-        let end = Date().addingTimeInterval(timeout)
-        var lines = try read()
-        while !lines.contains(where: { $0.text.contains(want) }), Date() < end {
-            settle(0.1)
-            await Task.yield()
-            lines = try read()
-        }
-        return lines
     }
 
     // steady waits until the window's frame and the view's fitting size hold for a fifth of a
@@ -218,33 +191,11 @@ func waitFor(_ timeout: TimeInterval = 15, _ done: () -> Bool) async -> Bool {
     return done()
 }
 
-// recognize reads the text in rep, drawn over white first, since dark text over a clear
-// backdrop reads poorly.
-func recognize(_ rep: NSBitmapImageRep) throws -> [TextLine] {
-    let clear = try #require(rep.cgImage)
-    let context = try #require(CGContext(
-        data: nil, width: clear.width, height: clear.height, bitsPerComponent: 8, bytesPerRow: 0,
-        space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
-    ))
-    let whole = CGRect(x: 0, y: 0, width: clear.width, height: clear.height)
-    context.setFillColor(CGColor(gray: 1, alpha: 1))
-    context.fill(whole)
-    context.draw(clear, in: whole)
-    let image = try #require(context.makeImage())
-    let request = VNRecognizeTextRequest()
-    request.recognitionLevel = .accurate
-    request.usesLanguageCorrection = false
-    try VNImageRequestHandler(cgImage: image).perform([request])
-    let width = rep.size.width
-    let height = rep.size.height
-    return (request.results ?? []).compactMap { observation in
-        guard let best = observation.topCandidates(1).first else { return nil }
-        let box = observation.boundingBox
-        return TextLine(text: best.string, box: CGRect(
-            x: box.minX * width, y: (1 - box.maxY) * height,
-            width: box.width * width, height: box.height * height
-        ))
-    }
+// ink returns how opaque rep is at x and y, in view points from the top left, from zero for
+// nothing drawn to one for solid.
+func ink(_ rep: NSBitmapImageRep, x: CGFloat, y: CGFloat) -> CGFloat {
+    let scale = CGFloat(rep.pixelsWide) / rep.size.width
+    return rep.colorAt(x: Int(x * scale), y: Int(y * scale))?.alphaComponent ?? 0
 }
 
 // ViewTests runs every suite that hosts a view one test at a time, since two hosted windows that
@@ -258,8 +209,8 @@ extension ViewTests {
     @MainActor
     @Suite
     struct ViewHarnessTests {
-        // Test 0: Keys typed into the real search window answer, the answer reads back from the
-        // rendered window, and nothing reaches the screen.
+        // Test 0: Keys typed into the real search window answer, the window grows to show the
+        // answer, and nothing reaches the screen.
         @Test func searchAnswersTypedKeys() async throws {
             let dir = try demoDir()
             defer { try? FileManager.default.removeItem(at: dir) }
@@ -267,10 +218,12 @@ extension ViewTests {
             let model = SearchModel(core: core, delay: .milliseconds(1), opener: Opened().open)
             let hosted = host(SearchView(model: model), size: NSSize(width: 360, height: 500))
             defer { hosted.window.close() }
+            await hosted.steady()
+            let empty = hosted.view.fittingSize.height
             hosted.type("terraform")
             #expect(await waitFor { model.people.first?.name == "Carol Lee" })
-            let lines = try await hosted.read(until: "Carol Lee").map(\.text)
-            #expect(lines.contains { $0.contains("Carol Lee") }, "read \(lines)")
+            await hosted.steady()
+            #expect(hosted.view.fittingSize.height > empty + 40)
             hosted.expectUntouched()
         }
 

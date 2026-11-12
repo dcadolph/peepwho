@@ -8,6 +8,8 @@ struct SearchView: View {
     @ObservedObject var model: SearchModel
     // onOpen runs each time the window opens, after the changes are read.
     var onOpen: () async -> Void = {}
+    // speak hands a name to VoiceOver to read aloud.
+    var speak: (String) -> Void = { AccessibilityNotification.Announcement($0).post() }
     // focused keeps the cursor in the field whenever the window opens.
     @FocusState private var focused: Bool
     // height is the content's height, which the window is sized to.
@@ -90,7 +92,7 @@ struct SearchView: View {
     // stays in the field and the mark alone is never spoken.
     private func announce(_ person: AskPerson?) {
         guard let person else { return }
-        AccessibilityNotification.Announcement(person.name).post()
+        speak(person.name)
     }
 }
 
