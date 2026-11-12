@@ -133,8 +133,10 @@ func (in *successorInputs) SuccessorFor(
 		review  bool
 	}
 	evidence := make(map[model.ID]*tally)
+	// at returns the tally for a candidate, or nil for the holder and for
+	// anybody who could not step in.
 	at := func(id model.ID) *tally {
-		if id == holder {
+		if id == holder || cannotSucceed(ix, id) {
 			return nil
 		}
 		t := evidence[id]
@@ -239,6 +241,20 @@ func (in *successorInputs) SuccessorFor(
 		out.Reasons = append(out.Reasons, SuccessorReason{Kind: "overlap", Detail: detail})
 	}
 	return out, true
+}
+
+// cannotSucceed reports whether id is nobody to hand work to. A team of
+// record holds subjects on paper, the way an owners file names it, and a
+// deactivated account belongs to somebody who has already left, so naming
+// either as the nearest candidate sends the reader to no one. Both still count
+// as holders where subjects are compared with each other, because what a team
+// owns and what a departed person worked on say how subjects relate.
+func cannotSucceed(ix *index.Index, id model.ID) bool {
+	if id.IsTeam() {
+		return true
+	}
+	p := ix.Graph.People[id]
+	return p != nil && p.Deactivated()
 }
 
 // countShared counts the subjects two people both hold.

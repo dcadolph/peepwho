@@ -233,3 +233,111 @@ func TestSuccessorForScoresEveryCandidate(t *testing.T) {
 		})
 	}
 }
+
+// candidate is one person's evidence in a hand-built succession case.
+type candidate struct {
+	// ID is the candidate's identifier.
+	ID model.ID
+	// Shares is how many of the holder's subjects the candidate also holds.
+	Shares int
+	// Work is the candidate's work in the place, zero for none.
+	Work float64
+	// Review marks a candidate who reviewed changes in the place.
+	Review bool
+}
+
+// successorEvidence builds succession inputs by hand: the holder holds every
+// subject in held and leads dir, and each candidate brings the evidence it
+// lists.
+func successorEvidence(holder model.ID, dir string, held []string, cands []candidate) *successorInputs {
+	in := &successorInputs{
+		holders:      make(map[string]map[model.ID]bool),
+		personTopics: make(map[model.ID]map[string]bool),
+		placeWork:    map[string]map[model.ID]float64{dir: {holder: 40}},
+		reviewed:     map[string]map[model.ID]bool{dir: {}},
+	}
+	hold := func(id model.ID, topics []string) {
+		for _, topic := range topics {
+			if in.holders[topic] == nil {
+				in.holders[topic] = make(map[model.ID]bool)
+			}
+			in.holders[topic][id] = true
+			if in.personTopics[id] == nil {
+				in.personTopics[id] = make(map[string]bool)
+			}
+			in.personTopics[id][topic] = true
+		}
+	}
+	hold(holder, held)
+	for _, c := range cands {
+		hold(c.ID, held[:c.Shares])
+		if c.Work > 0 {
+			in.placeWork[dir][c.ID] = c.Work
+		}
+		if c.Review {
+			in.reviewed[dir][c.ID] = true
+		}
+	}
+	return in
+}
+
+// TestSuccessorForNamesOnlySomebodyWhoCanStepIn checks the nearest candidate
+// is a person who is still here. Before this, a team named in an owners file
+// held the holder's subjects on paper and could top the overlap, and a
+// colleague who had already left could win on old work, so the report sent its
+// reader to a handle or to nobody.
+func TestSuccessorForNamesOnlySomebodyWhoCanStepIn(t *testing.T) {
+	t.Parallel()
+	const (
+		holder = model.ID("holder@x.com")
+		team   = model.ID("codeowners:corp/billing")
+		gone   = model.ID("gone@x.com")
+		near   = model.ID("near@x.com")
+		dir    = "internal/billing"
+	)
+	held := []string{"billing", "dunning", "invoices", "ledger"}
+	ix := index.New()
+	ix.Graph.People = map[model.ID]*model.Person{
+		holder: {ID: holder, Name: "Holder"},
+		team:   {ID: team, Name: "Billing"},
+		gone:   {ID: gone, Name: "Gone", Account: model.AccountDeactivated},
+		near:   {ID: near, Name: "Near"},
+	}
+
+	tests := []struct {
+		Cands  []candidate
+		WantID string
+	}{{ // Test 0: A team holding every subject loses to a person holding three.
+		Cands:  []candidate{{ID: team, Shares: 4}, {ID: near, Shares: 3}},
+		WantID: string(near),
+	}, { // Test 1: A departed colleague holding every subject loses the same way.
+		Cands:  []candidate{{ID: gone, Shares: 4}, {ID: near, Shares: 3}},
+		WantID: string(near),
+	}, { // Test 2: A departed colleague with the most work in the place is skipped.
+		Cands:  []candidate{{ID: gone, Work: 30}, {ID: near, Work: 1}},
+		WantID: string(near),
+	}, { // Test 3: A departed reviewer is skipped.
+		Cands:  []candidate{{ID: gone, Review: true}, {ID: near, Shares: 3}},
+		WantID: string(near),
+	}, { // Test 4: A team alone leaves nobody to name.
+		Cands: []candidate{{ID: team, Shares: 4}},
+	}, { // Test 5: A departed colleague alone leaves nobody to name.
+		Cands: []candidate{{ID: gone, Shares: 4, Work: 30, Review: true}},
+	}, { // Test 6: Somebody the graph does not know still counts.
+		Cands:  []candidate{{ID: "new@x.com", Shares: 3}},
+		WantID: "new@x.com",
+	}, { // Test 7: An active colleague with the strongest evidence is named.
+		Cands:  []candidate{{ID: near, Shares: 4, Work: 9}, {ID: "new@x.com", Shares: 3}},
+		WantID: string(near),
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			in := successorEvidence(holder, dir, held, test.Cands)
+			got, _ := in.SuccessorFor(ix, holder, dir)
+			if diff := cmp.Diff(test.WantID, got.ID); diff != "" {
+				t.Errorf("successor mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
