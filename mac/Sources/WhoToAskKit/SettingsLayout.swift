@@ -85,6 +85,12 @@ public struct SourceCard: Identifiable, Equatable, Sendable {
         }
         return .setUp
     }
+
+    // segment is the card's label in the row of source buttons, its title with a check mark when
+    // state is set up, so which sources are set up shows without opening each one.
+    public func segment(_ state: CardState) -> String {
+        state == .setUp ? "\(title) ✓" : title
+    }
 }
 
 // CardState is what a source card says beside its title.

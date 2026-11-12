@@ -60,6 +60,9 @@ struct SettingsView: View {
     @State private var showingPeople = false
     // sourceTitle is the title of the card the Sources tab shows, the first card until one is picked.
     @State private var sourceTitle = SourceCard.all[0].title
+    // unsaved holds what is typed and not yet saved in the fields that are not secure, such as a
+    // site address, by secret name, so switching cards keeps it.
+    @State private var unsaved: [String: String] = [:]
 
     // body lays the tabs out above the activity strip every tab shares.
     var body: some View {
@@ -139,7 +142,7 @@ struct SettingsView: View {
         let card = SourceCard.pick(sourceTitle)
         return VStack(spacing: 0) {
             Picker("Source", selection: $sourceTitle) {
-                ForEach(SourceCard.all) { Text($0.title).tag($0.title) }
+                ForEach(SourceCard.all) { Text($0.segment(state($0))).tag($0.title) }
             }
             .pickerStyle(.segmented)
             .labelsHidden()
@@ -151,13 +154,25 @@ struct SettingsView: View {
                     HStack {
                         Label(card.title, systemImage: card.symbol)
                         Spacer()
-                        badge(card.state(saved: model.saved, placed: Set(model.placeNames.keys), scopes: model.scopes))
+                        badge(state(card))
                     }
                 }
                 .id(card.id)
             }
             .formStyle(.grouped)
         }
+    }
+
+    // state says whether card holds what its source needs, from what is saved and picked now.
+    private func state(_ card: SourceCard) -> CardState {
+        card.state(saved: model.saved, placed: Set(model.placeNames.keys), scopes: model.scopes)
+    }
+
+    // kept is where a field that is not secure keeps what is typed in it, nil for a secure field,
+    // which keeps a typed token only while it shows.
+    private func kept(_ name: String, secure: Bool) -> Binding<String>? {
+        guard !secure else { return nil }
+        return Binding(get: { unsaved[name, default: ""] }, set: { unsaved[name] = $0 })
     }
 
     // fields are the rows of card: its places, its secrets, then what its source reads.
@@ -168,7 +183,8 @@ struct SettingsView: View {
         }
         ForEach(card.secrets, id: \.self) { name in
             let (label, secure) = secretLabel(name)
-            SecretRow(label: label, name: name, model: model, secure: secure)
+            SecretRow(label: label, name: name, model: model, secure: secure,
+                      kept: kept(name, secure: secure))
         }
         switch card.source {
         case "github":
@@ -403,8 +419,14 @@ struct SecretRow: View {
     @ObservedObject var model: SettingsModel
     // secure hides what is typed.
     var secure = true
-    // text is what is typed and not yet saved.
-    @State private var text = ""
+    // kept holds what is typed when the field must keep it past a switch to another card, nil when
+    // the row keeps it itself.
+    var kept: Binding<String>?
+    // typed is what is typed and not yet saved when kept is nil.
+    @State private var typed = ""
+
+    // text is what is typed and not yet saved, in kept when given and in typed otherwise.
+    private var text: Binding<String> { kept ?? $typed }
 
     // body shows the field with Save and Forget.
     var body: some View {
@@ -412,13 +434,13 @@ struct SecretRow: View {
             Group {
                 let prompt = Text(model.has(name) ? "Saved" : "Not set")
                 if secure {
-                    SecureField(label, text: $text, prompt: prompt)
+                    SecureField(label, text: text, prompt: prompt)
                 } else {
-                    TextField(label, text: $text, prompt: prompt)
+                    TextField(label, text: text, prompt: prompt)
                 }
             }
             .onSubmit(save)
-            Button("Save", action: save).disabled(text.isEmpty)
+            Button("Save", action: save).disabled(text.wrappedValue.isEmpty)
             if model.has(name) {
                 Button("Forget") { Task { await model.forgetSecret(name) } }
             }
@@ -428,14 +450,15 @@ struct SecretRow: View {
     // save stores the typed value and clears the field. A value of only spaces forgets the secret
     // the way the Forget button does, so its source stops refreshing too.
     private func save() {
-        guard !text.isEmpty else { return }
-        if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        let value = text.wrappedValue
+        guard !value.isEmpty else { return }
+        if value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             if model.has(name) {
                 Task { await model.forgetSecret(name) }
             }
         } else {
-            model.saveSecret(name, text)
+            model.saveSecret(name, value)
         }
-        text = ""
+        text.wrappedValue = ""
     }
 }

@@ -188,4 +188,21 @@ struct SettingsLayoutTests {
             #expect(SourceCard.pick(card.title) == card)
         }
     }
+
+    // Test 7: A card's button carries a check mark only when the card is set up, and the button's
+    // title without it still picks the card.
+    @Test func segmentMarksSetUp() {
+        for card in SourceCard.all {
+            #expect(card.segment(.setUp) == "\(card.title) ✓")
+            #expect(card.segment(.notSetUp) == card.title)
+            #expect(card.segment(.needs("Needs a repository")) == card.title)
+            #expect(SourceCard.pick(card.title) == card)
+        }
+        let saved: Set<String> = [SecretName.slackToken]
+        let labels = SourceCard.all.map {
+            $0.segment($0.state(saved: saved, placed: [.csv], scopes: Scopes()))
+        }
+        let want = ["Folders and files ✓", "Slack ✓", "GitHub", "Jira", "Confluence", "PagerDuty"]
+        #expect(labels == want)
+    }
 }
