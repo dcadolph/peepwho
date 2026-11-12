@@ -66,6 +66,38 @@ func TestAskReachesThroughTheTieGraph(t *testing.T) {
 	}
 }
 
+// TestChannelReasonSaysTheSubjectsTravelTogether covers a channel found only
+// through a tie. The question names billing retries, which has no channel, and
+// the channel comes from the kafka-lag subject that travels with it. Its reason
+// has to say so in words, never as a synonym, and never with the marker the
+// expansion keeps internally.
+func TestChannelReasonSaysTheSubjectsTravelTogether(t *testing.T) {
+	t.Parallel()
+	ix := tieFixture(t, connector.Record{
+		Kind: connector.KindChannel, Name: "kafka-lag", Topics: []string{"kafka-lag"},
+		Members: []string{"kafka@corp.com"}, Source: "slack",
+	})
+
+	got := ix.SearchChannels("billing retries", 0)
+	var found bool
+	for _, m := range got {
+		if m.Channel.Name != "kafka-lag" {
+			continue
+		}
+		found = true
+		reason := strings.Join(m.Reasons, " · ")
+		if !strings.Contains(reason, "travels with billing-retries") {
+			t.Errorf("reason %q does not say the subjects travel together", reason)
+		}
+		if strings.Contains(reason, tieAskedPrefix) {
+			t.Errorf("reason %q shows the internal tie marker", reason)
+		}
+	}
+	if !found {
+		t.Fatalf("no kafka-lag channel for a billing-retries question; matches: %d", len(got))
+	}
+}
+
 // TestTieExpansionStaysBounded checks the trade stays small: a query that
 // names no salient subject expands into nothing.
 func TestTieExpansionStaysBounded(t *testing.T) {

@@ -858,10 +858,17 @@ func (ix *Index) channelReasons(
 }
 
 // hitReason writes the reason line for one matched term of a channel or team:
-// the term and the field it hit, what it stood in for when it was a synonym,
-// and what it was read as when it was corrected.
+// the term and the field it hit, the subject it travels with when it came from
+// a tie, what it stood in for when it was a synonym, and what it was read as
+// when it was corrected.
 func hitReason(term, field, found string, hit termHit, asked map[string]string) string {
-	if from := asked[term]; from != "" && from != term {
+	from := asked[term]
+	// A tied subject is a different thing that moves with the one asked, so it
+	// reads the way it does for a person and never as a synonym of the question.
+	if origin, tied := strings.CutPrefix(from, tieAskedPrefix); tied {
+		return fmt.Sprintf("%s (%s), travels with %s here", term, field, origin)
+	}
+	if from != "" && from != term {
 		return fmt.Sprintf("%s (%s) for %q", term, field, from)
 	}
 	// A correction has to name what it corrected to. Told only that "zigby"
