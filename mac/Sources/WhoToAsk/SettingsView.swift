@@ -52,6 +52,8 @@ struct WindowReader: NSViewRepresentable {
 struct SettingsView: View {
     // model holds the settings and runs the actions.
     @ObservedObject var model: SettingsModel
+    // tab is the tab showing.
+    @State private var tab: SettingsTab
     // confirmingClear shows the Clear Index confirmation.
     @State private var confirmingClear = false
     // confirmingReset shows the Reset WhoToAsk confirmation.
@@ -64,12 +66,18 @@ struct SettingsView: View {
     // site address, by secret name, so switching cards keeps it.
     @State private var unsaved: [String: String] = [:]
 
+    // init shows model on tab, General unless another is given.
+    init(model: SettingsModel, tab: SettingsTab = .general) {
+        _model = ObservedObject(wrappedValue: model)
+        _tab = State(initialValue: tab)
+    }
+
     // body lays the tabs out above the activity strip every tab shares.
     var body: some View {
         VStack(spacing: 0) {
-            TabView {
-                ForEach(SettingsTab.allCases) { tab in
-                    content(tab).tabItem { Label(tab.title, systemImage: tab.symbol) }
+            TabView(selection: $tab) {
+                ForEach(SettingsTab.allCases) { item in
+                    content(item).tabItem { Label(item.title, systemImage: item.symbol) }.tag(item)
                 }
             }
             .padding([.top, .horizontal])
