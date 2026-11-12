@@ -83,6 +83,17 @@ public struct IndexJob: Equatable, Sendable {
         }
     }
 
+    // scopeKey is the scope the core records for a read of the place url in slot, such as
+    // repo:/path for git and file:/path for a file source.
+    static func scopeKey(_ slot: BookmarkSlot, _ url: URL) -> String {
+        switch slot {
+        case .git:
+            return "repo:" + url.path
+        case .csv, .codeowners:
+            return "file:" + url.path
+        }
+    }
+
     // forTokens lists the jobs for every token source whose secrets are stored and whose scope
     // is filled in. has reports whether a secret is stored under a name.
     public static func forTokens(_ scopes: Scopes, has: (String) -> Bool) -> [IndexJob] {
@@ -536,23 +547,72 @@ public final class SettingsModel: ObservableObject {
     }
 
     // refresh runs a refresh a person started, or the app on its own when onItsOwn is set, and
-    // says which in the busy label and the first line.
+    // says which in the busy label and the first line. It reads a picked place that moved from
+    // where it is now before the core replays every recorded scope, and holds access to every
+    // place that resolves until the run ends.
     private func refresh(onItsOwn: Bool) async {
         await run(onItsOwn ? "Refreshing on its own" : "Refreshing") { core in
-            if try await core.status().builtAt == nil {
+            let status = try await core.status()
+            if status.builtAt == nil {
                 return ["Nothing to refresh yet. Index something first."]
             }
-            let opened = try self.resolveAll()
+            var opened: [BookmarkSlot: URL] = [:]
             defer { opened.values.forEach(self.places.release) }
+            for slot in BookmarkSlot.allCases {
+                opened[slot] = self.resolveAlone(slot)
+            }
             self.started(onItsOwn ? .refreshedOnItsOwn : .refreshed)
+            var moved: (lines: [String], canceled: Bool) = ([], false)
+            if !status.sample {
+                moved = await self.readMoved(core, opened, status.scopes)
+            }
+            if moved.canceled {
+                self.ran = nil
+                return moved.lines + ["Canceled."]
+            }
             let result = try await core.refresh()
             if result.results.isEmpty, result.canceled != true {
                 self.ran = nil
-                return [Self.nothingRefreshed]
+                return moved.lines + [Self.nothingRefreshed]
             }
-            let done = result.results.map(\.line)
+            let done = moved.lines + result.results.map(\.line)
             return result.canceled == true ? done + ["Canceled."] : done
         }
+    }
+
+    // resolveAlone starts access to slot's place and returns it, or nil when the slot holds no
+    // place or the place no longer resolves. A refresh goes on without such a place, so the replay
+    // of what the place recorded fails for want of it and the core records why.
+    private func resolveAlone(_ slot: BookmarkSlot) -> URL? {
+        do {
+            return try places.resolve(slot)
+        } catch {
+            return nil
+        }
+    }
+
+    // readMoved indexes each opened place whose source recorded scopes and none of them for the
+    // path the place resolves to now, since a bookmark follows a move or a rename and the recorded
+    // flags do not. A read that works drops the old scope. A read that fails keeps it, so the
+    // replay after it fails and the core records why. It returns a line for each read that failed
+    // and whether the person canceled.
+    private func readMoved(_ core: Core, _ opened: [BookmarkSlot: URL],
+                           _ scopes: [IndexScope]) async -> (lines: [String], canceled: Bool) {
+        var out: [String] = []
+        for slot in BookmarkSlot.allCases {
+            let recorded = scopes.filter { $0.source == slot.source }.map(\.scope)
+            guard let url = opened[slot], !recorded.isEmpty,
+                  !recorded.contains(IndexJob.scopeKey(slot, url)) else { continue }
+            guard !canceled else { return (out, true) }
+            let job = IndexJob.forPlace(slot, url)
+            do {
+                _ = try await index(core, job)
+            } catch {
+                guard !canceled else { return (out, true) }
+                out.append("\(SourceLabel.of(job.source)): \(SearchModel.describe(error))")
+            }
+        }
+        return (out, false)
     }
 
     // nothingRefreshed says a refresh had no recorded scope to run.

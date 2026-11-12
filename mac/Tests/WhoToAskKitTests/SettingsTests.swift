@@ -97,13 +97,18 @@ final class MemoryPlaces: PlaceStore {
     var open = 0
     // resolves is how many resolves ran.
     var resolves = 0
+    // failing are the slots whose resolve throws, like a bookmark that no longer resolves.
+    var failing: Set<BookmarkSlot> = []
 
     // save stores url for slot.
     func save(_ url: URL, in slot: BookmarkSlot) throws { urls[slot] = url }
 
-    // resolve returns slot's place and counts the access.
+    // resolve returns slot's place and counts the access, and throws for a failing slot.
     func resolve(_ slot: BookmarkSlot) throws -> URL? {
         guard let url = urls[slot] else { return nil }
+        if failing.contains(slot) {
+            throw BookmarkError.noAccess(slot)
+        }
         open += 1
         resolves += 1
         return url
@@ -187,6 +192,17 @@ func gitRepo() throws -> URL {
     }
     return dir
 }
+
+// rosterCSV writes an org chart CSV of one person and returns its file.
+func rosterCSV() throws -> URL {
+    let csv = tempDir("whotoask-roster").appendingPathExtension("csv")
+    try "name,email,title,team,topics\nAnn Lee,ann@x.com,Engineer,Billing,ledger\n"
+        .write(to: csv, atomically: true, encoding: .utf8)
+    return csv
+}
+
+// gitFailure is what the menu says after a refresh that failed for git alone.
+let gitFailure = "Last refresh failed for git. Open Settings to see why."
 
 // scopesNotSaved is the line an edit to the scopes shows before the store has answered a read of
 // them.
@@ -1078,6 +1094,151 @@ struct SettingsTests {
         model.scopes.githubOrg = "acme"
         #expect(try Scopes.read(secrets).githubOrg == "acme")
         #expect(secrets.sets == 2)
+    }
+
+    // Test 28: A picked repo that moved is read from where it is now on refresh, and from then on
+    // only the new place is replayed.
+    @Test func refreshReadsAMovedPlace() async throws {
+        let (first, second) = (try gitRepo(), try gitRepo())
+        let dir = tempDir("whotoask-data")
+        defer {
+            try? FileManager.default.removeItem(at: first)
+            try? FileManager.default.removeItem(at: second)
+            try? FileManager.default.removeItem(at: dir)
+        }
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let places = MemoryPlaces()
+        let model = SettingsModel(
+            dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+            secrets: MemorySecrets(), places: places, defaults: defaults)
+        await model.pick(first, as: .git)
+        #expect(model.status?.scopes.map(\.scope) == ["repo:\(first.path)"])
+
+        places.urls[.git] = second
+        try FileManager.default.removeItem(at: first)
+        await model.refresh()
+        #expect(model.status?.scopes.map(\.scope) == ["repo:\(second.path)"])
+        #expect(model.refreshFailure == nil)
+        #expect(model.lastRun?.kind == .refreshed)
+        #expect(model.lines == [try #require(model.lastRun).line, refreshedOneRepo(model)])
+        #expect(places.open == 0)
+    }
+
+    // Test 29: A picked repo that moved to a place that cannot be read shows in the menu after an
+    // automatic refresh, with the place it was first read from still recorded.
+    @Test func movedThenBrokenPlaceShowsFailure() async throws {
+        let first = try gitRepo()
+        let dir = tempDir("whotoask-data")
+        defer {
+            try? FileManager.default.removeItem(at: first)
+            try? FileManager.default.removeItem(at: dir)
+        }
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        defaults.set(60.0, forKey: SettingsModel.intervalKey)
+        let places = MemoryPlaces()
+        let model = SettingsModel(
+            dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+            secrets: MemorySecrets(), places: places, defaults: defaults)
+        await model.pick(first, as: .git)
+        #expect(model.refreshFailure == nil)
+
+        places.urls[.git] = tempDir("whotoask-missing")
+        try FileManager.default.removeItem(at: first)
+        #expect(await model.refreshIfStale(now: Date().addingTimeInterval(3600)))
+        #expect(model.refreshFailure == gitFailure)
+        #expect(model.status?.scopes.map(\.scope) == ["repo:\(first.path)"])
+        #expect(model.lines.count == 3)
+        #expect(model.lines.first == model.lastRun?.line)
+        #expect(model.lines.dropFirst().allSatisfy { $0.hasPrefix("Git: ") })
+        #expect(places.open == 0)
+    }
+
+    // Test 30: A place that no longer resolves does not stop the refresh: the core records its
+    // failed try, and the other picked place is still read.
+    @Test func unresolvablePlaceStillRefreshesTheRest() async throws {
+        let repo = try gitRepo()
+        let csv = try rosterCSV()
+        let dir = tempDir("whotoask-data")
+        defer {
+            try? FileManager.default.removeItem(at: repo)
+            try? FileManager.default.removeItem(at: csv)
+            try? FileManager.default.removeItem(at: dir)
+        }
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let places = MemoryPlaces()
+        let model = SettingsModel(
+            dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+            secrets: MemorySecrets(), places: places, defaults: defaults)
+        await model.pick(repo, as: .git)
+        await model.pick(csv, as: .csv)
+        #expect(model.refreshFailure == nil)
+
+        places.failing = [.git]
+        try FileManager.default.removeItem(at: repo)
+        await model.refresh()
+        #expect(model.refreshFailure == gitFailure)
+        #expect(model.lines.contains { $0.hasPrefix("Org chart CSV: refreshed and found ") })
+        #expect(places.open == 0)
+    }
+
+    // Test 31: The scope key built for each kind of picked place is the scope the core records
+    // for a read of it.
+    @Test func scopeKeyMatchesTheCore() async throws {
+        let repo = try gitRepo()
+        let csv = try rosterCSV()
+        let owners = tempDir("whotoask-owners").appendingPathComponent("CODEOWNERS")
+        let dir = tempDir("whotoask-data")
+        defer {
+            try? FileManager.default.removeItem(at: repo)
+            try? FileManager.default.removeItem(at: csv)
+            try? FileManager.default.removeItem(at: owners.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: dir)
+        }
+        try FileManager.default.createDirectory(at: owners.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
+        try "/billing/ ann@x.com\n".write(to: owners, atomically: true, encoding: .utf8)
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let model = SettingsModel(
+            dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+            secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
+        for (slot, url) in [(BookmarkSlot.git, repo), (.csv, csv), (.codeowners, owners)] {
+            await model.pick(url, as: slot)
+            let recorded = model.status?.scopes.filter { $0.source == slot.source }.map(\.scope)
+            #expect(recorded == [IndexJob.scopeKey(slot, url)])
+        }
+    }
+
+    // Test 32: A cancel pressed as a refresh starts reads no moved place, leaves every recorded
+    // scope as it was, and releases every place.
+    @Test func cancelStopsTheMovedPlaces() async throws {
+        let (first, second) = (try gitRepo(), try gitRepo())
+        let (csv, moved) = (try rosterCSV(), try rosterCSV())
+        let dir = tempDir("whotoask-data")
+        defer {
+            for url in [first, second, csv, moved, dir] {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let places = MemoryPlaces()
+        let model = SettingsModel(
+            dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+            secrets: MemorySecrets(), places: places, defaults: defaults)
+        await model.pick(first, as: .git)
+        await model.pick(csv, as: .csv)
+        let recorded = ["repo:\(first.path)", "file:\(csv.path)"]
+        #expect(model.status?.scopes.map(\.scope) == recorded)
+
+        places.urls = [.git: second, .csv: moved]
+        async let all: Void = model.refresh()
+        while model.busy == nil { await Task.yield() }
+        model.cancel()
+        await all
+        #expect(model.lines.last == "Canceled.")
+        #expect(model.status?.scopes.map(\.scope) == recorded)
+        #expect(model.lastRun?.kind == .indexed)
+        #expect(model.busy == nil)
+        #expect(places.open == 0)
     }
 }
 
