@@ -406,7 +406,8 @@ func (ix *Index) SearchChannels(query string, limit int) []model.ChannelMatch {
 // first, using precomputed person scores. It selects the top n in a single pass
 // with one score lookup per member, rather than sorting the whole membership
 // with a lookup inside the comparator, which was the dominant cost of a query at
-// scale.
+// scale. Only people worth sending the asker to are listed, so a channel names
+// fewer than n members rather than a departed or an unrelated one.
 func (ix *Index) topMembers(ch *model.Channel, scores map[model.ID]float64, n int) []*model.Person {
 	if n <= 0 {
 		return nil
@@ -418,10 +419,13 @@ func (ix *Index) topMembers(ch *model.Channel, scores map[model.ID]float64, n in
 	best := make([]scored, 0, n+1)
 	for _, id := range ch.Members {
 		p := ix.Graph.People[id]
-		if p == nil {
+		score := scores[id]
+		// A team handle is nobody to ask, a deactivated account cannot answer,
+		// and a member with no score has nothing to do with the question.
+		if p == nil || id.IsTeam() || p.Deactivated() || score <= 0 {
 			continue
 		}
-		cand := scored{person: p, score: scores[id]}
+		cand := scored{person: p, score: score}
 		pos := len(best)
 		for pos > 0 && best[pos-1].score < cand.score {
 			pos--
