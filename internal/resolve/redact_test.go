@@ -27,17 +27,18 @@ func (c *captureChatter) Chat(_ context.Context, system, user string) (string, e
 	return c.reply, nil
 }
 
-// redactIndex builds two people whose order the model will flip: Alice the
-// clear topic owner retrieves first, Bob the passing mentioner second.
+// redactIndex builds two people whose order the model will flip. Both hold the
+// topic, so neither is chatter the model path drops, and Alice, whose title
+// names it too, retrieves first.
 func redactIndex() *index.Index {
 	ix := index.New()
 	ix.Build([]connector.Record{{
 		Kind: connector.KindPerson, Email: "alice@corp.com", Name: "Alice Smith",
-		Title: "Staff Engineer", Team: "Payments", Topics: []string{"billing"},
+		Title: "Billing Lead", Team: "Payments", Topics: []string{"billing"},
 		Source: "org-csv",
 	}, {
 		Kind: connector.KindPerson, Email: "bob@corp.com", Name: "Bob Jones",
-		Title: "Engineer", Team: "Payments", Text: "answered billing once in passing",
+		Title: "Engineer", Team: "Payments", Topics: []string{"billing"},
 		Source: "org-csv",
 	}, {
 		Kind: connector.KindChannel, Name: "pay-help", Title: "billing questions",
@@ -62,7 +63,7 @@ func TestRedactedLLMSendsNoIdentifiers(t *testing.T) {
 			t.Errorf("prompt leaked %q:\n%s", leak, chat.user)
 		}
 	}
-	if !strings.Contains(chat.user, "Staff Engineer") {
+	if !strings.Contains(chat.user, "Billing Lead") {
 		t.Errorf("prompt missing role context:\n%s", chat.user)
 	}
 

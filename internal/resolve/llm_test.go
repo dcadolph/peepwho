@@ -13,6 +13,7 @@ import (
 
 	"github.com/dcadolph/whotoask/internal/connector"
 	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // fakeChat is a Chatter stub returning a canned reply and recording the prompt.
@@ -41,6 +42,92 @@ func llmIndex() *index.Index {
 			Members: []string{"jane@x.com", "bob@x.com"}},
 	})
 	return ix
+}
+
+// TestLLMOffersNoChatterBehindAStatedMatch checks that the model path drops the
+// people and channels that only said the word when a stated match leads, as
+// the keyword answer does, so a model that picks the first candidate gets the
+// keyword answer and is never padded back out with chatter. A chatter leader
+// keeps everything, and the channels offered list their members.
+func TestLLMOffersNoChatterBehindAStatedMatch(t *testing.T) {
+	t.Parallel()
+	ix := index.New()
+	ix.Build([]connector.Record{
+		{Name: "Jane Roe", Email: "jane@x.com", Title: "Engineer", Topics: []string{"retries"}},
+		{Name: "Bob Lee", Email: "bob@x.com", Title: "SRE", Text: "saw retries spike once"},
+		{Name: "Ann Poe", Email: "ann@x.com", Title: "PM", Text: "retries spike in planning"},
+		{Kind: connector.KindChannel, Name: "billing", Title: "retries and dunning",
+			Members: []string{"jane@x.com", "bob@x.com", "ann@x.com"}},
+		{Kind: connector.KindChannel, Name: "ops", Text: "retries pager",
+			Members: []string{"bob@x.com", "ann@x.com"}},
+	})
+	tests := []struct {
+		Query        string
+		WantPeople   []string
+		WantChannels []string
+		NotOffered   []string
+	}{{ // Test 0: A stated owner and channel lead, so the chatter is never offered.
+		Query: "retries", WantPeople: []string{"Jane Roe"}, WantChannels: []string{"billing"},
+		NotOffered: []string{"Bob Lee", "Ann Poe", "#ops"},
+	}, { // Test 1: Only chatter matches, so the chatter stays.
+		Query: "spike", WantPeople: []string{"Ann Poe", "Bob Lee"},
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			chat := &fakeChat{reply: `{"people":["1"],"channels":["1"]}`}
+			got, err := NewLLM(ix, chat, nil).Resolve(context.Background(), test.Query, 5)
+			if err != nil {
+				t.Fatalf("llm resolve: %v", err)
+			}
+			keyword, err := NewKeyword(ix).Resolve(context.Background(), test.Query, 5)
+			if err != nil {
+				t.Fatalf("keyword resolve: %v", err)
+			}
+			if diff := cmp.Diff(test.WantPeople, matchNames(keyword.People)); diff != "" {
+				t.Fatalf("keyword people mismatch, the case proves nothing (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(test.WantPeople, matchNames(got.People)); diff != "" {
+				t.Errorf("people mismatch (-want +got):\n%s", diff)
+			}
+			// A channel's member list names people too, so people are looked for
+			// only in the candidate people section and channels only in theirs.
+			peoplePart, channelPart, _ := strings.Cut(chat.gotUser, "\nCandidate channels:")
+			for _, name := range test.WantPeople {
+				if !strings.Contains(peoplePart, name) {
+					t.Errorf("%s was not offered to the model:\n%s", name, chat.gotUser)
+				}
+			}
+			for _, name := range test.NotOffered {
+				part := peoplePart
+				if strings.HasPrefix(name, "#") {
+					part = channelPart
+				}
+				if strings.Contains(part, name) {
+					t.Errorf("%s was offered to the model:\n%s", name, chat.gotUser)
+				}
+			}
+			var channels []string
+			for _, c := range got.Channels {
+				channels = append(channels, c.Channel.Name)
+				if len(c.TopMembers) == 0 {
+					t.Errorf("channel %s offered with no members", c.Channel.Name)
+				}
+			}
+			if diff := cmp.Diff(test.WantChannels, channels, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("channels mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// matchNames lists the names of matched people in order.
+func matchNames(ms []model.Match) []string {
+	var out []string
+	for _, m := range ms {
+		out = append(out, m.Person.Name)
+	}
+	return out
 }
 
 // TestLLMResolveRanksAndSummarizes verifies the model reply drives ranking, the

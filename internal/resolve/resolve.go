@@ -397,7 +397,11 @@ func rankedChannels(cands []model.ChannelMatch, order []rankToken, limit int) []
 
 // retrieve gets candidate people and channels, semantically when an embedder is
 // configured and the index has vectors, otherwise by keyword. A failed query
-// embedding falls back to keyword retrieval.
+// embedding falls back to keyword retrieval. Keyword candidates lose their
+// chatter the way the keyword answer does, so the model is never offered
+// somebody who only said the word when a stated match leads. Semantic matches
+// carry no stated evidence, so the filter would keep them all. Channel members
+// are ranked only for the channels that pass, since the prompt shows them.
 func (l *LLM) retrieve(
 	ctx context.Context, query string, n int,
 ) (people, departed []model.Match, channels []model.ChannelMatch) {
@@ -408,7 +412,9 @@ func (l *LLM) retrieve(
 		}
 	}
 	people, departed = l.ix.SearchSplit(query, n)
-	return people, departed, l.ix.SearchChannels(query, n)
+	channels = withoutChatter(l.ix.RankChannels(query, n), channelClass)
+	l.ix.FillTopMembers(query, channels)
+	return withoutChatter(people, personClass), withoutChatter(departed, personClass), channels
 }
 
 // candidateN returns how many candidates to retrieve for the model, a small
