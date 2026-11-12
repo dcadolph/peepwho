@@ -70,13 +70,18 @@ public enum Keychain {
 }
 
 // KeychainError reports a failed Keychain write by its OSStatus.
-public struct KeychainError: Error, CustomStringConvertible {
+public struct KeychainError: Error, CustomStringConvertible, LocalizedError {
     // status is the OSStatus SecItemAdd returned.
     public let status: OSStatus
 
-    // description names the status in words when Security has a message for it.
+    // description names the status by number and in words, for a log.
     public var description: String {
-        let text = SecCopyErrorMessageString(status, nil) as String? ?? "unknown"
-        return "keychain status \(status): \(text)"
+        "keychain status \(status): \(errorDescription ?? "")"
+    }
+
+    // errorDescription is what the app shows: the Security message alone, with no status number,
+    // or a plain sentence when Security has none.
+    public var errorDescription: String? {
+        SecCopyErrorMessageString(status, nil) as String? ?? "The Keychain refused the change."
     }
 }

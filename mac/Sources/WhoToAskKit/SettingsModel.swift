@@ -353,7 +353,7 @@ public final class SettingsModel: ObservableObject {
             }
         } catch {
             if !on || loginItem.state != .needsApproval {
-                lines = ["Could not change opening at login: \(error)."]
+                lines = ["Could not change opening at login: \(SearchModel.describe(error))"]
             }
         }
         login = loginItem.state
@@ -378,7 +378,7 @@ public final class SettingsModel: ObservableObject {
         do {
             try scopes.save(secrets)
         } catch {
-            lines = ["Could not save to the Keychain: \(error)."]
+            lines = ["Could not save to the Keychain: \(SearchModel.describe(error))"]
         }
     }
 
@@ -393,7 +393,7 @@ public final class SettingsModel: ObservableObject {
         do {
             try secrets.set(name, trimmed)
         } catch {
-            lines = ["Could not save to the Keychain: \(error)."]
+            lines = ["Could not save to the Keychain: \(SearchModel.describe(error))"]
         }
         readSaved()
     }
@@ -436,7 +436,8 @@ public final class SettingsModel: ObservableObject {
         do {
             try places.save(url, in: slot)
         } catch {
-            lines = ["Could not keep access to \(url.lastPathComponent): \(error)."]
+            let why = SearchModel.describe(error)
+            lines = ["Could not keep access to \(url.lastPathComponent): \(why)"]
             return
         }
         readSaved()
@@ -788,7 +789,7 @@ public final class SettingsModel: ObservableObject {
         let failed = scopes.filter { scope in
             scope.error != nil && SecretName.required(by: scope.source).allSatisfy(saved.contains)
         }
-        let names = Set(failed.map(\.source)).sorted()
+        let names = Set(failed.map(\.source)).sorted().map(SourceLabel.of)
         guard !names.isEmpty else { return nil }
         return "Last refresh failed for \(names.joined(separator: ", ")). Open Settings to see why."
     }

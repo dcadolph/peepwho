@@ -105,9 +105,16 @@ final class MemoryPlaces: PlaceStore {
     var unrestorable: Set<BookmarkSlot> = []
     // restores is how many restores were tried.
     var restores = 0
+    // saveError is what save throws when set, like a place macOS will not make a bookmark for.
+    var saveError: Error?
 
-    // save stores url for slot.
-    func save(_ url: URL, in slot: BookmarkSlot) throws { urls[slot] = url }
+    // save stores url for slot, or throws saveError when it is set.
+    func save(_ url: URL, in slot: BookmarkSlot) throws {
+        if let saveError {
+            throw saveError
+        }
+        urls[slot] = url
+    }
 
     // resolve returns slot's place and counts the access, and throws for a failing slot.
     func resolve(_ slot: BookmarkSlot) throws -> URL? {
@@ -226,7 +233,7 @@ func rosterCSV() throws -> URL {
 }
 
 // gitFailure is what the menu says after a refresh that failed for git alone.
-let gitFailure = "Last refresh failed for git. Open Settings to see why."
+let gitFailure = "Last refresh failed for Git. Open Settings to see why."
 
 // scopesNotSaved is the line an edit to the scopes shows before the store has answered a read of
 // them.
@@ -526,6 +533,11 @@ struct SettingsTests {
                                   secrets: secrets, places: MemoryPlaces(), defaults: defaults)
         model.scopes.jiraProjects = "KAFKA"
         #expect(model.lines.first?.hasPrefix("Could not save to the Keychain") == true)
+        let line = try #require(model.lines.first)
+        let said = try #require(SecCopyErrorMessageString(errSecAuthFailed, nil) as String?)
+        #expect(line.contains(said.trimmingCharacters(in: CharacterSet(charactersIn: "."))))
+        #expect(!line.contains("status"))
+        #expect(line.hasSuffix(".") && !line.hasSuffix(".."))
     }
 
     // Test 12: A bookmark lives in the secret store and never in preferences, resolves back to
@@ -824,7 +836,7 @@ struct SettingsTests {
         #expect(model.refreshFailure == nil)
         try FileManager.default.removeItem(at: first)
         #expect(await model.refreshIfStale(now: Date().addingTimeInterval(3600)))
-        let failure = "Last refresh failed for git. Open Settings to see why."
+        let failure = "Last refresh failed for Git. Open Settings to see why."
         #expect(model.refreshFailure == failure)
         #expect(heard.last == failure)
         #expect(!(model.refreshFailure ?? "").contains(first.path))
@@ -922,11 +934,11 @@ struct SettingsTests {
         #expect(SettingsModel.refreshFailure([], saved: []) == nil)
         #expect(SettingsModel.refreshFailure([scope("git", "repo:/a")], saved: []) == nil)
         #expect(SettingsModel.refreshFailure([scope("git", "repo:/a", error: "lost")], saved: [])
-            == "Last refresh failed for git. Open Settings to see why.")
+            == "Last refresh failed for Git. Open Settings to see why.")
         let two = [scope("jira", "project:A", error: "401"), scope("jira", "project:B", error: "401"),
                    scope("git", "repo:/a", error: "lost")]
         #expect(SettingsModel.refreshFailure(two, saved: Set(jira))
-            == "Last refresh failed for git, jira. Open Settings to see why.")
+            == "Last refresh failed for Git, Jira. Open Settings to see why.")
         #expect(SettingsModel.refreshFailure([scope("jira", "project:A", error: "no token")],
                                              saved: [SecretName.jiraURL]) == nil)
         for source in ["slack", "github", "jira", "confluence", "pagerduty"] {
@@ -1639,6 +1651,29 @@ struct SettingsTests {
         defer { resolved.url.stopAccessingSecurityScopedResource() }
         #expect(resolved.url.resolvingSymlinksInPath().path == first.resolvingSymlinksInPath().path)
         #expect(throws: KeychainError.self) { try Bookmarks.text(.git, store: RefusingSecrets()) }
+    }
+
+    // Test 43: A place macOS will not keep access to says why in a sentence, with no error dump,
+    // no path, and one period, and nothing is picked.
+    @Test func failedBookmarkSaveReadsPlainly() async throws {
+        let dir = tempDir("whotoask-data")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let places = MemoryPlaces()
+        let place = URL(fileURLWithPath: "/Users/someone/src/payments")
+        places.saveError = NSError(domain: NSCocoaErrorDomain, code: NSFileReadUnknownError,
+                                   userInfo: [NSURLErrorKey: place])
+        let model = SettingsModel(
+            dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+            secrets: MemorySecrets(), places: places, defaults: defaults)
+        await model.pick(place, as: .git)
+        let line = try #require(model.lines.first)
+        #expect(model.lines.count == 1)
+        #expect(line.hasPrefix("Could not keep access to payments: "))
+        #expect(!line.contains("Error Domain"))
+        #expect(!line.contains("/Users/someone"))
+        #expect(line.hasSuffix(".") && !line.hasSuffix(".."))
+        #expect(places.urls[.git] == nil)
     }
 }
 
