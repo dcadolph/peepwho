@@ -14,10 +14,6 @@ import (
 // Successor tuning. Each constant bounds one evidence source so no single
 // signal can hand the recommendation to a stranger.
 const (
-	// successorCandidates is how many people are scored per finding before the
-	// best is named. It bounds work, not correctness: everyone with any of the
-	// three kinds of evidence is a candidate.
-	successorCandidates = 64
 	// successorOverlapWeight scales shared-subject overlap. Overlap is the
 	// broadest signal and the weakest per unit, because two people can share
 	// every word of a subject without either being able to take it over.
@@ -193,16 +189,14 @@ func (in *successorInputs) SuccessorFor(
 		return Successor{}, false
 	}
 
-	ids := slices.Sorted(maps.Keys(evidence))
-	if len(ids) > successorCandidates {
-		ids = ids[:successorCandidates]
-	}
-
-	// Each signal is normalized against the strongest candidate rather than
-	// the holder, so the score reads as standing among the available people.
-	// Ties break toward the lower id, which the sorted walk provides.
+	// Everyone who cleared the floor is scored. Scoring is a little arithmetic
+	// per person, and cutting the list first by id named a weaker candidate
+	// from early in the alphabet over the colleague with the most work in the
+	// place. Each signal is normalized against the strongest candidate rather
+	// than the holder, so the score reads as standing among the available
+	// people. Ties break toward the lower id, which the sorted walk provides.
 	best, bestScore := model.ID(""), 0.0
-	for _, id := range ids {
+	for _, id := range slices.Sorted(maps.Keys(evidence)) {
 		t := evidence[id]
 		score := 0.0
 		if maxShared > 0 {
