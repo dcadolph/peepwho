@@ -178,6 +178,8 @@ your people graph. Encryption turns on whenever a key is configured, through
 With a key set, every `whotoask index` write is encrypted and every read decrypts.
 `encrypt` and `decrypt` rewrite every store beside the index too: the
 conversations, facts, feedback, and the change log, and `status` reports each.
+Piped or with `--json`, `status` prints the key's source (never the key) and
+each store's name, path, and state: `encrypted`, `plain`, or `absent`.
 Reading an encrypted index without the key fails rather than exposing anything. See
 [PRIVACY.md](PRIVACY.md) for the full model.
 
@@ -704,6 +706,8 @@ is encrypted at rest, which connector credentials are set, and how many declared
 owners have no work recorded against them. Every problem
 prints the exact command that resolves it, and `doctor` exits nonzero when
 something stops whotoask from answering, so it works as a gate in a script.
+Piped or with `--json`, it prints `{"findings": [...]}`, one entry per check
+with its `name`, `level` (`ok`, `warn`, or `fail`), `detail`, and `fix`.
 
 ## whotoask serve
 

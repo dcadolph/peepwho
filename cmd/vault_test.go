@@ -92,7 +92,7 @@ func TestVaultStatusAndKeygen(t *testing.T) {
 	t.Setenv(keyring.EnvKey, "")
 	t.Setenv(keyring.EnvPassphrase, "")
 
-	out, _, err := runCmd(t, "vault", "status", "--data-dir", dir)
+	out, _, err := runCmd(t, "vault", "status", "--human", "--data-dir", dir)
 	if err != nil {
 		t.Fatalf("status: %v", err)
 	}
@@ -193,7 +193,7 @@ func TestVaultCoversConversations(t *testing.T) {
 		t.Error("retained message text still readable on disk after vault encrypt")
 	}
 
-	out, _, err := runCmd(t, "vault", "status", "--data-dir", dir)
+	out, _, err := runCmd(t, "vault", "status", "--human", "--data-dir", dir)
 	if err != nil {
 		t.Fatalf("status: %v", err)
 	}
@@ -254,7 +254,7 @@ func TestVaultCoversFactsAndFeedback(t *testing.T) {
 		t.Error("fact detail still readable on disk after vault encrypt")
 	}
 
-	out, _, err := runCmd(t, "vault", "status", "--data-dir", dir)
+	out, _, err := runCmd(t, "vault", "status", "--human", "--data-dir", dir)
 	if err != nil {
 		t.Fatalf("status: %v", err)
 	}
@@ -321,7 +321,7 @@ func TestVaultCoversChangeLog(t *testing.T) {
 	if raw, _ := os.ReadFile(logPath); !vault.IsEncrypted(raw) || bytes.Contains(raw, []byte("Al Poe")) {
 		t.Error("change log not sealed after vault encrypt")
 	}
-	out, _, err := runCmd(t, "vault", "status", "--data-dir", dir)
+	out, _, err := runCmd(t, "vault", "status", "--human", "--data-dir", dir)
 	if err != nil {
 		t.Fatalf("status: %v", err)
 	}
@@ -398,7 +398,7 @@ func TestDoctorReportsFileEncryptionState(t *testing.T) {
 
 	key, _ := keyring.GenerateKey()
 	t.Setenv(keyring.EnvKey, key)
-	out, _, err := runCmd(t, "doctor", "--data-dir", dir)
+	out, _, err := runCmd(t, "doctor", "--human", "--data-dir", dir)
 	if err != nil {
 		t.Fatalf("doctor: %v\n%s", err, out)
 	}
@@ -471,7 +471,7 @@ func TestVaultCoversRefreshAndWatermarks(t *testing.T) {
 	if raw, _ := os.ReadFile(statePath); !vault.IsEncrypted(raw) || bytes.Contains(raw, []byte("PLANTED")) {
 		t.Errorf("watermarks not sealed after encrypt: %s", raw)
 	}
-	out, _, err := runCmd(t, "vault", "status", "--data-dir", dir)
+	out, _, err := runCmd(t, "vault", "status", "--human", "--data-dir", dir)
 	if err != nil {
 		t.Fatalf("status: %v", err)
 	}
@@ -496,5 +496,68 @@ func TestVaultCoversRefreshAndWatermarks(t *testing.T) {
 	}
 	if _, _, err := runCmd(t, "refresh", "--data-dir", dir); err != nil {
 		t.Fatalf("refresh with no key after decrypt: %v", err)
+	}
+}
+
+// TestVaultStatusHonorsTheOutputFlags checks that vault status writes JSON when
+// asked or piped, naming each store's state as a word and never holding a key,
+// and text only when a person asks for it. The subtests share the cleared key
+// variables, so none runs in parallel.
+func TestVaultStatusHonorsTheOutputFlags(t *testing.T) {
+	t.Setenv(keyring.EnvKey, "")
+	t.Setenv(keyring.EnvPassphrase, "")
+	tests := []struct {
+		Flag     string
+		WantJSON bool
+	}{{ // Test 0: --json forces JSON.
+		Flag: "--json", WantJSON: true,
+	}, { // Test 1: Piped output is JSON by default.
+		Flag: "", WantJSON: true,
+	}, { // Test 2: --human forces text.
+		Flag: "--human", WantJSON: false,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			dir := t.TempDir()
+			if err := os.WriteFile(engine.Dir(dir).Feedback(), []byte("[]"), 0o600); err != nil {
+				t.Fatalf("write feedback: %v", err)
+			}
+			args := []string{"vault", "status", "--data-dir", dir}
+			if test.Flag != "" {
+				args = append(args, test.Flag)
+			}
+			out, _, err := runCmd(t, args...)
+			if err != nil {
+				t.Fatalf("status: %v", err)
+			}
+			if !test.WantJSON {
+				for _, want := range []string{"key:           none", "no index yet", "plain JSON"} {
+					if !strings.Contains(string(out), want) {
+						t.Errorf("text output lacks %q:\n%s", want, out)
+					}
+				}
+				return
+			}
+			var got struct {
+				Key    string `json:"key"`
+				Stores []struct {
+					Store, State, Path string
+				} `json:"stores"`
+			}
+			if err := json.Unmarshal(out, &got); err != nil {
+				t.Fatalf("output is not JSON: %v\n%s", err, out)
+			}
+			states := make(map[string]string, len(got.Stores))
+			for _, st := range got.Stores {
+				states[st.Store] = st.State
+				if !strings.HasPrefix(st.Path, dir) {
+					t.Errorf("store %s path = %q, want it under %s", st.Store, st.Path, dir)
+				}
+			}
+			if got.Key != "" || states["index"] != "absent" || states["feedback"] != "plain" ||
+				len(got.Stores) != len(vaultStores(&options{dataDir: dir})) {
+				t.Errorf("status = %+v, want no key, index absent, feedback plain", got)
+			}
+		})
 	}
 }

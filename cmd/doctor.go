@@ -44,17 +44,35 @@ func (l checkLevel) label() string {
 	}
 }
 
+// MarshalText writes the level as ok, warn, or fail, so JSON output names it.
+func (l checkLevel) MarshalText() ([]byte, error) {
+	switch l {
+	case levelFail:
+		return []byte("fail"), nil
+	case levelWarn:
+		return []byte("warn"), nil
+	default:
+		return []byte("ok"), nil
+	}
+}
+
 // finding is one doctor check result: what was examined, how it turned out, and
 // the exact command that fixes it when it did not pass.
 type finding struct {
 	// Name is the short check name.
-	Name string
+	Name string `json:"name"`
 	// Level is the severity.
-	Level checkLevel
+	Level checkLevel `json:"level"`
 	// Detail is what doctor found.
-	Detail string
+	Detail string `json:"detail"`
 	// Fix is the command that resolves the finding; empty when nothing to fix.
-	Fix string
+	Fix string `json:"fix,omitempty"`
+}
+
+// doctorReport is what doctor prints as JSON.
+type doctorReport struct {
+	// Findings is every check result, in report order.
+	Findings []finding `json:"findings"`
 }
 
 // doctorFacts is the plain snapshot diagnose reasons over, so the check logic is
@@ -302,16 +320,22 @@ func credentialFindings(f doctorFacts) []finding {
 	return out
 }
 
-// writeFindings prints the report and returns how many findings failed.
-func writeFindings(w io.Writer, findings []finding) int {
+// writeFindings prints the report for a person.
+func writeFindings(w io.Writer, findings []finding) {
+	for _, fnd := range findings {
+		fmt.Fprintf(w, "[%s] %s: %s\n", fnd.Level.label(), fnd.Name, fnd.Detail)
+		if fnd.Fix != "" {
+			fmt.Fprintf(w, "       fix: %s\n", fnd.Fix)
+		}
+	}
+}
+
+// failedCount returns how many findings failed.
+func failedCount(findings []finding) int {
 	fails := 0
 	for _, fnd := range findings {
 		if fnd.Level == levelFail {
 			fails++
-		}
-		fmt.Fprintf(w, "[%s] %s: %s\n", fnd.Level.label(), fnd.Name, fnd.Detail)
-		if fnd.Fix != "" {
-			fmt.Fprintf(w, "       fix: %s\n", fnd.Fix)
 		}
 	}
 	return fails
@@ -369,8 +393,13 @@ whotoask from answering, so it works as a gate in a script.`,
 				}
 			}
 			findings := diagnose(facts)
-			fails := writeFindings(cmd.OutOrStdout(), findings)
-			if fails > 0 {
+			report := doctorReport{Findings: append([]finding{}, findings...)}
+			if err := opts.render(cmd.OutOrStdout(), report, func(w io.Writer, _ style) {
+				writeFindings(w, findings)
+			}); err != nil {
+				return err
+			}
+			if fails := failedCount(findings); fails > 0 {
 				return fmt.Errorf("doctor: %d problem(s) need attention", fails)
 			}
 			return nil

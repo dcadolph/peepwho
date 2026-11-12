@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -193,6 +194,81 @@ func TestOwnershipFinding(t *testing.T) {
 			}
 			if test.WantLevel == levelWarn && got.Fix == "" {
 				t.Error("a warning with no fix leaves the reader nothing to do")
+			}
+		})
+	}
+}
+
+// TestCheckLevelMarshalsAsAWord checks that JSON names each level as a word.
+func TestCheckLevelMarshalsAsAWord(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		WantText string
+		Level    checkLevel
+	}{{ // Test 0: A passing check.
+		Level: levelOK, WantText: `"level":"ok"`,
+	}, { // Test 1: A warning.
+		Level: levelWarn, WantText: `"level":"warn"`,
+	}, { // Test 2: A failure.
+		Level: levelFail, WantText: `"level":"fail"`,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			raw, err := json.Marshal(finding{Name: "index", Level: test.Level})
+			if err != nil {
+				t.Fatalf("marshal: %v", err)
+			}
+			if !strings.Contains(string(raw), test.WantText) {
+				t.Errorf("json = %s, want %s", raw, test.WantText)
+			}
+		})
+	}
+}
+
+// TestDoctorHonorsTheOutputFlags checks that doctor writes JSON when asked or
+// piped and text only when a person asks for it, and still exits nonzero when a
+// check fails.
+func TestDoctorHonorsTheOutputFlags(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		Flag     string
+		WantJSON bool
+	}{{ // Test 0: --json forces JSON.
+		Flag: "--json", WantJSON: true,
+	}, { // Test 1: Piped output is JSON by default.
+		Flag: "", WantJSON: true,
+	}, { // Test 2: --human forces text.
+		Flag: "--human", WantJSON: false,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			args := []string{"doctor", "--data-dir", t.TempDir()}
+			if test.Flag != "" {
+				args = append(args, test.Flag)
+			}
+			out, _, err := runCmd(t, args...)
+			if err == nil {
+				t.Error("doctor with no index: want a nonzero exit")
+			}
+			if !test.WantJSON {
+				if !strings.HasPrefix(string(out), "[FAIL] index: ") {
+					t.Errorf("text output = %q, want the index failure first", out)
+				}
+				return
+			}
+			var got struct {
+				Findings []struct {
+					Name, Level, Detail, Fix string
+				} `json:"findings"`
+			}
+			if err := json.Unmarshal(out, &got); err != nil {
+				t.Fatalf("output is not JSON: %v\n%s", err, out)
+			}
+			if len(got.Findings) == 0 || got.Findings[0].Name != "index" ||
+				got.Findings[0].Level != "fail" || got.Findings[0].Fix == "" {
+				t.Errorf("findings = %+v, want the index failure with its fix first", got.Findings)
 			}
 		})
 	}

@@ -45,25 +45,24 @@ func newVaultStatusCmd(opts *options) *cobra.Command {
 		Short: "Report the key and encryption state",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			out := cmd.OutOrStdout()
-			if src := keyring.Source(); src != "" {
-				fmt.Fprintf(out, "key:           configured via %s\n", src)
-			} else {
-				fmt.Fprintln(out, "key:           none (every store is written as plain JSON)")
-			}
 			// Every store is reported, not just the index: the conversation
 			// store holds retained message text, facts hold typed statements
 			// about people, and votes hold the questions asked. A status that
 			// spoke only for the index would call an install encrypted while
 			// the sensitive files beside it sat in plain JSON.
+			status := vaultStatus{Key: keyring.Source(), Stores: []storeState{}}
 			for _, store := range vaultStores(opts) {
-				state, err := fileState(store.path, store.absent)
+				state, err := diskState(store.path)
 				if err != nil {
 					return err
 				}
-				fmt.Fprintf(out, "%-14s %s (%s)\n", store.label+":", state, store.path)
+				status.Stores = append(status.Stores, storeState{
+					Store: store.label, State: state, Path: store.path, absent: store.absent,
+				})
 			}
-			return nil
+			return opts.render(cmd.OutOrStdout(), status, func(w io.Writer, _ style) {
+				renderVaultStatus(w, status)
+			})
 		},
 	}
 }
@@ -414,21 +413,70 @@ func openEpisodes(cmd *cobra.Command, opts *options, w io.Writer) error {
 	return nil
 }
 
-// fileState describes a store on disk for status: absent, encrypted, or plain.
-// absent is what to say when the file is not there yet, which differs between
-// the index and the conversations beside it.
-func fileState(path, absent string) (string, error) {
+// diskState reports a store's state on disk for status: stateAbsent,
+// stateEncrypted, or statePlain.
+func diskState(path string) (string, error) {
 	enc, err := isEncryptedOnDisk(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		return absent, nil
+		return stateAbsent, nil
 	}
 	if err != nil {
 		return "", err
 	}
 	if enc {
-		return "encrypted", nil
+		return stateEncrypted, nil
 	}
-	return "plain JSON", nil
+	return statePlain, nil
+}
+
+// States a store can be in on disk, as vault status reports them.
+const (
+	// stateEncrypted marks a store sealed under the key.
+	stateEncrypted = "encrypted"
+	// statePlain marks a store written as plain JSON.
+	statePlain = "plain"
+	// stateAbsent marks a store that does not exist yet.
+	stateAbsent = "absent"
+)
+
+// vaultStatus is the key and encryption state vault status reports.
+type vaultStatus struct {
+	// Key names where the key is configured from, and is empty when there is
+	// none. It never holds the key itself.
+	Key string `json:"key"`
+	// Stores is each store's state on disk, in report order.
+	Stores []storeState `json:"stores"`
+}
+
+// storeState is one store's line in vault status.
+type storeState struct {
+	// Store is the store's display name, e.g. "index".
+	Store string `json:"store"`
+	// State is encrypted, plain, or absent.
+	State string `json:"state"`
+	// Path is the store's file path.
+	Path string `json:"path"`
+	// absent is what the human report says when the file does not exist yet.
+	absent string
+}
+
+// renderVaultStatus writes the vault status for a person.
+func renderVaultStatus(w io.Writer, s vaultStatus) {
+	if s.Key != "" {
+		fmt.Fprintf(w, "key:           configured via %s\n", s.Key)
+	} else {
+		fmt.Fprintln(w, "key:           none (every store is written as plain JSON)")
+	}
+	for _, st := range s.Stores {
+		state := st.State
+		switch st.State {
+		case statePlain:
+			state = "plain JSON"
+		case stateAbsent:
+			state = st.absent
+		}
+		fmt.Fprintf(w, "%-14s %s (%s)\n", st.Store+":", state, st.Path)
+	}
 }
 
 // isEncryptedOnDisk reports whether the file at path carries the vault prefix,
