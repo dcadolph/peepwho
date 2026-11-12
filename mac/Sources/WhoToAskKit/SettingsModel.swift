@@ -414,11 +414,25 @@ public final class SettingsModel: ObservableObject {
         }
     }
 
-    // pick remembers url for slot, stops refreshing the place it replaces, and indexes it. A pick
-    // whose first index fails or is canceled is forgotten, so a picked place is always one that
-    // indexed.
+    // pick remembers url for slot and indexes it, and stops refreshing the place it replaces once
+    // the new one has indexed. A pick whose index fails or is canceled puts back the place slot
+    // held before, or forgets slot when it held none, so a picked place is always one that
+    // indexed. Nothing is saved while a run is going, while the index is not open, or when the
+    // store refuses to say what slot holds, since the place picked before could not be put back.
     public func pick(_ url: URL, as slot: BookmarkSlot) async {
         guard refuseWhileBusy() else { return }
+        guard core != nil else {
+            lines = ["The index is not open."]
+            return
+        }
+        let old: String?
+        do {
+            old = try places.kept(slot)
+        } catch {
+            let why = SearchModel.describe(error)
+            lines = ["Could not read the place picked before, so it stays picked: \(why)"]
+            return
+        }
         do {
             try places.save(url, in: slot)
         } catch {
@@ -426,18 +440,37 @@ public final class SettingsModel: ObservableObject {
             return
         }
         readSaved()
+        var notPutBack: String?
         await run("Indexing \(url.lastPathComponent)") { core in
             do {
                 guard let url = try self.places.resolve(slot) else { return [] }
                 defer { self.places.release(url) }
-                try await core.forgetScopes(slot.source)
                 self.started(.indexed)
                 return [try await self.index(core, IndexJob.forPlace(slot, url))]
             } catch {
-                self.places.forget(slot)
-                self.readSaved()
+                notPutBack = self.putBack(old, in: slot)
                 throw error
             }
+        }
+        if let notPutBack {
+            lines.append(notPutBack)
+        }
+    }
+
+    // putBack undoes a pick that did not index: it stores old, the text slot's place was kept as
+    // before the pick, in slot again, or forgets slot when it held no place. It tries once, and
+    // returns a line when the store refuses the write, which leaves slot as the store left it.
+    private func putBack(_ old: String?, in slot: BookmarkSlot) -> String? {
+        defer { readSaved() }
+        guard let old else {
+            places.forget(slot)
+            return nil
+        }
+        do {
+            try places.restore(old, in: slot)
+            return nil
+        } catch {
+            return "Could not put back the place picked before: \(SearchModel.describe(error))"
         }
     }
 

@@ -52,6 +52,17 @@ public enum Bookmarks {
         store.get(slot.storeKey) != nil
     }
 
+    // text returns the text slot's bookmark is stored as, or nil when slot holds none. It throws
+    // when the store refuses, so a refusal is never taken for no bookmark.
+    public static func text(_ slot: BookmarkSlot, store: SecretStore = KeychainStore()) throws -> String? {
+        try store.read(slot.storeKey)
+    }
+
+    // restore stores text, as text returned it, as slot's bookmark again, unchanged.
+    public static func restore(_ text: String, in slot: BookmarkSlot, store: SecretStore = KeychainStore()) throws {
+        try store.set(slot.storeKey, text)
+    }
+
     // resolve turns slot's bookmark back into a URL and starts access to it. A stale bookmark is
     // saved again from the resolved URL. It returns nil when slot holds no bookmark.
     public static func resolve(_ slot: BookmarkSlot, store: SecretStore = KeychainStore()) throws -> Resolved? {

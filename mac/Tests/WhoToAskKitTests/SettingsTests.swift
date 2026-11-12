@@ -99,6 +99,12 @@ final class MemoryPlaces: PlaceStore {
     var resolves = 0
     // failing are the slots whose resolve throws, like a bookmark that no longer resolves.
     var failing: Set<BookmarkSlot> = []
+    // refusing are the slots whose kept throws, like a Keychain that will not say what it holds.
+    var refusing: Set<BookmarkSlot> = []
+    // unrestorable are the slots whose restore throws, like a Keychain that refuses the write.
+    var unrestorable: Set<BookmarkSlot> = []
+    // restores is how many restores were tried.
+    var restores = 0
 
     // save stores url for slot.
     func save(_ url: URL, in slot: BookmarkSlot) throws { urls[slot] = url }
@@ -122,6 +128,24 @@ final class MemoryPlaces: PlaceStore {
 
     // has reports whether slot holds a place.
     func has(_ slot: BookmarkSlot) -> Bool { urls[slot] != nil }
+
+    // kept returns slot's place as text, nil when there is none, and throws for a refusing slot.
+    func kept(_ slot: BookmarkSlot) throws -> String? {
+        if refusing.contains(slot) {
+            throw KeychainError(status: errSecInteractionNotAllowed)
+        }
+        return urls[slot]?.absoluteString
+    }
+
+    // restore counts the try and puts the place text names back in slot, and throws for an
+    // unrestorable slot.
+    func restore(_ text: String, in slot: BookmarkSlot) throws {
+        restores += 1
+        if unrestorable.contains(slot) {
+            throw KeychainError(status: errSecAuthFailed)
+        }
+        urls[slot] = URL(string: text)
+    }
 }
 
 // CoreMemorySecrets hands the core what a MemorySecrets holds.
@@ -833,9 +857,9 @@ struct SettingsTests {
         #expect(model.lines == ["Nothing to refresh: index a source at least once first."])
     }
 
-    // Test 17: A new pick that fails to index still stops refreshing the place it replaced, since
-    // the slot no longer holds access to it.
-    @Test func failedPickDropsOldScope() async throws {
+    // Test 17: A new pick that fails to index leaves the place it would have replaced picked,
+    // recorded, and refreshing.
+    @Test func failedRePickKeepsOldPlace() async throws {
         let first = try gitRepo()
         let dir = tempDir("whotoask-data")
         defer {
@@ -843,14 +867,16 @@ struct SettingsTests {
             try? FileManager.default.removeItem(at: dir)
         }
         let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let places = MemoryPlaces()
         let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
-                                  secrets: MemorySecrets(), places: MemoryPlaces(), defaults: defaults)
+                                  secrets: MemorySecrets(), places: places, defaults: defaults)
         await model.pick(first, as: .git)
         #expect(model.status?.scopes.count == 1)
         await model.pick(tempDir("whotoask-missing"), as: .git)
         #expect(!model.lines.contains { $0.hasPrefix("Git: read") })
         #expect(!model.lines.contains { $0.hasPrefix("Indexed at") })
-        #expect(model.status?.scopes.isEmpty == true)
+        #expect(places.urls[.git] == first)
+        #expect(model.status?.scopes.map(\.scope) == ["repo:\(first.path)"])
     }
 
     // Test 15: Indexing again keeps only what this run read, so a scope changed in Settings stops
@@ -1239,6 +1265,249 @@ struct SettingsTests {
         #expect(model.lastRun?.kind == .indexed)
         #expect(model.busy == nil)
         #expect(places.open == 0)
+    }
+
+    // Test 33: A pick of a folder git rejects, made over a picked repo, leaves the repo in the
+    // slot under its name with its scope recorded, and a refresh after it reads the repo again.
+    @Test func failedRePickStillRefreshes() async throws {
+        let first = try gitRepo()
+        let empty = tempDir("whotoask-place")
+        let dir = tempDir("whotoask-data")
+        try FileManager.default.createDirectory(at: empty, withIntermediateDirectories: true)
+        defer {
+            for url in [first, empty, dir] {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let places = MemoryPlaces()
+        let model = SettingsModel(
+            dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+            secrets: MemorySecrets(), places: places, defaults: defaults)
+        await model.pick(first, as: .git)
+        let recorded = ["repo:\(first.path)"]
+        #expect(model.status?.scopes.map(\.scope) == recorded)
+
+        await model.pick(empty, as: .git)
+        #expect(model.lines.count == 1)
+        #expect(model.lines.first?.contains("folder with no repository in it") == true)
+        #expect(places.urls[.git] == first)
+        #expect(model.placeNames[.git] == first.lastPathComponent)
+        #expect(model.status?.scopes.map(\.scope) == recorded)
+        #expect(places.restores == 1)
+        #expect(places.open == 0)
+
+        await model.refresh()
+        #expect(model.refreshFailure == nil)
+        #expect(model.lines == [try #require(model.lastRun).line, refreshedOneRepo(model)])
+        #expect(model.status?.scopes.map(\.scope) == recorded)
+        #expect(places.open == 0)
+    }
+
+    // Test 34: A cancel of a pick made over a picked file leaves the file in the slot under its
+    // name with its scope recorded, and a refresh after it reads the file again. The new pick is
+    // a pipe nobody has written to, so the core is still reading it when the cancel lands.
+    @Test func canceledRePickKeepsOldPlace() async throws {
+        let first = try rosterCSV()
+        let pipe = tempDir("whotoask-pipe").appendingPathExtension("csv")
+        let dir = tempDir("whotoask-data")
+        defer {
+            for url in [first, pipe, dir] {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
+        try #require(mkfifo(pipe.path, 0o600) == 0)
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let places = MemoryPlaces()
+        let model = SettingsModel(
+            dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+            secrets: MemorySecrets(), places: places, defaults: defaults)
+        await model.pick(first, as: .csv)
+        let recorded = ["file:\(first.path)"]
+        #expect(model.status?.scopes.map(\.scope) == recorded)
+
+        async let picked: Void = model.pick(pipe, as: .csv)
+        // A pipe opens for writing only once a reader waits on it, and the core registers the run
+        // a cancel reaches before it reads, so the cancel below always finds the run.
+        var writer: Int32 = -1
+        for _ in 0..<6000 where writer < 0 {
+            writer = Darwin.open(pipe.path, O_WRONLY | O_NONBLOCK)
+            if writer < 0 {
+                try await Task.sleep(for: .milliseconds(10))
+            }
+        }
+        try #require(writer >= 0)
+        #expect(model.busy == "Indexing \(pipe.lastPathComponent)")
+        #expect(model.canCancel)
+        model.cancel()
+        // The model keeps calling the core's cancel from a task of its own. This call makes sure
+        // one has landed before the pipe closes and the read ends.
+        model.core?.cancel()
+        _ = Darwin.close(writer)
+        await picked
+        #expect(model.lines == ["Canceled."])
+        #expect(places.urls[.csv] == first)
+        #expect(model.placeNames[.csv] == first.lastPathComponent)
+        #expect(model.status?.scopes.map(\.scope) == recorded)
+        #expect(places.restores == 1)
+        #expect(model.busy == nil)
+        #expect(places.open == 0)
+
+        await model.refresh()
+        #expect(model.refreshFailure == nil)
+        #expect(model.lines.contains { $0.hasPrefix("Org chart CSV: refreshed and found ") })
+        #expect(model.status?.scopes.map(\.scope) == recorded)
+        #expect(places.open == 0)
+    }
+
+    // Test 35: A pick while the index is not open says so, saves no place, and leaves a place
+    // picked before as it was.
+    @Test func pickWithNoCoreSavesNothing() async throws {
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let old = URL(fileURLWithPath: "/tmp/repo")
+        let places = MemoryPlaces()
+        places.urls = [.git: old]
+        let model = SettingsModel(
+            dir: tempDir("whotoask-data"),
+            open: { throw KeychainError(status: errSecInteractionNotAllowed) },
+            secrets: MemorySecrets(), places: places, defaults: defaults)
+        await model.pick(URL(fileURLWithPath: "/tmp/other"), as: .git)
+        #expect(model.lines == ["The index is not open."])
+        #expect(places.urls == [.git: old])
+        #expect(model.placeNames == [.git: "repo"])
+        await model.pick(URL(fileURLWithPath: "/tmp/roster.csv"), as: .csv)
+        #expect(model.lines == ["The index is not open."])
+        #expect(places.urls == [.git: old])
+        #expect(places.restores == 0)
+        #expect(places.open == 0)
+    }
+
+    // Test 36: A pick made while the store refuses to say what the slot holds is refused in one
+    // line and saves nothing, so the place picked before stays picked, recorded, and refreshing.
+    @Test func refusedReadKeepsOldPlace() async throws {
+        let first = try gitRepo()
+        let empty = tempDir("whotoask-place")
+        let dir = tempDir("whotoask-data")
+        try FileManager.default.createDirectory(at: empty, withIntermediateDirectories: true)
+        defer {
+            for url in [first, empty, dir] {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let places = MemoryPlaces()
+        let model = SettingsModel(
+            dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+            secrets: MemorySecrets(), places: places, defaults: defaults)
+        await model.pick(first, as: .git)
+        let recorded = ["repo:\(first.path)"]
+        #expect(model.status?.scopes.map(\.scope) == recorded)
+
+        places.refusing = [.git]
+        await model.pick(empty, as: .git)
+        #expect(model.lines.count == 1)
+        let refused = "Could not read the place picked before, so it stays picked: "
+        #expect(model.lines.first?.hasPrefix(refused) == true)
+        #expect(places.urls[.git] == first)
+        #expect(model.placeNames[.git] == first.lastPathComponent)
+        #expect(model.status?.scopes.map(\.scope) == recorded)
+        #expect(places.restores == 0)
+        #expect(places.open == 0)
+
+        await model.refresh()
+        #expect(model.refreshFailure == nil)
+        #expect(model.lines == [try #require(model.lastRun).line, refreshedOneRepo(model)])
+        #expect(model.status?.scopes.map(\.scope) == recorded)
+    }
+
+    // Test 37: A failed pick whose old place cannot be put back says so in one line after why the
+    // pick failed, tries the write once, and leaves the slot as the store left it.
+    @Test func failedPutBackSaysSo() async throws {
+        let first = try gitRepo()
+        let empty = tempDir("whotoask-place")
+        let dir = tempDir("whotoask-data")
+        try FileManager.default.createDirectory(at: empty, withIntermediateDirectories: true)
+        defer {
+            for url in [first, empty, dir] {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let places = MemoryPlaces()
+        let model = SettingsModel(
+            dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+            secrets: MemorySecrets(), places: places, defaults: defaults)
+        await model.pick(first, as: .git)
+
+        places.unrestorable = [.git]
+        await model.pick(empty, as: .git)
+        #expect(model.lines.count == 2)
+        #expect(model.lines.first?.contains("folder with no repository in it") == true)
+        #expect(model.lines.last?.hasPrefix("Could not put back the place picked before: ") == true)
+        #expect(places.restores == 1)
+        #expect(places.urls[.git] == empty)
+        #expect(model.placeNames[.git] == empty.lastPathComponent)
+        #expect(model.status?.scopes.map(\.scope) == ["repo:\(first.path)"])
+        #expect(model.busy == nil)
+        #expect(places.open == 0)
+    }
+
+    // Test 38: A pick while a run is going is refused and saves no place, so the run going keeps
+    // the place it started with.
+    @Test func pickWhileBusySavesNothing() async throws {
+        let (first, second) = (try gitRepo(), try gitRepo())
+        let dir = tempDir("whotoask-data")
+        defer {
+            for url in [first, second, dir] {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let places = MemoryPlaces()
+        let model = SettingsModel(
+            dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+            secrets: MemorySecrets(), places: places, defaults: defaults)
+        async let picked: Void = model.pick(first, as: .git)
+        while model.busy == nil { await Task.yield() }
+        await model.pick(second, as: .git)
+        let busy = "is still running. Try again when it finishes."
+        #expect(model.lines.first?.hasSuffix(busy) == true)
+        #expect(places.urls[.git] == first)
+        await picked
+        #expect(places.urls[.git] == first)
+        #expect(model.placeNames[.git] == first.lastPathComponent)
+        #expect(model.status?.scopes.map(\.scope) == ["repo:\(first.path)"])
+        #expect(places.restores == 0)
+        #expect(places.open == 0)
+    }
+
+    // Test 39: A bookmark's stored text reads out as the store holds it and, written back over a
+    // later bookmark, is the same text under the same name and resolves to the first place. A
+    // store that refuses the read throws, and is not taken for no bookmark.
+    @Test func bookmarkTextRestores() throws {
+        let (first, second) = (tempDir("whotoask-place"), tempDir("whotoask-place"))
+        for place in [first, second] {
+            try FileManager.default.createDirectory(at: place, withIntermediateDirectories: true)
+        }
+        defer {
+            for place in [first, second] {
+                try? FileManager.default.removeItem(at: place)
+            }
+        }
+        let secrets = MemorySecrets()
+        let key = BookmarkSlot.git.storeKey
+        #expect(try Bookmarks.text(.git, store: secrets) == nil)
+        try Bookmarks.save(first, in: .git, store: secrets)
+        let text = try #require(try Bookmarks.text(.git, store: secrets))
+        #expect(secrets.values == [key: text])
+        try Bookmarks.save(second, in: .git, store: secrets)
+        #expect(secrets.values[key] != text)
+        try Bookmarks.restore(text, in: .git, store: secrets)
+        #expect(secrets.values == [key: text])
+        let resolved = try #require(try Bookmarks.resolve(.git, store: secrets))
+        defer { resolved.url.stopAccessingSecurityScopedResource() }
+        #expect(resolved.url.resolvingSymlinksInPath().path == first.resolvingSymlinksInPath().path)
+        #expect(throws: KeychainError.self) { try Bookmarks.text(.git, store: RefusingSecrets()) }
     }
 }
 

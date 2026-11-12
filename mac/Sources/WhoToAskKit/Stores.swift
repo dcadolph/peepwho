@@ -44,6 +44,11 @@ public protocol PlaceStore {
     func forget(_ slot: BookmarkSlot)
     // has reports whether slot holds a place.
     func has(_ slot: BookmarkSlot) -> Bool
+    // kept returns the text slot's place is stored as, or nil when nothing is saved. It throws
+    // when the store refuses, so a caller never takes a refusal for nothing saved.
+    func kept(_ slot: BookmarkSlot) throws -> String?
+    // restore stores text, as kept returned it, as slot's place again, unchanged.
+    func restore(_ text: String, in slot: BookmarkSlot) throws
 }
 
 // BookmarkStore keeps places as security-scoped bookmarks in the Keychain.
@@ -65,4 +70,13 @@ public struct BookmarkStore: PlaceStore {
 
     // has reports whether slot holds a bookmark.
     public func has(_ slot: BookmarkSlot) -> Bool { Bookmarks.has(slot) }
+
+    // kept returns the text slot's bookmark is stored as, nil when there is none, and throws when
+    // the Keychain refuses.
+    public func kept(_ slot: BookmarkSlot) throws -> String? { try Bookmarks.text(slot) }
+
+    // restore stores text as slot's bookmark again, unchanged.
+    public func restore(_ text: String, in slot: BookmarkSlot) throws {
+        try Bookmarks.restore(text, in: slot)
+    }
 }
