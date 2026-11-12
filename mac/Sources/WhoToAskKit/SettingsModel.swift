@@ -19,11 +19,18 @@ public struct Scopes: Equatable, Sendable, Codable {
     // init makes empty scopes.
     public init() {}
 
-    // load reads the scopes saved in secrets. Nothing saved, or nothing readable, is empty scopes.
-    public static func load(_ secrets: SecretStore) -> Scopes {
-        guard let text = secrets.get(SecretName.scopes),
+    // read returns the scopes saved in secrets. Nothing saved, or a saved value that does not
+    // decode, is empty scopes. It throws when the store refuses, so a refusal is never taken for
+    // nothing saved.
+    public static func read(_ secrets: SecretStore) throws -> Scopes {
+        guard let text = try secrets.read(SecretName.scopes),
               let scopes = try? JSONDecoder().decode(Scopes.self, from: Data(text.utf8)) else { return Scopes() }
         return scopes
+    }
+
+    // load reads the scopes saved in secrets. Nothing saved, or nothing readable, is empty scopes.
+    public static func load(_ secrets: SecretStore) -> Scopes {
+        (try? read(secrets)) ?? Scopes()
     }
 
     // save writes the scopes to secrets. They name the repositories, projects, and spaces a person
@@ -243,10 +250,20 @@ public final class SettingsModel: ObservableObject {
     @Published public private(set) var people: [ListedPerson] = []
     // peopleError says why the people list did not load, nil when it did.
     @Published public private(set) var peopleError: String?
-    // scopes are what the token sources read, saved on every change.
+    // scopes are what the token sources read, saved on every change once a load has succeeded.
     @Published public var scopes: Scopes {
-        didSet { saveScopes() }
+        didSet {
+            if !reloadingScopes {
+                saveScopes()
+            }
+        }
     }
+    // scopesLoaded reports whether the store has answered a read of the scopes. Until it has,
+    // nothing is saved, so an edit never overwrites saved scopes that were never read.
+    private var scopesLoaded = false
+    // reloadingScopes is set while loadScopes puts what the store holds into scopes, so the reload
+    // does not save them back.
+    private var reloadingScopes = false
     // core is the open data directory, nil when it did not open.
     public private(set) var core: Core?
     // lastAttempt is when refreshIfStale last started a refresh, so a refresh that keeps failing
@@ -290,8 +307,9 @@ public final class SettingsModel: ObservableObject {
     // log records when a run starts and ends, with no paths, names, or line text.
     private let log = Logger(subsystem: "com.dcadolph.whotoask", category: "index")
 
-    // init opens dir with open and reads which secrets and places are saved. clock tells the time
-    // a run starts at.
+    // init opens dir with open and reads which secrets and places are saved. A store that refuses
+    // the scopes read leaves them empty and unsaved until a later load succeeds. clock tells the
+    // time a run starts at.
     public init(dir: URL, open: @escaping () throws -> Core, secrets: SecretStore, places: PlaceStore,
                 defaults: UserDefaults = .standard, sampleDir: URL? = nil, loginItem: LoginItem? = nil,
                 clock: @escaping () -> Date = Date.init) {
@@ -304,7 +322,9 @@ public final class SettingsModel: ObservableObject {
         self.secrets = secrets
         self.places = places
         self.defaults = defaults
-        scopes = Scopes.load(secrets)
+        let stored = try? Scopes.read(secrets)
+        scopes = stored ?? Scopes()
+        scopesLoaded = stored != nil
         reopen()
         readSaved()
     }
@@ -333,8 +353,17 @@ public final class SettingsModel: ObservableObject {
         login == .needsApproval ? "Turn WhoToAsk on in System Settings, under General, Login Items." : nil
     }
 
-    // saveScopes keeps the scopes in the secret store, or says why it could not.
+    // scopesNotSaved says an edit to the scopes was not kept, since the store has not answered a
+    // read of them yet.
+    private static let scopesNotSaved = "This change is not saved because the Keychain has not answered yet."
+
+    // saveScopes keeps the scopes in the secret store, or says why it could not. Before a load has
+    // succeeded it writes nothing, since what the store holds was never read and would be lost.
     private func saveScopes() {
+        guard scopesLoaded else {
+            lines = [Self.scopesNotSaved]
+            return
+        }
         do {
             try scopes.save(secrets)
         } catch {
@@ -449,6 +478,9 @@ public final class SettingsModel: ObservableObject {
             lines = ["Reset. Nothing is kept."]
         }
         reopen()
+        if !scopesLoaded {
+            reloadSaved()
+        }
         busy = nil
         await loadStatus()
     }
@@ -570,13 +602,15 @@ public final class SettingsModel: ObservableObject {
     }
 
     // reopenIfClosed tries the data directory again after an open that failed, such as under a
-    // locked Keychain. The menu opening and the Mac waking call it, and the timer does not, so a
-    // Keychain prompt never repeats on its own.
+    // locked Keychain, and once it opens reads the scopes and what is saved again, since a locked
+    // Keychain read as nothing saved. The menu opening and the Mac waking call it, and the timer
+    // does not, so a Keychain prompt never repeats on its own.
     public func reopenIfClosed() {
         guard core == nil, busy == nil else { return }
         reopen()
         if core != nil {
             lines = []
+            reloadSaved()
         }
     }
 
@@ -607,6 +641,9 @@ public final class SettingsModel: ObservableObject {
             lines = ["Deleted \(removed) files. The index is empty."]
         }
         reopen()
+        if !scopesLoaded {
+            reloadSaved()
+        }
         busy = nil
         await loadStatus()
     }
@@ -881,6 +918,24 @@ public final class SettingsModel: ObservableObject {
         }
         follow(core)
         onCore?(core)
+    }
+
+    // reloadSaved reads the scopes and which secrets and places are saved again once the core is
+    // open. A store that refused at launch read as nothing saved, and it may answer now.
+    private func reloadSaved() {
+        guard core != nil else { return }
+        loadScopes()
+        readSaved()
+    }
+
+    // loadScopes puts the scopes the store holds into scopes without saving them back, and marks
+    // the load as succeeded. A store that refuses the read leaves scopes and the mark as they were.
+    private func loadScopes() {
+        guard let stored = try? Scopes.read(secrets) else { return }
+        reloadingScopes = true
+        scopes = stored
+        reloadingScopes = false
+        scopesLoaded = true
     }
 
     // readSaved reads which secrets and places the stores hold.

@@ -4,6 +4,9 @@ import Foundation
 public protocol SecretStore {
     // get returns the value stored under name, or nil when there is none.
     func get(_ name: String) -> String?
+    // read returns the value stored under name and nil only when nothing is stored. It throws when
+    // the store refuses, so a caller never takes a refusal for nothing stored.
+    func read(_ name: String) throws -> String?
     // set stores value under name, replacing any value already there.
     func set(_ name: String, _ value: String) throws
     // delete removes the value stored under name.
@@ -17,6 +20,10 @@ public struct KeychainStore: SecretStore {
 
     // get returns the Keychain item stored under name.
     public func get(_ name: String) -> String? { Keychain.get(name) }
+
+    // read returns the Keychain item stored under name, nil when there is none, and throws when
+    // the Keychain refuses.
+    public func read(_ name: String) throws -> String? { try Keychain.read(name) }
 
     // set stores value as the Keychain item name.
     public func set(_ name: String, _ value: String) throws { try Keychain.set(name, value) }

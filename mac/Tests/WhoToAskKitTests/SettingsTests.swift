@@ -15,6 +15,9 @@ final class MemorySecrets: SecretStore {
     // get returns the value stored under name.
     func get(_ name: String) -> String? { values[name] }
 
+    // read returns the value stored under name, and never refuses.
+    func read(_ name: String) throws -> String? { values[name] }
+
     // set stores value under name.
     func set(_ name: String, _ value: String) throws { values[name] = value }
 
@@ -22,16 +25,67 @@ final class MemorySecrets: SecretStore {
     func delete(_ name: String) { values[name] = nil }
 }
 
-// RefusingSecrets holds nothing and refuses every write, like a Keychain that says no.
+// RefusingSecrets holds nothing and refuses every read and write, like a Keychain that says no.
 final class RefusingSecrets: SecretStore {
     // get finds nothing.
     func get(_ name: String) -> String? { nil }
+
+    // read refuses.
+    func read(_ name: String) throws -> String? { throw KeychainError(status: errSecAuthFailed) }
 
     // set refuses.
     func set(_ name: String, _ value: String) throws { throw KeychainError(status: errSecAuthFailed) }
 
     // delete does nothing.
     func delete(_ name: String) {}
+}
+
+// ReadOnlySecrets holds nothing, answers every read, and refuses every write, like a Keychain
+// that can be read and not changed.
+final class ReadOnlySecrets: SecretStore {
+    // get finds nothing.
+    func get(_ name: String) -> String? { nil }
+
+    // read finds nothing, and never refuses.
+    func read(_ name: String) throws -> String? { nil }
+
+    // set refuses.
+    func set(_ name: String, _ value: String) throws { throw KeychainError(status: errSecAuthFailed) }
+
+    // delete does nothing.
+    func delete(_ name: String) {}
+}
+
+// LockableSecrets keeps secrets in a dictionary and refuses every read while locked, like a
+// Keychain before it unlocks. A write always lands and is counted, so a test sees any write made
+// under the lock.
+final class LockableSecrets: SecretStore {
+    // values are the stored secrets by name.
+    var values: [String: String] = [:]
+    // locked makes every read refuse.
+    var locked = true
+    // sets is how many writes ran.
+    var sets = 0
+
+    // get returns the value stored under name, or nil while locked.
+    func get(_ name: String) -> String? { try? read(name) }
+
+    // read returns the value stored under name, and refuses while locked.
+    func read(_ name: String) throws -> String? {
+        if locked {
+            throw KeychainError(status: errSecInteractionNotAllowed)
+        }
+        return values[name]
+    }
+
+    // set stores value under name and counts the write.
+    func set(_ name: String, _ value: String) throws {
+        values[name] = value
+        sets += 1
+    }
+
+    // delete removes the value stored under name.
+    func delete(_ name: String) { values[name] = nil }
 }
 
 // MemoryPlaces keeps places in a dictionary and counts access, so a test sees every resolve
@@ -132,6 +186,36 @@ func gitRepo() throws -> URL {
         try #require(git.terminationStatus == 0, "git \(args) exited \(git.terminationStatus)")
     }
     return dir
+}
+
+// scopesNotSaved is the line an edit to the scopes shows before the store has answered a read of
+// them.
+let scopesNotSaved = "This change is not saved because the Keychain has not answered yet."
+
+// savedNames are the secret names a locked store test keeps a value under before launch.
+let savedNames: Set<String> = [
+    SecretName.githubToken, SecretName.jiraURL, SecretName.jiraToken, SecretName.confluenceURL,
+    SecretName.confluenceToken,
+]
+
+// savedScopes are the scopes a locked store test keeps in the store before launch.
+func savedScopes() -> Scopes {
+    var scopes = Scopes()
+    scopes.jiraProjects = "KAFKA, PAY"
+    scopes.jiraServer = true
+    scopes.confluenceSpaces = "ENG"
+    return scopes
+}
+
+// lockedSecrets makes a locked store that holds savedScopes and a value under each of savedNames,
+// as a Keychain holds them before it unlocks. Saving the scopes is its one counted write.
+func lockedSecrets() throws -> LockableSecrets {
+    let secrets = LockableSecrets()
+    try savedScopes().save(secrets)
+    for name in savedNames {
+        secrets.values[name] = "value"
+    }
+    return secrets
 }
 
 // SettingsTests check the flags each source runs with and the Index, Refresh, Clear Index, and Reset actions
@@ -385,7 +469,7 @@ struct SettingsTests {
     // Test 11: A failed scope save says so instead of dropping it in silence.
     @Test func scopeSaveFailureShows() throws {
         let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
-        let secrets = RefusingSecrets()
+        let secrets = ReadOnlySecrets()
         let model = SettingsModel(dir: tempDir("whotoask-data"), open: { try Core.open(dir: tempDir("x"), key: "", secrets: KeychainSecrets()) },
                                   secrets: secrets, places: MemoryPlaces(), defaults: defaults)
         model.scopes.jiraProjects = "KAFKA"
@@ -879,6 +963,121 @@ struct SettingsTests {
         handed = []
         model.reopenIfClosed()
         #expect(handed.isEmpty)
+    }
+
+    // Test 23: A launch under a locked store with the open failing shows nothing saved and saves
+    // no edit, and the reopen after the unlock brings back the stored scopes and saved names
+    // without writing them, so an edit then keeps the other stored fields.
+    @Test func reopenReloadsScopesAndSaved() throws {
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let dir = tempDir("whotoask-data")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let secrets = try lockedSecrets()
+        let json = try #require(secrets.values[SecretName.scopes])
+        let model = SettingsModel(dir: dir, open: {
+            if secrets.locked { throw KeychainError(status: errSecInteractionNotAllowed) }
+            return try Core.open(dir: dir, key: "", secrets: KeychainSecrets())
+        }, secrets: secrets, places: MemoryPlaces(), defaults: defaults)
+        #expect(model.core == nil)
+        #expect(model.scopes == Scopes())
+        #expect(model.saved.isEmpty)
+
+        model.scopes.githubRepos = "o/a"
+        #expect(secrets.values[SecretName.scopes] == json)
+        #expect(secrets.sets == 1)
+        #expect(model.lines == [scopesNotSaved])
+
+        secrets.locked = false
+        model.reopenIfClosed()
+        #expect(model.core != nil)
+        #expect(model.lines.isEmpty)
+        #expect(model.scopes == savedScopes())
+        #expect(model.saved == savedNames)
+        #expect(secrets.sets == 1)
+
+        model.scopes.githubRepos = "o/a"
+        var want = savedScopes()
+        want.githubRepos = "o/a"
+        #expect(try Scopes.read(secrets) == want)
+        #expect(secrets.sets == 2)
+        #expect(model.lines.isEmpty)
+    }
+
+    // Test 24: A launch where the store answers with nothing stored saves an edit at once, even
+    // with the index closed.
+    @Test func emptyLaunchSavesAtOnce() throws {
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let secrets = LockableSecrets()
+        secrets.locked = false
+        let model = SettingsModel(dir: tempDir("whotoask-data"),
+                                  open: { throw KeychainError(status: errSecInteractionNotAllowed) },
+                                  secrets: secrets, places: MemoryPlaces(), defaults: defaults)
+        #expect(model.scopes == Scopes())
+        model.scopes.confluenceSpaces = "ENG"
+        #expect(try Scopes.read(secrets).confluenceSpaces == "ENG")
+        #expect(secrets.sets == 1)
+        #expect(model.lines.first?.hasPrefix("The index did not open") == true)
+    }
+
+    // Test 25: A reopen under a store that still refuses the scopes read saves no edit, since the
+    // scopes were still never read. A write that was tried would show the Keychain's refusal.
+    @Test func reopenUnderRefusalSavesNothing() throws {
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let dir = tempDir("whotoask-data")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        var closed = true
+        let model = SettingsModel(dir: dir, open: {
+            if closed { throw KeychainError(status: errSecInteractionNotAllowed) }
+            return try Core.open(dir: dir, key: "", secrets: KeychainSecrets())
+        }, secrets: RefusingSecrets(), places: MemoryPlaces(), defaults: defaults)
+        closed = false
+        model.reopenIfClosed()
+        #expect(model.core != nil)
+        #expect(model.lines.isEmpty)
+        model.scopes.jiraProjects = "KAFKA"
+        #expect(model.lines == [scopesNotSaved])
+    }
+
+    // Test 26: Clear Index after a launch under a locked store with the open failing opens the
+    // index and brings back the stored scopes and saved names without writing them.
+    @Test func clearIndexReloadsScopesAndSaved() async throws {
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let dir = tempDir("whotoask-data")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let secrets = try lockedSecrets()
+        let model = SettingsModel(dir: dir, open: {
+            if secrets.locked { throw KeychainError(status: errSecInteractionNotAllowed) }
+            return try Core.open(dir: dir, key: "", secrets: KeychainSecrets())
+        }, secrets: secrets, places: MemoryPlaces(), defaults: defaults)
+        #expect(model.core == nil)
+        secrets.locked = false
+        await model.clearIndex()
+        #expect(model.core != nil)
+        #expect(model.scopes == savedScopes())
+        #expect(model.saved == savedNames)
+        #expect(secrets.sets == 1)
+    }
+
+    // Test 27: Reset after a launch where the index opened and the store refused the scopes read
+    // ends with empty scopes, nothing stored, and an edit that saves at once.
+    @Test func resetLoadsScopes() async throws {
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let dir = tempDir("whotoask-data")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let secrets = try lockedSecrets()
+        let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+                                  secrets: secrets, places: MemoryPlaces(), defaults: defaults)
+        #expect(model.core != nil)
+        #expect(model.scopes == Scopes())
+        secrets.locked = false
+        await model.reset()
+        #expect(model.lines == ["Reset. Nothing is kept."])
+        #expect(model.scopes == Scopes())
+        #expect(secrets.values[SecretName.scopes] == nil)
+        #expect(secrets.sets == 1)
+        model.scopes.githubOrg = "acme"
+        #expect(try Scopes.read(secrets).githubOrg == "acme")
+        #expect(secrets.sets == 2)
     }
 }
 
