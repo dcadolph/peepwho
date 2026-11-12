@@ -258,6 +258,18 @@ func lockedSecrets() throws -> LockableSecrets {
     return secrets
 }
 
+// filledSecrets makes a store that holds a value under every name a person can enter, savedScopes,
+// and an index key, as a Keychain holds them once everything is set up.
+func filledSecrets() throws -> MemorySecrets {
+    let secrets = MemorySecrets()
+    for name in SourceCard.entered {
+        secrets.values[name] = "value"
+    }
+    try savedScopes().save(secrets)
+    secrets.values[SecretName.indexKey] = "old key"
+    return secrets
+}
+
 // SettingsTests check the flags each source runs with and the Index, Refresh, Clear Index, and Reset actions
 // through the real core.
 @MainActor
@@ -1120,6 +1132,125 @@ struct SettingsTests {
         model.scopes.githubOrg = "acme"
         #expect(try Scopes.read(secrets).githubOrg == "acme")
         #expect(secrets.sets == 2)
+    }
+
+    // Test 40: Reset while the index will not open, here over a damaged index file, deletes every
+    // token, the scopes, every place, the data directory, and the index key, says what a reset of
+    // an open index says, and opens a fresh, empty index that the search is handed.
+    @Test func resetWithIndexClosed() async throws {
+        let repo = try gitRepo()
+        let dir = tempDir("whotoask-data")
+        defer {
+            try? FileManager.default.removeItem(at: repo)
+            try? FileManager.default.removeItem(at: dir)
+        }
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let open = { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) }
+        do {
+            let builder = SettingsModel(
+                dir: dir, open: open, secrets: MemorySecrets(), places: MemoryPlaces(),
+                defaults: defaults)
+            await builder.pick(repo, as: .git)
+            #expect(builder.status?.scopes.count == 1)
+        }
+        let recorded = dir.appendingPathComponent("refresh.json")
+        #expect(FileManager.default.fileExists(atPath: recorded.path))
+        try Data("damaged".utf8).write(to: dir.appendingPathComponent("index.json"))
+
+        let secrets = try filledSecrets()
+        let places = MemoryPlaces()
+        places.urls = [.git: repo]
+        let model = SettingsModel(
+            dir: dir, open: open, secrets: secrets, places: places, defaults: defaults)
+        var handed: [Core?] = []
+        model.onCore = { handed.append($0) }
+        #expect(model.core == nil)
+        #expect(model.saved == Set(SourceCard.entered))
+        #expect(model.scopes == savedScopes())
+        #expect(model.placeNames == [.git: repo.lastPathComponent])
+
+        await model.reset()
+        #expect(model.lines == ["Reset. Nothing is kept."])
+        #expect(secrets.values.isEmpty)
+        #expect(BookmarkSlot.allCases.allSatisfy { !places.has($0) })
+        #expect(model.saved.isEmpty)
+        #expect(model.placeNames.isEmpty)
+        #expect(model.scopes == Scopes())
+        #expect(!FileManager.default.fileExists(atPath: dir.path))
+        #expect(model.busy == nil)
+        #expect(places.open == 0)
+
+        #expect(model.core != nil)
+        #expect(handed.map { $0 != nil } == [false, true])
+        #expect(model.status?.builtAt == nil)
+        #expect(model.status?.people == 0)
+        #expect(model.status?.scopes.isEmpty == true)
+        await model.refresh()
+        #expect(model.lines == ["Nothing to refresh yet. Index something first."])
+    }
+
+    // Test 41: Reset while the index will not open keeps the index key when the data directory
+    // cannot be deleted, since the files the key seals are still there, and does not say the reset
+    // is done.
+    @Test func closedResetKeepsKeyWhenWipeFails() async throws {
+        let dir = tempDir("whotoask-data")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        // A folder where the index file belongs is something the wipe refuses to remove.
+        let blocked = dir.appendingPathComponent("index.json", isDirectory: true)
+        try FileManager.default.createDirectory(at: blocked, withIntermediateDirectories: true)
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let secrets = try filledSecrets()
+        let places = MemoryPlaces()
+        places.urls = [.git: URL(fileURLWithPath: "/tmp/repo")]
+        let model = SettingsModel(
+            dir: dir, open: { throw KeychainError(status: errSecInteractionNotAllowed) },
+            secrets: secrets, places: places, defaults: defaults)
+        #expect(model.core == nil)
+
+        await model.reset()
+        #expect(secrets.values == [SecretName.indexKey: "old key"])
+        #expect(!model.lines.isEmpty)
+        #expect(!model.lines.contains("Reset. Nothing is kept."))
+        #expect(BookmarkSlot.allCases.allSatisfy { !places.has($0) })
+        #expect(model.saved.isEmpty)
+        #expect(model.scopes == Scopes())
+        #expect(FileManager.default.fileExists(atPath: blocked.path))
+        #expect(model.core == nil)
+        #expect(model.busy == nil)
+    }
+
+    // Test 42: Reset under an open that keeps failing still deletes every token, the scopes, every
+    // place, the data directory, and the index key, and leaves the model idle with no index open.
+    @Test func closedResetDeletesUnderFailingOpen() async throws {
+        let dir = tempDir("whotoask-data")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try Data(#"{"git":{}}"#.utf8).write(to: dir.appendingPathComponent("refresh.json"))
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let secrets = try filledSecrets()
+        let places = MemoryPlaces()
+        places.urls = [
+            .git: URL(fileURLWithPath: "/tmp/repo"), .csv: URL(fileURLWithPath: "/tmp/a.csv"),
+        ]
+        let model = SettingsModel(
+            dir: dir, open: { throw KeychainError(status: errSecInteractionNotAllowed) },
+            secrets: secrets, places: places, defaults: defaults)
+        #expect(model.core == nil)
+        #expect(model.saved == Set(SourceCard.entered))
+        #expect(model.placeNames.count == 2)
+
+        await model.reset()
+        #expect(secrets.values.isEmpty)
+        #expect(BookmarkSlot.allCases.allSatisfy { !places.has($0) })
+        #expect(model.saved.isEmpty)
+        #expect(model.placeNames.isEmpty)
+        #expect(model.scopes == Scopes())
+        #expect(!FileManager.default.fileExists(atPath: dir.path))
+        #expect(model.lines != ["The index is not open."])
+        #expect(model.core == nil)
+        #expect(model.status == nil)
+        #expect(model.busy == nil)
+        #expect(places.open == 0)
     }
 
     // Test 28: A picked repo that moved is read from where it is now on refresh, and from then on

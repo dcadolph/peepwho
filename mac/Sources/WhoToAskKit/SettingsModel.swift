@@ -486,24 +486,23 @@ public final class SettingsModel: ObservableObject {
         }
     }
 
-    // reset forgets every token, site address, scope, and picked place while the core is open,
-    // then deletes the data directory and its key and opens a fresh, empty one under a new key, so
-    // WhoToAsk is back to the way it was when first installed. The key stays when the delete
-    // fails, since the files it seals are still there. Nothing is touched when the index is not
-    // open or a run is going.
+    // reset forgets every token, site address, scope, and picked place, then deletes the data
+    // directory and its key and opens a fresh, empty one under a new key, so WhoToAsk is back to
+    // the way it was when first installed. While the core is open it stops every refresh through
+    // the core first, and stops there when the core refuses. When the index is not open it skips
+    // that step, since the delete takes every recorded scope with it, so a lost key or a damaged
+    // index never blocks a reset. The key stays when the delete fails, since the files it seals
+    // are still there. Nothing is touched while a run is going.
     public func reset() async {
         guard refuseWhileBusy() else { return }
-        guard let core else {
-            lines = ["The index is not open."]
-            return
-        }
+        let core = core
         busy = "Resetting"
         do {
             for card in SourceCard.all where !card.source.isEmpty {
-                try await core.forgetScopes(card.source)
+                try await core?.forgetScopes(card.source)
             }
             for slot in BookmarkSlot.allCases {
-                try await core.forgetScopes(slot.source)
+                try await core?.forgetScopes(slot.source)
                 places.forget(slot)
             }
             for name in SourceCard.entered {
