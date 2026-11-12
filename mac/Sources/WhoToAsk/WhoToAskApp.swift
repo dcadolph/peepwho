@@ -55,6 +55,7 @@ final class AppModel: ObservableObject {
         settings.onSample = { [weak search] sample in search?.sample = sample }
         settings.onEmpty = { [weak search] empty in search?.empty = empty }
         settings.onRefreshFailure = { [weak search] failure in search?.refreshFailure = failure }
+        settings.onIndexChanged = { [weak search] in await search?.reask() }
         let tick = max(15, min(settings.refreshInterval / 4, 300))
         timer = Timer.scheduledTimer(withTimeInterval: tick, repeats: true) { [weak self] _ in
             Task { @MainActor in await self?.settings.refreshIfStale() }

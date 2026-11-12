@@ -82,12 +82,16 @@ public final class SearchModel: ObservableObject {
     // lastLookKey is the UserDefaults key for when the menu last closed.
     public static let lastLookKey = "WhoToAskLastLook"
 
-    // opened shows what changed since the last look. The first open ever starts the clock and
-    // shows nothing, since everything would count as new. A read that fails starts nothing and
-    // moves nothing, so what changed still shows on the next open.
+    // opened answers the shown question again, since the index may have changed while the window
+    // was closed, then shows what changed since the last look. The first open ever starts the
+    // clock and shows nothing, since everything would count as new. A read that fails starts
+    // nothing and moves nothing, so what changed still shows on the next open.
     public func opened(now: Date = Date()) async {
         lookedRead = false
         guard let core else { return }
+        if !answered.isEmpty {
+            await reask()
+        }
         let last = defaults.object(forKey: Self.lastLookKey) as? Date
         guard let answer = try? await core.changes(since: last ?? now) else { return }
         lookedRead = true
@@ -139,6 +143,16 @@ public final class SearchModel: ObservableObject {
             guard mine == generation else { return }
             show(people: [], channels: [], teams: [], message: Self.describe(error), for: text)
         }
+    }
+
+    // reask answers the field again from the index as it now stands, such as after an index run
+    // or a sample load. It does nothing while a person shows or the field is empty, and a question
+    // still waiting for typing to pause is asked now in its place.
+    public func reask() async {
+        guard detail == nil, !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        pending?.cancel()
+        pending = nil
+        await ask(query)
     }
 
     // submit acts on the person shown, if the field still holds the question that led there, by

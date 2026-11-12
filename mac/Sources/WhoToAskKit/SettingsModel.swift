@@ -260,6 +260,9 @@ public final class SettingsModel: ObservableObject {
     public var onEmpty: ((Bool) -> Void)?
     // onRefreshFailure hears refreshFailure after each status read.
     public var onRefreshFailure: ((String?) -> Void)?
+    // onIndexChanged hears that a run finished without failing, such as an index, a refresh, or a
+    // sample load, so the search answers its question again from what the index now holds.
+    public var onIndexChanged: (@MainActor () async -> Void)?
 
     // dir is the data directory Clear Index removes.
     private let dir: URL
@@ -739,8 +742,9 @@ public final class SettingsModel: ObservableObject {
         return false
     }
 
-    // run marks the model busy with label, runs body on the open core, shows its lines, and
-    // reads the status again. A cancelable body can be stopped with cancel.
+    // run marks the model busy with label, runs body on the open core, shows its lines, reads the
+    // status again, and tells onIndexChanged when body did not fail. A cancelable body can be
+    // stopped with cancel.
     private func run(_ label: String, cancelable: Bool = true, _ body: (Core) async throws -> [String]) async {
         guard refuseWhileBusy() else { return }
         guard let core else {
@@ -751,8 +755,10 @@ public final class SettingsModel: ObservableObject {
         canceled = false
         canCancel = cancelable
         ran = nil
+        var finished = false
         do {
             lines = headed(try await body(core))
+            finished = true
         } catch {
             // A run that failed outright read nothing, so no line names it.
             ran = nil
@@ -776,6 +782,9 @@ public final class SettingsModel: ObservableObject {
         progress = nil
         canCancel = false
         await loadStatus()
+        if finished {
+            await onIndexChanged?()
+        }
     }
 
     // started marks the run going now as kind, from the moment it begins reading a source.

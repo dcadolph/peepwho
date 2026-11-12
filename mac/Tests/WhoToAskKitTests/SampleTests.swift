@@ -142,4 +142,46 @@ struct SampleTests {
         #expect(opened.urls.isEmpty)
         #expect(search.detail?.id == departed.id)
     }
+
+    // Test 4: A question asked before anything is indexed is answered again when the sample
+    // company loads, and a window nothing told is answered again when it opens, so neither keeps
+    // saying nothing is indexed. A run that fails tells nothing, and a person on screen stays.
+    @Test func answerFollowsTheIndex() async throws {
+        let dir = tempDir("whotoask-data")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let settings = try model(dir)
+        let told = SearchModel(core: settings.core, defaults: defaults, opener: { _ in true })
+        let untold = SearchModel(core: settings.core, defaults: defaults, opener: { _ in true })
+        var heard = 0
+        settings.onIndexChanged = {
+            heard += 1
+            await told.reask()
+        }
+        for search in [told, untold] {
+            search.query = "kafka lag"
+            await search.ask(search.query)
+            #expect(search.message == SearchModel.noIndex)
+            #expect(search.enterHint == nil)
+        }
+
+        await settings.loadSample()
+        #expect(heard == 1)
+        #expect(told.message == nil)
+        #expect(told.people.first?.id == "stanley.lewis7@example.com")
+        #expect(told.enterHint == "Enter messages the first person.")
+        #expect(untold.message == SearchModel.noIndex)
+        await untold.opened()
+        #expect(untold.message == nil)
+        #expect(untold.people.first?.id == "stanley.lewis7@example.com")
+
+        await settings.refresh()
+        #expect(settings.lines.first?.contains("holds sample data") == true)
+        #expect(heard == 1)
+
+        await told.select("erin.hale79@example.com")
+        await settings.loadSample()
+        #expect(heard == 2)
+        #expect(told.detail?.id == "erin.hale79@example.com")
+    }
 }
