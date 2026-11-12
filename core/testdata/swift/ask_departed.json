@@ -27,6 +27,7 @@
         "slack:u1"
       ],
       "name": "Nora Here",
+      "reachable": true,
       "reasons": [
         "ledgers (topic)"
       ],

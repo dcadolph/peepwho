@@ -169,7 +169,7 @@ struct SampleTests {
         #expect(heard == 1)
         #expect(told.message == nil)
         #expect(told.people.first?.id == "stanley.lewis7@example.com")
-        #expect(told.enterHint == "Enter messages the first person.")
+        #expect(told.enterHint == "Enter shows the first person.")
         #expect(untold.message == SearchModel.noIndex)
         await untold.opened()
         #expect(untold.message == nil)

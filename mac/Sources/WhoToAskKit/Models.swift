@@ -94,9 +94,15 @@ public struct AskPerson: Codable, Hashable, Sendable, Identifiable {
     // deactivated is true when every account the index knows for the person is deactivated,
     // absent otherwise.
     public var deactivated: Bool? = nil
+    // reachable is true when the person has a link the app opens to message them, absent
+    // otherwise.
+    public var reachable: Bool? = nil
 
     // isDeactivated reports whether the person can no longer be reached.
     public var isDeactivated: Bool { deactivated ?? false }
+
+    // isReachable reports whether Enter on the person opens a conversation rather than their page.
+    public var isReachable: Bool { reachable ?? false }
 
     // role is the person's role line, empty when there is nothing to show.
     public var role: String { Role.line(title: title, team: team, deactivated: isDeactivated) }

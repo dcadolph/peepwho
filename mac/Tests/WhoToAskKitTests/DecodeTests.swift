@@ -47,6 +47,18 @@ struct DecodeTests {
         #expect(plain.people?.contains { $0.isDeactivated } == false)
     }
 
+    // askReachable decodes the reachable mark, true for a person with a Slack link and false
+    // when the key is absent, as it is for a deactivated person whose only link is Slack.
+    @Test func askReachable() throws {
+        let got: AskAnswer = try Core.decode(fixture("ask_departed"))
+        #expect(got.people?.first?.reachable == true)
+        #expect(got.people?.first?.isReachable == true)
+        #expect(got.departed?.first?.reachable == nil)
+        #expect(got.departed?.first?.isReachable == false)
+        let plain: AskAnswer = try Core.decode(fixture("ask"))
+        #expect(plain.people?.first?.isReachable == true)
+    }
+
     // personDeparted decodes the deactivated mark on a person and keeps their Slack link out of
     // the contact buttons, while an active person keeps theirs.
     @Test @MainActor func personDeparted() throws {

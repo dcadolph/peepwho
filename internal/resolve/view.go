@@ -2,6 +2,7 @@ package resolve
 
 import (
 	"math"
+	"net/url"
 	"slices"
 	"sort"
 
@@ -135,6 +136,9 @@ type JSONPerson struct {
 	Team string `json:"team,omitempty"`
 	// Deactivated marks a person whose every known account is deactivated.
 	Deactivated bool `json:"deactivated,omitempty"`
+	// Reachable marks a person the Mac app can open a conversation with, so
+	// Enter on their row can promise a message rather than their page.
+	Reachable bool `json:"reachable,omitempty"`
 	// Identities lists alternate identifiers merged into this person, such as
 	// a GitHub login joined to an email.
 	Identities []string `json:"identities,omitempty"`
@@ -256,14 +260,38 @@ func ProfileView(ix *index.Index, p index.Profile) JSONProfile {
 	return out
 }
 
+// reachable reports whether links hold one the Mac app opens to reach the
+// person: an https, http, slack, or mailto link, never counting a Slack link for
+// a deactivated person, since a message there can no longer reach them. It is
+// the rule the app's contactLinks applies.
+func reachable(links []string, deactivated bool) bool {
+	for _, link := range links {
+		u, err := url.Parse(link)
+		if err != nil {
+			continue
+		}
+		switch u.Scheme {
+		case "https", "http", "mailto":
+			return true
+		case "slack":
+			if !deactivated {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // personView renders one ranked person.
 func (a Answer) personView(m model.Match) JSONPerson {
+	deactivated := m.Person.Deactivated()
 	jp := JSONPerson{
 		ID:          string(m.Person.ID),
 		Name:        m.Person.Name,
 		Email:       m.Person.Email,
 		Title:       m.Person.Title,
-		Deactivated: m.Person.Deactivated(),
+		Deactivated: deactivated,
+		Reachable:   reachable(m.Person.Links, deactivated),
 		Topics:      salientTopics(a.ix, m.Person.Topics, 8),
 		Score:       m.Score,
 		Strength:    roundStrength(m.Strength),

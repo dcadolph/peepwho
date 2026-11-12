@@ -208,18 +208,22 @@ public final class SearchModel: ObservableObject {
         return true
     }
 
-    // enterHint says what Enter does in the window as it stands, nil when it does nothing.
+    // enterHint says what Enter does in the window as it stands, nil when it does nothing. It
+    // promises a message only for a person with a link the app opens, and says Enter shows the
+    // person otherwise.
     public var enterHint: String? {
         guard let detail else {
             let nobody = query.isEmpty || (answered == query && people.isEmpty)
             if nobody {
                 return nil
             }
-            // Stale results are answered again on Enter, which marks the first row anew.
-            guard answered == query, let selected, selected > 0, let target = marked else {
-                return "Enter messages the first person."
+            // Stale results are answered again on Enter, which marks the first row anew, so who
+            // that is, and whether they can be messaged, is not known yet.
+            guard answered == query, let selected, let target = marked else {
+                return "Enter opens the first person."
             }
-            return "Enter messages \(target.name)."
+            let verb = target.isReachable ? "messages" : "shows"
+            return "Enter \(verb) \(selected > 0 ? target.name : "the first person")."
         }
         let links = Self.contactLinks(detail.links ?? [], deactivated: detail.isDeactivated)
         return links.isEmpty ? nil : "Enter messages this person."

@@ -147,8 +147,9 @@ struct SearchTests {
     }
 
     // Test 6: The arrow keys mark a row and stop at both ends, Enter opens the marked person and
-    // not the first, the hint names whom Enter reaches, and a new answer marks the first row
-    // again. Billing kafka ranks four people, the first and the third with a Slack link each.
+    // not the first, the hint names whom Enter reaches and whether it messages or shows them, a
+    // field not answered yet promises neither, and a new answer marks the first row again.
+    // Billing kafka ranks four people, and only the fourth, Pam Vance, has no link.
     @Test func arrowsMarkWhoEnterOpens() async throws {
         let dir = try demoDir()
         defer { try? FileManager.default.removeItem(at: dir) }
@@ -179,9 +180,14 @@ struct SearchTests {
         model.moveDown()
         model.moveDown()
         #expect(model.selected == 3)
+        let last = model.people[3]
+        #expect(try await core.person(last.id).links?.isEmpty ?? true)
+        #expect(!last.isReachable)
+        #expect(model.enterHint == "Enter shows \(last.name).")
         model.moveUp()
         #expect(model.selected == 2)
         model.query = "terraform"
+        #expect(model.enterHint == "Enter opens the first person.")
         await model.ask(model.query)
         #expect(model.selected == 0)
         #expect(model.enterHint == "Enter messages the first person.")

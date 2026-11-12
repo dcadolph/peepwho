@@ -5,21 +5,13 @@
         {
           "email": "carol@example.com",
           "name": "Carol Lee"
-        },
-        {
-          "email": "grace@example.com",
-          "name": "Grace Kim"
-        },
-        {
-          "email": "angela@example.com",
-          "name": "Angela Malone"
         }
       ],
       "name": "infra",
       "reasons": [
         "terraform (mention)"
       ],
-      "score": 1.4206134443117913,
+      "score": 1.420689646781667,
       "strength": 0.5,
       "topic": "kubernetes deploys and oncall",
       "url": "https://corp.slack.com/archives/C3"
@@ -33,10 +25,11 @@
         "slack:u3"
       ],
       "name": "Carol Lee",
+      "reachable": true,
       "reasons": [
         "terraform (topic)"
       ],
-      "score": 6.499783715423147,
+      "score": 6.499822085617256,
       "strength": 1,
       "team": "Infrastructure",
       "title": "Site Reliability Engineer",
@@ -53,7 +46,7 @@
       "reasons": [
         "terraform (topic)"
       ],
-      "score": 3.518065574387133,
+      "score": 3.51821026755467,
       "strength": 1,
       "team": "Infrastructure",
       "title": "Systems Engineer",
