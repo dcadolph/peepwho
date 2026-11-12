@@ -31,6 +31,30 @@ public struct Scopes: Equatable, Sendable, Codable {
     public func save(_ secrets: SecretStore) throws {
         try secrets.set(SecretName.scopes, String(decoding: try JSONEncoder().encode(self), as: UTF8.self))
     }
+
+    // need says what source still needs typed in before Index Now reads it, nil when its scope is
+    // filled in or the source takes no scope.
+    public func need(_ source: String) -> ScopeNeed? {
+        let noOrg = githubOrg.trimmingCharacters(in: .whitespaces).isEmpty
+        switch source {
+        case "github" where IndexJob.list(githubRepos).isEmpty && noOrg:
+            return ScopeNeed(badge: "Needs a repository", line: "GitHub: add a repository or org to read.")
+        case "jira" where IndexJob.list(jiraProjects).isEmpty:
+            return ScopeNeed(badge: "Needs a project", line: "Jira: add a project key to read.")
+        case "confluence" where IndexJob.list(confluenceSpaces).isEmpty:
+            return ScopeNeed(badge: "Needs a space", line: "Confluence: add a space key to read.")
+        default:
+            return nil
+        }
+    }
+}
+
+// ScopeNeed is what a token source with its secrets saved still needs before Index Now reads it.
+public struct ScopeNeed: Equatable, Sendable {
+    // badge is the card's state beside its title, such as "Needs a repository".
+    public let badge: String
+    // line is what Index Now says when it skips the source, such as "Jira: add a project key to read.".
+    public let line: String
 }
 
 // IndexJob is one core Index call: a source and the command line flags it runs with.
@@ -426,14 +450,18 @@ public final class SettingsModel: ObservableObject {
         await loadStatus()
     }
 
-    // indexAll indexes every picked place and every token source with a scope.
+    // indexAll indexes every picked place and every token source with a scope, and says which token
+    // sources it skipped for an empty scope.
     public func indexAll() async {
         await run("Indexing") { core in
             let opened = try self.resolveAll()
             defer { opened.values.forEach(self.places.release) }
             var jobs = BookmarkSlot.allCases.compactMap { slot in opened[slot].map { IndexJob.forPlace(slot, $0) } }
             jobs += IndexJob.forTokens(self.scopes) { self.secrets.get($0) != nil }
-            guard !jobs.isEmpty else { return ["Nothing to index yet. Pick a folder or add a token first."] }
+            let skipped = self.unscoped()
+            guard !jobs.isEmpty else {
+                return skipped.isEmpty ? ["Nothing to index yet. Pick a folder or add a token first."] : skipped
+            }
             self.started(.indexed)
             var out: [String] = []
             for job in jobs {
@@ -448,11 +476,21 @@ public final class SettingsModel: ObservableObject {
                 }
                 self.lines = self.headed(out)
             }
-            guard self.canceled else { return out }
+            guard self.canceled else { return out + skipped }
             if out.isEmpty {
                 self.ran = nil
             }
             return out + ["Canceled."]
+        }
+    }
+
+    // unscoped says, one line each in card order, which token sources have every secret they need
+    // saved and nothing to read, so Index Now skips them.
+    private func unscoped() -> [String] {
+        SourceCard.all.compactMap { card in
+            guard !card.source.isEmpty,
+                  SecretName.required(by: card.source).allSatisfy({ secrets.get($0) != nil }) else { return nil }
+            return scopes.need(card.source)?.line
         }
     }
 

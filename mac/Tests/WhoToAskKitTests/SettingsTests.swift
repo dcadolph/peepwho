@@ -467,6 +467,53 @@ struct SettingsTests {
         #expect(model.lines == ["Nothing to refresh yet. Index something first."])
     }
 
+    // Test 22: Index Now names each token source it skips for an empty scope, in card order, in
+    // place of the nothing-to-index line, and after what it read when a place ran. No source is
+    // read over the network, since none has a scope.
+    @Test func indexNamesUnscopedSources() async throws {
+        let repo = try gitRepo()
+        let dir = tempDir("whotoask-data")
+        defer {
+            try? FileManager.default.removeItem(at: repo)
+            try? FileManager.default.removeItem(at: dir)
+        }
+        let defaults = try #require(UserDefaults(suiteName: "whotoask-test-\(UUID().uuidString)"))
+        let secrets = MemorySecrets()
+        let clock = Date(timeIntervalSince1970: 1_800_000_000)
+        let model = SettingsModel(dir: dir, open: { try Core.open(dir: dir, key: "", secrets: KeychainSecrets()) },
+                                  secrets: secrets, places: MemoryPlaces(), defaults: defaults, clock: { clock })
+        let github = "GitHub: add a repository or org to read."
+        let jira = "Jira: add a project key to read."
+        let confluence = "Confluence: add a space key to read."
+
+        model.saveSecret(SecretName.githubToken, "token")
+        await model.indexAll()
+        #expect(model.lines == [github])
+        #expect(model.lastRun == nil)
+
+        model.saveSecret(SecretName.confluenceURL, "https://example.atlassian.net/wiki")
+        model.saveSecret(SecretName.confluenceToken, "token")
+        model.saveSecret(SecretName.jiraURL, "https://example.atlassian.net")
+        await model.indexAll()
+        #expect(model.lines == [github, confluence])
+        model.saveSecret(SecretName.jiraToken, "token")
+        await model.indexAll()
+        #expect(model.lines == [github, jira, confluence])
+
+        model.scopes.githubOrg = "  "
+        model.scopes.jiraProjects = " , "
+        await model.indexAll()
+        #expect(model.lines == [github, jira, confluence])
+
+        for name in [SecretName.jiraURL, SecretName.jiraToken, SecretName.confluenceURL, SecretName.confluenceToken] {
+            model.saveSecret(name, "")
+        }
+        await model.pick(repo, as: .git)
+        await model.indexAll()
+        let indexed = "Indexed at \(clock.formatted(date: .omitted, time: .shortened))."
+        #expect(model.lines == [indexed, readOneRepo(model), github])
+    }
+
     // Test 6: A wipe or a second index started while an index runs is refused, so the running
     // index cannot write its files back after the wipe.
     @Test func actionsNeverOverlap() async throws {

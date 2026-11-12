@@ -73,12 +73,28 @@ public struct SourceCard: Identifiable, Equatable, Sendable {
     // entered lists every secret a person types into a card.
     public static var entered: [String] { all.flatMap(\.secrets) }
 
-    // connected reports whether the card holds what its source needs: every required secret for a
-    // token card, and at least one picked place for the places card.
-    public func connected(saved: Set<String>, placed: Set<BookmarkSlot>) -> Bool {
+    // state says whether the card holds what its source needs: every required secret and a scope
+    // for a token card, and at least one picked place for the places card.
+    public func state(saved: Set<String>, placed: Set<BookmarkSlot>, scopes: Scopes) -> CardState {
         if !slots.isEmpty {
-            return slots.contains(where: placed.contains)
+            return slots.contains(where: placed.contains) ? .setUp : .notSetUp
         }
-        return SecretName.required(by: source).allSatisfy(saved.contains)
+        guard SecretName.required(by: source).allSatisfy(saved.contains) else { return .notSetUp }
+        if let need = scopes.need(source) {
+            return .needs(need.badge)
+        }
+        return .setUp
     }
+}
+
+// CardState is what a source card says beside its title.
+public enum CardState: Equatable, Sendable {
+    // notSetUp is a token card missing a secret its source needs, or the places card with nothing
+    // picked.
+    case notSetUp
+    // needs is a token card with its secrets saved and nothing to read, holding what to add, such
+    // as "Needs a repository".
+    case needs(String)
+    // setUp is a card Index Now reads.
+    case setUp
 }

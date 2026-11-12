@@ -38,20 +38,76 @@ struct SettingsLayoutTests {
         #expect(!SourceCard.entered.contains(SecretName.scopes))
     }
 
-    // Test 2: A token card is set up once every secret its source needs is saved, an optional one
-    // does not count, and the places card is set up once any place is picked.
-    @Test func connected() throws {
+    // Test 2: A token card is set up once every secret its source needs is saved and, for GitHub,
+    // Jira, and Confluence, its scope is filled in. With the secrets saved and no scope it says what
+    // to add. An optional secret does not count, and the places card is set up once any place is
+    // picked.
+    @Test func state() throws {
+        let none = Scopes()
+        var filled = Scopes()
+        filled.jiraProjects = "KAFKA"
+        filled.confluenceSpaces = "ENG"
         let jira = try #require(SourceCard.all.first { $0.source == "jira" })
-        #expect(!jira.connected(saved: [], placed: []))
-        #expect(!jira.connected(saved: [SecretName.jiraToken, SecretName.jiraEmail], placed: [.git]))
-        #expect(jira.connected(saved: [SecretName.jiraURL, SecretName.jiraToken], placed: []))
+        let jiraSaved: Set<String> = [SecretName.jiraURL, SecretName.jiraToken]
+        #expect(jira.state(saved: [], placed: [], scopes: filled) == .notSetUp)
+        let noURL: Set<String> = [SecretName.jiraToken, SecretName.jiraEmail]
+        #expect(jira.state(saved: noURL, placed: [.git], scopes: filled) == .notSetUp)
+        #expect(jira.state(saved: jiraSaved, placed: [], scopes: filled) == .setUp)
+        #expect(jira.state(saved: jiraSaved, placed: [], scopes: none) == .needs("Needs a project"))
+        var blank = Scopes()
+        blank.jiraProjects = " , ,"
+        #expect(jira.state(saved: jiraSaved, placed: [], scopes: blank) == .needs("Needs a project"))
+
+        let confluence = try #require(SourceCard.all.first { $0.source == "confluence" })
+        let confluenceSaved: Set<String> = [SecretName.confluenceURL, SecretName.confluenceToken]
+        #expect(confluence.state(saved: confluenceSaved, placed: [], scopes: none) == .needs("Needs a space"))
+        #expect(confluence.state(saved: confluenceSaved, placed: [], scopes: filled) == .setUp)
+
+        let github = try #require(SourceCard.all.first { $0.source == "github" })
+        #expect(github.state(saved: [], placed: [], scopes: none) == .notSetUp)
+        #expect(github.state(saved: [SecretName.githubToken], placed: [], scopes: none) == .needs("Needs a repository"))
+        var repos = Scopes()
+        repos.githubRepos = "o/a"
+        #expect(github.state(saved: [SecretName.githubToken], placed: [], scopes: repos) == .setUp)
+        var org = Scopes()
+        org.githubOrg = " acme "
+        #expect(github.state(saved: [SecretName.githubToken], placed: [], scopes: org) == .setUp)
+
         let slack = try #require(SourceCard.all.first { $0.source == "slack" })
-        #expect(!slack.connected(saved: [SecretName.githubToken], placed: [.git]))
-        #expect(slack.connected(saved: [SecretName.slackToken], placed: []))
+        #expect(slack.state(saved: [SecretName.githubToken], placed: [.git], scopes: none) == .notSetUp)
+        #expect(slack.state(saved: [SecretName.slackToken], placed: [], scopes: none) == .setUp)
+        let pagerduty = try #require(SourceCard.all.first { $0.source == "pagerduty" })
+        #expect(pagerduty.state(saved: [SecretName.pagerdutyToken], placed: [], scopes: none) == .setUp)
         let places = try #require(SourceCard.all.first { !$0.slots.isEmpty })
-        #expect(!places.connected(saved: Set(SourceCard.entered), placed: []))
+        #expect(places.state(saved: Set(SourceCard.entered), placed: [], scopes: filled) == .notSetUp)
         for slot in BookmarkSlot.allCases {
-            #expect(places.connected(saved: [], placed: [slot]))
+            #expect(places.state(saved: [], placed: [slot], scopes: none) == .setUp)
+        }
+    }
+
+    // Test 6: A card reads set up exactly when Index Now runs its source, for every token card and
+    // every way the scopes can be filled in.
+    @Test func stateMatchesIndexJobs() {
+        var repos = Scopes()
+        repos.githubRepos = "o/a"
+        var org = Scopes()
+        org.githubOrg = "acme"
+        var blank = Scopes()
+        blank.githubRepos = " , "
+        blank.githubOrg = "  "
+        blank.jiraProjects = ","
+        blank.confluenceSpaces = " "
+        var everything = Scopes()
+        everything.githubRepos = "o/a"
+        everything.jiraProjects = "A"
+        everything.confluenceSpaces = "B"
+        let saved = Set(SourceCard.entered)
+        for (n, scopes) in [Scopes(), repos, org, blank, everything].enumerated() {
+            let runs = Set(IndexJob.forTokens(scopes) { saved.contains($0) }.map(\.source))
+            for card in SourceCard.all where !card.source.isEmpty {
+                let state = card.state(saved: saved, placed: [], scopes: scopes)
+                #expect((state == .setUp) == runs.contains(card.source), "scopes \(n), \(card.title)")
+            }
         }
     }
 

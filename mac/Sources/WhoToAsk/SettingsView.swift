@@ -151,7 +151,7 @@ struct SettingsView: View {
                     HStack {
                         Label(card.title, systemImage: card.symbol)
                         Spacer()
-                        badge(card.connected(saved: model.saved, placed: Set(model.placeNames.keys)))
+                        badge(card.state(saved: model.saved, placed: Set(model.placeNames.keys), scopes: model.scopes))
                     }
                 }
                 .id(card.id)
@@ -185,12 +185,16 @@ struct SettingsView: View {
         }
     }
 
-    // badge says whether a card holds what its source needs.
-    private func badge(_ connected: Bool) -> some View {
+    // badge says whether a card holds what its source needs, and what to add when only the scope
+    // is missing.
+    private func badge(_ state: CardState) -> some View {
         Group {
-            if connected {
+            switch state {
+            case .setUp:
                 Label("Set up", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-            } else {
+            case .needs(let what):
+                Label(what, systemImage: "exclamationmark.circle").foregroundStyle(.orange)
+            case .notSetUp:
                 Text("Not set up").foregroundStyle(.secondary)
             }
         }
