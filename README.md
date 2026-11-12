@@ -80,9 +80,10 @@ Every name it gives you can be checked against the same history:
 Without `--repo`, the demo builds a simulated company across every source, which shows what a
 git-only run cannot, and the sidebar has a two-minute guided tour.
 
-Then index something real and ask:
+Then index an org chart and ask. The example chart lives in this repository, so fetch it first:
 
-    whotoask index --source org-csv --file examples/people.csv
+    curl -sLO https://raw.githubusercontent.com/dcadolph/whotoask/main/examples/people.csv
+    whotoask index --source org-csv --file people.csv
     whotoask ask --pretty "who do I talk to about billing retries"
 
 When the person who knew has left, ask what happened instead of who to ask. `recall` finds the
