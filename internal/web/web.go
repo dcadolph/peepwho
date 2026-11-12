@@ -22,6 +22,7 @@ import (
 
 	"github.com/dcadolph/whotoask/internal/feedback"
 	"github.com/dcadolph/whotoask/internal/llm"
+	"github.com/dcadolph/whotoask/internal/policy"
 	"github.com/dcadolph/whotoask/internal/recall"
 	"github.com/dcadolph/whotoask/internal/report"
 	"github.com/dcadolph/whotoask/internal/resolve"
@@ -434,28 +435,73 @@ func askHandler(ask AskFunc, logw io.Writer) http.HandlerFunc {
 			}
 		}
 
-		ans, err := ask(r.Context(), query, r.URL.Query().Get("mode"), r.URL.Query().Get("provider"), limit)
+		mode, provider := r.URL.Query().Get("mode"), r.URL.Query().Get("provider")
+		ans, err := ask(r.Context(), query, mode, provider, limit)
 		if err != nil {
-			if errors.Is(err, ErrBadRequest) {
-				writeError(w, http.StatusBadRequest, err.Error())
-				return
-			}
-			if errors.Is(err, llm.ErrModel) {
-				writeError(w, http.StatusBadGateway,
-					"The local model is not reachable. LLM and semantic modes need Ollama "+
-						"running on this machine: install it from ollama.com, run "+
-						"`ollama pull llama3.1`, and ask again. Keyword mode always works.")
-				return
-			}
-			// Log the failure but not the query itself: a question can carry
-			// sensitive terms, and an operator who wired a log file should not
-			// have every asked question land in it.
-			fmt.Fprintf(logw, "web: ask failed: %v\n", err)
-			writeError(w, http.StatusBadGateway, "the answer service is unavailable")
+			writeAskError(w, logw, err, mode, provider)
 			return
+		}
+		// A model that failed costs the ranking and never the answer, so the
+		// cause would otherwise be lost. The query stays out of the log.
+		if ans.ModelErr != nil {
+			fmt.Fprintf(logw, "web: model failed, answered without it: %v\n", ans.ModelErr)
 		}
 		_ = json.NewEncoder(w).Encode(ans.View(query))
 	}
+}
+
+// writeAskError answers a failed ask with a status and a message the asker can
+// act on, and logs the cause of a server-side failure. It never sees the query:
+// a question can carry sensitive terms, and an operator who wired a log file
+// should not have every asked question land in it. An egress denial is checked
+// before a model failure because a denied request inside a model call carries
+// both.
+func writeAskError(w http.ResponseWriter, logw io.Writer, err error, mode, provider string) {
+	switch {
+	case errors.Is(err, ErrBadRequest):
+		writeError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, policy.ErrEgressDenied):
+		writeError(w, http.StatusForbidden, err.Error())
+	case errors.Is(err, llm.ErrModel):
+		fmt.Fprintf(logw, "web: ask failed: %v\n", err)
+		writeError(w, http.StatusBadGateway, modelDownMessage(mode, provider))
+	default:
+		fmt.Fprintf(logw, "web: ask failed: %v\n", err)
+		writeError(w, http.StatusBadGateway, "the answer service is unavailable")
+	}
+}
+
+// cloudProviderName names a cloud provider the way the page's provider buttons
+// do, or returns "" for any other provider.
+func cloudProviderName(provider string) string {
+	switch provider {
+	case "anthropic":
+		return "Claude"
+	case "openai":
+		return "ChatGPT"
+	case "gemini":
+		return "Gemini"
+	}
+	return ""
+}
+
+// modelDownMessage tells the asker which model failed and what to do next.
+// Semantic mode always embeds through the local Ollama, whatever provider was
+// named. A cloud provider's message stays free of the error text, which can
+// echo part of a key back. An empty provider means the server's default,
+// which the handler cannot see, so that case names no model.
+func modelDownMessage(mode, provider string) string {
+	const keywordWorks = " Keyword mode always works."
+	if mode == "semantic" || provider == "ollama" {
+		return "The local model is not reachable. LLM and semantic modes need Ollama " +
+			"running on this machine: install it from ollama.com, run " +
+			"`ollama pull llama3.1`, and ask again." + keywordWorks
+	}
+	who := "The model"
+	if name := cloudProviderName(provider); name != "" {
+		who = name
+	}
+	return who + " did not answer, and the server log has the cause." + keywordWorks
 }
 
 // recallHandler answers what the named person worked through before. The

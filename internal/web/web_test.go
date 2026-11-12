@@ -1,10 +1,11 @@
 package web
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"github.com/dcadolph/whotoask/internal/report"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -16,7 +17,9 @@ import (
 	"github.com/dcadolph/whotoask/internal/feedback"
 	"github.com/dcadolph/whotoask/internal/llm"
 	"github.com/dcadolph/whotoask/internal/model"
+	"github.com/dcadolph/whotoask/internal/policy"
 	"github.com/dcadolph/whotoask/internal/recall"
+	"github.com/dcadolph/whotoask/internal/report"
 	"github.com/dcadolph/whotoask/internal/resolve"
 )
 
@@ -603,24 +606,156 @@ func TestFeedbackCrossOrigin(t *testing.T) {
 	}
 }
 
-// TestAskAPIModelDown verifies an unreachable model maps to guidance instead
-// of a raw dial error.
-func TestAskAPIModelDown(t *testing.T) {
+// askQuery is the question the ask error tests send, which must never reach
+// the server log.
+const askQuery = "privatequestion"
+
+// TestAskAPIErrors checks that a failed ask answers with a status and a message
+// the asker can act on: Ollama guidance only where Ollama ran, the cloud
+// provider by name with the error text kept out, a policy denial as 403 with
+// its message, and the cause logged without the query.
+func TestAskAPIErrors(t *testing.T) {
 	t.Parallel()
-	ask := func(_ context.Context, _, _, _ string, _ int) (resolve.Answer, error) {
-		return resolve.Answer{}, fmt.Errorf("llm resolve: %w: connection refused", llm.ErrModel)
+	const secret = "sk-test-echoed-key"
+	denied := fmt.Errorf("cloud provider anthropic: %w: mode=strict dest=api.anthropic.com "+
+		"(use --policy redacted to send anonymized candidates, or --policy open)",
+		policy.ErrEgressDenied)
+	tests := []struct {
+		WantBody   string
+		WantLog    string
+		Params     string
+		Err        error
+		NotBody    []string
+		WantStatus int
+	}{{ // Test 0: Ollama down in llm mode gets the Ollama steps.
+		Err:    fmt.Errorf("llm resolve: %w: connection refused", llm.ErrModel),
+		Params: "mode=llm&provider=ollama", WantStatus: http.StatusBadGateway,
+		WantBody: "ollama.com", WantLog: "connection refused",
+	}, { // Test 1: Semantic mode embeds through Ollama whatever provider is named.
+		Err:    fmt.Errorf("semantic resolve: %w: connection refused", llm.ErrModel),
+		Params: "mode=semantic", WantStatus: http.StatusBadGateway,
+		WantBody: "ollama.com", WantLog: "connection refused",
+	}, { // Test 2: A Claude failure names Claude and keeps the error text out.
+		Err:    fmt.Errorf("llm: %w: anthropic status 401: invalid key %s", llm.ErrModel, secret),
+		Params: "mode=llm&provider=anthropic", WantStatus: http.StatusBadGateway,
+		WantBody: "Claude did not answer", NotBody: []string{"ollama", secret, "401"},
+		WantLog: "anthropic status 401",
+	}, { // Test 3: A ChatGPT failure names ChatGPT.
+		Err:    fmt.Errorf("llm: %w: openai status 429: slow down %s", llm.ErrModel, secret),
+		Params: "mode=llm&provider=openai", WantStatus: http.StatusBadGateway,
+		WantBody: "ChatGPT did not answer", NotBody: []string{"ollama", secret, "429"},
+		WantLog: "openai status 429",
+	}, { // Test 4: A Gemini failure names Gemini.
+		Err:    fmt.Errorf("llm: %w: openai returned no text", llm.ErrModel),
+		Params: "mode=llm&provider=gemini", WantStatus: http.StatusBadGateway,
+		WantBody: "Gemini did not answer", NotBody: []string{"ollama", "returned no text"},
+		WantLog: "returned no text",
+	}, { // Test 5: The server's default provider is unknown here, so no model is named.
+		Err:    fmt.Errorf("llm: %w: anthropic status 500: %s", llm.ErrModel, secret),
+		Params: "mode=llm", WantStatus: http.StatusBadGateway,
+		WantBody: "The model did not answer", NotBody: []string{"ollama", "Claude", secret, "500"},
+		WantLog: "anthropic status 500",
+	}, { // Test 6: A policy denial is a 403 that says how to allow the call.
+		Err: denied, Params: "mode=llm&provider=anthropic", WantStatus: http.StatusForbidden,
+		WantBody: "--policy redacted", NotBody: []string{"ollama", "unavailable"},
+	}, { // Test 7: A denial inside a model call is still a policy denial.
+		Err:    fmt.Errorf("llm: %w: anthropic request: %w", llm.ErrModel, denied),
+		Params: "mode=llm&provider=anthropic", WantStatus: http.StatusForbidden,
+		WantBody: "egress denied", NotBody: []string{"ollama", "Claude did not answer"},
+	}, { // Test 8: Any other failure stays generic and is logged.
+		Err: errors.New("index closed"), Params: "mode=keyword", WantStatus: http.StatusBadGateway,
+		WantBody: "the answer service is unavailable", NotBody: []string{"index closed"},
+		WantLog: "index closed",
+	}, { // Test 9: A bad request is a 400 with its message and no log line.
+		Err:    fmt.Errorf("%w: mode %q", ErrBadRequest, "x"),
+		Params: "mode=x", WantStatus: http.StatusBadRequest, WantBody: "mode",
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			ask := func(_ context.Context, _, _, _ string, _ int) (resolve.Answer, error) {
+				return resolve.Answer{}, test.Err
+			}
+			var logBuf bytes.Buffer
+			h, err := Handler(Config{Ask: ask, Version: "test", Log: &logBuf})
+			if err != nil {
+				t.Fatalf("Handler: %v", err)
+			}
+			rec := httptest.NewRecorder()
+			target := "/api/ask?q=" + askQuery + "&" + test.Params
+			h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, target, nil))
+			body, logged := rec.Body.String(), logBuf.String()
+			if rec.Code != test.WantStatus {
+				t.Errorf("status = %d, want %d", rec.Code, test.WantStatus)
+			}
+			if !strings.Contains(body, test.WantBody) {
+				t.Errorf("body = %s, want it to contain %q", body, test.WantBody)
+			}
+			for _, not := range test.NotBody {
+				if strings.Contains(strings.ToLower(body), strings.ToLower(not)) {
+					t.Errorf("body = %s, want no %q", body, not)
+				}
+			}
+			if test.WantLog == "" && logged != "" {
+				t.Errorf("log = %q, want nothing", logged)
+			}
+			if !strings.Contains(logged, test.WantLog) {
+				t.Errorf("log = %q, want it to contain %q", logged, test.WantLog)
+			}
+			if strings.Contains(logged, askQuery) {
+				t.Errorf("log = %q, carries the query", logged)
+			}
+		})
 	}
-	h, err := Handler(Config{Ask: ask, Version: "test"})
-	if err != nil {
-		t.Fatalf("Handler: %v", err)
-	}
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/ask?q=x&mode=llm", nil))
-	if rec.Code != http.StatusBadGateway {
-		t.Fatalf("status = %d, want 502", rec.Code)
-	}
-	if !strings.Contains(rec.Body.String(), "ollama.com") {
-		t.Errorf("body = %s, want Ollama guidance", rec.Body.String())
+}
+
+// TestAskAPILogsTheModelFailureBehindAnAnswer checks that an answer ranked
+// without the model still reaches the asker, and that the model's failure,
+// which the answer carries off the error path, lands in the log without the
+// query and never in the response.
+func TestAskAPILogsTheModelFailureBehindAnAnswer(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		ModelErr error
+		WantLog  string
+	}{{ // Test 0: A model failure behind the answer is logged.
+		ModelErr: fmt.Errorf("llm resolve: %w: anthropic status 429: slow down", llm.ErrModel),
+		WantLog: "web: model failed, answered without it: " +
+			"llm resolve: llm: model error: anthropic status 429",
+	}, { // Test 1: An answer the model ranked logs nothing.
+		ModelErr: nil, WantLog: "",
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			ask := func(_ context.Context, _, _, _ string, _ int) (resolve.Answer, error) {
+				return resolve.Answer{Summary: "talk to jane", ModelErr: test.ModelErr}, nil
+			}
+			var logBuf bytes.Buffer
+			h, err := Handler(Config{Ask: ask, Version: "test", Log: &logBuf})
+			if err != nil {
+				t.Fatalf("Handler: %v", err)
+			}
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
+				"/api/ask?q="+askQuery+"&mode=llm&provider=anthropic", nil))
+			body, logged := rec.Body.String(), logBuf.String()
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200", rec.Code)
+			}
+			if !strings.Contains(body, "talk to jane") || strings.Contains(body, "429") {
+				t.Errorf("body = %s, want the summary and no model error", body)
+			}
+			if test.WantLog == "" && logged != "" {
+				t.Errorf("log = %q, want nothing", logged)
+			}
+			if !strings.Contains(logged, test.WantLog) {
+				t.Errorf("log = %q, want it to contain %q", logged, test.WantLog)
+			}
+			if strings.Contains(logged, askQuery) {
+				t.Errorf("log = %q, carries the query", logged)
+			}
+		})
 	}
 }
 
