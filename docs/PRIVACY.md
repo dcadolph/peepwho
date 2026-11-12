@@ -35,9 +35,10 @@ guarantees in one place.
   keychain keeps a token out of your shell profile and history; an environment
   variable still wins when it is set.
 - Indexing talks only to the sources you name, with your own tokens. With no AI
-  model configured, `index`, `ask`, and `serve` make no network requests at all,
-  and a test in the suite proves it by refusing every request the process tries
-  to make.
+  model configured, `ask` makes no network requests at all, and neither does
+  `index` reading a local file such as an org chart CSV or a Slack export. A
+  test in the suite proves both by refusing every request the process tries to
+  make.
 - Credentials pasted into messages and tickets are scrubbed at ingest. Keys,
   tokens, passwords, and private key blocks are replaced with `[redacted]`
   before anything reaches the index, the search terms, or retained
@@ -72,12 +73,15 @@ key. It is off unless you ask for it:
 stores: their records under every identity they were known by, the alias
 entries joining those identities, their entries in channel member lists, their
 retained conversation notes, any conversation where they were the only
-participant, and their name and email in the change history. A conversation
-with other participants keeps its pointer and loses its searchable words.
+participant, their name and email in the change history, and every feedback
+vote cast on them. A conversation with other participants keeps its pointer and
+loses its searchable words.
 
-Two caveats it prints and that bear repeating: `feedback.json` holds questions
-askers typed and is pruned by deleting the file, and re-indexing a source that
-still contains the person brings them back, so remove them at the source too.
+Two caveats it prints and that bear repeating: a vote cast on somebody else
+keeps the question and comment typed with it, which can name the person, so
+delete `feedback.json` to drop every recorded question, and re-indexing a
+source that still contains the person brings them back, so remove them at the
+source too.
 
 ## Deleting everything
 

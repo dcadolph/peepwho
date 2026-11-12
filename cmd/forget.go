@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"strings"
 
@@ -9,6 +11,7 @@ import (
 
 	"github.com/dcadolph/whotoask/internal/engine"
 	"github.com/dcadolph/whotoask/internal/fact"
+	"github.com/dcadolph/whotoask/internal/feedback"
 	"github.com/dcadolph/whotoask/internal/model"
 	"github.com/dcadolph/whotoask/internal/util"
 )
@@ -19,19 +22,20 @@ func newForgetCmd(opts *options) *cobra.Command {
 	var yes bool
 	cmd := &cobra.Command{
 		Use:   "forget <email or name>",
-		Short: "Purge a person from the index, remembered conversations, and facts",
+		Short: "Purge a person from the index, remembered conversations, facts, and votes",
 		Long: `Purge a person from everything whotoask stores on this machine.
 
 Their records are removed from the index under every identity they were known
 by, references to them are stripped from channel membership and org relations,
 their retained conversation notes are deleted, conversations they were alone in
 are forgotten entirely, recorded facts naming any of their identities are
-removed, and the change history stops naming them. A conversation with other
-participants keeps its pointer and loses its searchable words, since theirs
-cannot be separated out.
+removed, the change history stops naming them, and every feedback vote cast on
+them is deleted. A conversation with other participants keeps its pointer and
+loses its searchable words, since theirs cannot be separated out.
 
 Two caveats:
-  - feedback.json holds questions people asked; prune it by deleting the file.
+  - A vote cast on somebody else keeps its question and comment, which can
+    name the person. Delete feedback.json to drop every recorded question.
   - Re-indexing a source that still contains the person brings them back. To
     keep them out, remove them at the source or stop indexing it.
 
@@ -48,7 +52,8 @@ Examples:
 }
 
 // runForgetPerson purges the one person query names from the index, the remembered
-// conversations, and the recorded facts, asking first unless yes is set.
+// conversations, the recorded facts, the change log, and the feedback votes,
+// asking first unless yes is set.
 func runForgetPerson(cmd *cobra.Command, opts *options, query string, yes bool) error {
 	// Taking the lock creates the data directory, so a purge with no
 	// index to purge from would leave a directory and a lock file
@@ -117,11 +122,44 @@ func runForgetPerson(cmd *cobra.Command, opts *options, query string, yes bool) 
 		return err
 	}
 
+	votes, err := forgetVotes(opts, purgeIDs)
+	if err != nil {
+		return err
+	}
+
 	fmt.Fprintf(out,
-		"forgot %s: %d records removed, %d mentions stripped, "+
-			"%d conversations dropped, %d edited, %d facts removed, %d change entries edited\n",
-		label, res.Records, res.Mentions, dropped, edited, facts, changes)
+		"forgot %s: %d records removed, %d mentions stripped, %d conversations dropped, "+
+			"%d edited, %d facts removed, %d change entries edited, %d votes removed\n",
+		label, res.Records, res.Mentions, dropped, edited, facts, changes, votes)
 	return nil
+}
+
+// forgetVotes removes every feedback vote cast on one of the purged identities
+// and reports how many went. A vote stores the voted person's identifier, so a
+// purge that left it would keep them on disk. A blank identity is skipped,
+// since an empty filter matches every vote, and a missing file is left
+// missing, so a purge never creates one.
+func forgetVotes(opts *options, purgeIDs []model.ID) (int, error) {
+	if _, err := os.Stat(opts.feedbackPath()); errors.Is(err, fs.ErrNotExist) {
+		return 0, nil
+	}
+	store, err := opts.loadFeedback()
+	if err != nil {
+		return 0, err
+	}
+	removed := 0
+	for _, id := range purgeIDs {
+		person := strings.TrimSpace(string(id))
+		if person == "" {
+			continue
+		}
+		n, err := store.Clear(feedback.Filter{Person: person})
+		removed += n
+		if err != nil {
+			return removed, err
+		}
+	}
+	return removed, nil
 }
 
 // forgetTarget returns the single person a purge names, refusing no match
@@ -152,7 +190,7 @@ func forgetTarget(people []*model.Person, query string) (*model.Person, error) {
 // the answer read from stdin was yes.
 func confirmForget(cmd *cobra.Command, label string, identities int) bool {
 	fmt.Fprintf(cmd.ErrOrStderr(), "This purges %s and %d linked identities from the index, "+
-		"remembered conversations, and recorded facts.\nProceed? [y/N]: ",
+		"remembered conversations, recorded facts, and feedback votes.\nProceed? [y/N]: ",
 		label, identities)
 	var answer string
 	if _, err := fmt.Fscanln(cmd.InOrStdin(), &answer); err != nil ||

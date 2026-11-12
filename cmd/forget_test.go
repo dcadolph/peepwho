@@ -2,14 +2,96 @@ package cmd
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+
 	"github.com/dcadolph/whotoask/internal/engine"
+	"github.com/dcadolph/whotoask/internal/feedback"
+	"github.com/dcadolph/whotoask/internal/model"
 	"github.com/dcadolph/whotoask/internal/resolve"
 )
+
+// TestForgetVotes checks that a purge clears the votes cast on every purged
+// identity and leaves every other vote, never lets a blank identity act as a
+// filter that matches everything, and never creates a feedback file.
+func TestForgetVotes(t *testing.T) {
+	t.Parallel()
+	seeded := []feedback.Entry{
+		{Query: "billing", Person: "bob@corp.com", Vote: feedback.Helpful},
+		{Query: "billing", Person: "SLACK:U2", Vote: feedback.NotHelpful},
+		{Query: "billing", Person: "zed@corp.com", Vote: feedback.Helpful},
+		{Query: "billing", Channel: "payments", Vote: feedback.Helpful},
+	}
+	everyone := []string{"bob@corp.com", "SLACK:U2", "zed@corp.com", "#payments"}
+	tests := []struct {
+		PurgeIDs  []model.ID
+		WantKept  []string
+		WantCount int
+		Seed      bool
+		WantFile  bool
+	}{{ // Test 0: Votes on every purged identity go, matched regardless of case.
+		Seed: true, PurgeIDs: []model.ID{"bob@corp.com", "slack:u2"},
+		WantCount: 2, WantKept: []string{"zed@corp.com", "#payments"}, WantFile: true,
+	}, { // Test 1: A blank identity never clears the votes on anybody else.
+		Seed: true, PurgeIDs: []model.ID{"", "  "},
+		WantCount: 0, WantKept: everyone, WantFile: true,
+	}, { // Test 2: An identity nobody voted on removes nothing.
+		Seed: true, PurgeIDs: []model.ID{"amy@corp.com"},
+		WantCount: 0, WantKept: everyone, WantFile: true,
+	}, { // Test 3: With no feedback file, none is created.
+		Seed: false, PurgeIDs: []model.ID{"bob@corp.com"},
+		WantCount: 0, WantKept: nil, WantFile: false,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			opts := &options{dataDir: t.TempDir()}
+			if test.Seed {
+				store, err := feedback.Load(opts.feedbackPath(), nil)
+				if err != nil {
+					t.Fatalf("load: %v", err)
+				}
+				for _, e := range seeded {
+					if err := store.Add(e); err != nil {
+						t.Fatalf("add: %v", err)
+					}
+				}
+			}
+			got, err := forgetVotes(opts, test.PurgeIDs)
+			if err != nil {
+				t.Fatalf("forgetVotes: %v", err)
+			}
+			if got != test.WantCount {
+				t.Errorf("removed = %d, want %d", got, test.WantCount)
+			}
+			_, statErr := os.Stat(opts.feedbackPath())
+			if gotFile := statErr == nil; gotFile != test.WantFile {
+				t.Fatalf("feedback file exists = %v, want %v", gotFile, test.WantFile)
+			}
+			store, err := feedback.Load(opts.feedbackPath(), nil)
+			if err != nil {
+				t.Fatalf("reload: %v", err)
+			}
+			var kept []string
+			for _, e := range store.All() {
+				if e.Channel != "" {
+					kept = append(kept, "#"+e.Channel)
+					continue
+				}
+				kept = append(kept, e.Person)
+			}
+			if diff := cmp.Diff(test.WantKept, kept, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("kept votes mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
 
 // TestForgetPurgesPerson indexes the Slack export fixture, purges one person,
 // and then proves they are gone from every file whotoask keeps and every answer
@@ -58,8 +140,28 @@ func TestForgetPurgesPerson(t *testing.T) {
 		t.Fatalf("bob not findable before the purge:\n%s", out)
 	}
 
-	if _, stderr, err := runCmd(t, "forget", "--data-dir", dir, "--yes", "bob@corp.com"); err != nil {
+	// Votes on bob and on alice. The vote on bob stores his identifier, so the
+	// file scan below proves it went, and the vote on alice must stay.
+	for _, voted := range []string{"bob@corp.com", "alice@corp.com"} {
+		if _, stderr, err := runCmd(t, "feedback", "record", "--data-dir", dir,
+			"--person", voted, "--helpful", "consumer lag dashboards"); err != nil {
+			t.Fatalf("feedback record %s: %v\n%s", voted, err, stderr)
+		}
+	}
+
+	_, stderr, err := runCmd(t, "forget", "--data-dir", dir, "--yes", "bob@corp.com")
+	if err != nil {
 		t.Fatalf("forget: %v\n%s", err, stderr)
+	}
+	if !strings.Contains(string(stderr), "1 votes removed") {
+		t.Errorf("forget did not report the removed vote:\n%s", stderr)
+	}
+	votesOut, _, err := runCmd(t, "feedback", "list", "--data-dir", dir, "--json")
+	if err != nil {
+		t.Fatalf("feedback list after forget: %v", err)
+	}
+	if !strings.Contains(string(votesOut), "alice@corp.com") {
+		t.Errorf("the vote on alice went with bob's:\n%s", votesOut)
 	}
 
 	// The fact is gone from the store, not merely from one file scan.

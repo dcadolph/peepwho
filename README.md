@@ -160,8 +160,9 @@ Indexing talks only to the sources you name, with your own tokens. The index on 
 only by your user and can be encrypted at rest with `whotoask vault`. Serving the web UI beyond
 localhost requires a bearer token on every request. An organization can pin the policy with a
 locked file that flags and environment variables cannot override. `whotoask forget` purges a
-person from everything WhoToAsk stores on the machine. [docs/PRIVACY.md](docs/PRIVACY.md) lists
-what is kept, where, and for how long.
+person from everything WhoToAsk stores on the machine, except the words of a question or comment
+on a vote cast for somebody else. [docs/PRIVACY.md](docs/PRIVACY.md) lists what is kept, where,
+and for how long.
 
 ## Docs
 

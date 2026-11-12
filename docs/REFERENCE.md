@@ -634,9 +634,11 @@ Their records are removed under every identity they were known by, the alias
 entries joining those identities are deleted, references to them are stripped
 from channel membership and org relations, their retained conversation notes
 are deleted, conversations where they were the only participant are
-forgotten, and the change log stops naming them. A conversation with other participants keeps its pointer and loses
-its searchable words. `feedback.json` is not touched, and re-indexing a source
-that still contains the person brings them back.
+forgotten, the change log stops naming them, and every feedback vote cast on
+them is deleted. A conversation with other participants keeps its pointer and
+loses its searchable words. A vote cast on somebody else keeps its question and
+comment, which can name the person, and re-indexing a source that still
+contains the person brings them back.
 
 ## whotoask wipe
 
