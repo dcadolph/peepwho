@@ -219,6 +219,54 @@ struct SearchTests {
         #expect(model.selected == 1)
         #expect(opened.urls.isEmpty)
     }
+
+    // Test 8: Command-Return before the debounced question runs answers the field first and shows
+    // the marked person from that answer, and the question that was waiting never closes the page.
+    @Test func commandReturnAnswersStaleField() async throws {
+        let dir = try demoDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let opened = Opened()
+        let model = SearchModel(core: try Core.open(dir: dir, key: "", secrets: KeychainSecrets()),
+                                delay: .milliseconds(200), opener: opened.open)
+        model.query = "billing"
+        await model.ask(model.query)
+        model.moveDown()
+        try #require(model.selected == 1)
+        model.query = "terraform"
+        model.typed(model.query)
+        await model.showMarked()
+        #expect(model.people.first?.name == "Carol Lee")
+        #expect(model.selected == 0)
+        #expect(model.detail?.name == "Carol Lee")
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(model.detail?.name == "Carol Lee")
+        #expect(opened.urls.isEmpty)
+    }
+
+    // Test 9: Clicking a row shows that person and marks the row, so after Escape the hint and
+    // Enter reach the person clicked, and a person not in the results leaves the mark alone.
+    // Billing kafka ranks four people, and the third has a link the first does not share.
+    @Test func clickMovesMark() async throws {
+        let dir = try demoDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let opened = Opened()
+        let core = try Core.open(dir: dir, key: "", secrets: KeychainSecrets())
+        let model = SearchModel(core: core, delay: .milliseconds(1), opener: opened.open)
+        model.query = "billing kafka"
+        await model.ask(model.query)
+        try #require(model.people.count == 4)
+        let third = model.people[2]
+        await model.select(third.id)
+        #expect(model.detail?.id == third.id)
+        #expect(model.selected == 2)
+        #expect(model.escape())
+        #expect(model.enterHint == "Enter messages \(third.name).")
+        let want = try #require(try await core.person(third.id).links?.first)
+        await model.submit()
+        #expect(opened.urls.map(\.absoluteString) == [want])
+        await model.select("nobody-in-these-results")
+        #expect(model.selected == 2)
+    }
 }
 
 // SearchStateTests check that the window never shows or opens what it moved on from.

@@ -194,9 +194,16 @@ public final class SearchModel: ObservableObject {
         self.selected = max(selected - 1, 0)
     }
 
-    // showMarked shows the marked person in place of the results, which Command-Return does.
+    // showMarked shows the marked person in place of the results, which Command-Return does. As
+    // with Enter, a question still waiting for typing to pause is asked first, so the person shown
+    // is from the answer to what the field holds.
     public func showMarked() async {
-        guard detail == nil, let target = marked else { return }
+        guard detail == nil else { return }
+        pending?.cancel()
+        if answered != query {
+            await ask(query)
+        }
+        guard let target = marked else { return }
         await select(target.id)
     }
 
@@ -242,8 +249,12 @@ public final class SearchModel: ObservableObject {
         show(person)
     }
 
-    // select shows the person with id in place of the results.
+    // select shows the person with id in place of the results, and marks their row when they are
+    // in the results, so a click moves the mark the way the arrow keys do.
     public func select(_ id: String) async {
+        if let row = people.firstIndex(where: { $0.id == id }) {
+            selected = row
+        }
         let mine = nextGeneration()
         guard let person = await lookUp(id, mine), mine == generation else { return }
         show(person)
