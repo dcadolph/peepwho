@@ -86,6 +86,67 @@ func TestWarnEmptyAskSuggests(t *testing.T) {
 	}
 }
 
+// TestSuggestionLabelMarksTheDeactivated checks a line of the closest-by-name
+// list says when the person has left, so a departed colleague found by name is
+// never offered as somebody to message without a word.
+func TestSuggestionLabelMarksTheDeactivated(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		In         resolve.SearchResult
+		WantResult string
+	}{{ // Test 0: A departed person with a title.
+		In: resolve.SearchResult{
+			Kind: "person", Name: "Dinesh White", Title: "Engineer", Deactivated: true,
+		},
+		WantResult: "Dinesh White (Engineer, deactivated)",
+	}, { // Test 1: A departed person with no title or team.
+		In:         resolve.SearchResult{Kind: "person", Name: "Dinesh White", Deactivated: true},
+		WantResult: "Dinesh White (deactivated)",
+	}, { // Test 2: An active person with only a team.
+		In:         resolve.SearchResult{Kind: "person", Name: "Kevin Novak", Team: "Payments"},
+		WantResult: "Kevin Novak (Payments)",
+	}, { // Test 3: An active person with nothing else to say.
+		In:         resolve.SearchResult{Kind: "person", Name: "Kevin Novak"},
+		WantResult: "Kevin Novak",
+	}, { // Test 4: A channel with a topic.
+		In:         resolve.SearchResult{Kind: "channel", Name: "payments", Team: "Payments"},
+		WantResult: "#payments (Payments)",
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			if got := suggestionLabel(test.In); got != test.WantResult {
+				t.Errorf("label = %q, want %q", got, test.WantResult)
+			}
+		})
+	}
+}
+
+// TestWarnEmptyAskMarksTheDeactivated checks the closest-by-name fallback puts
+// an active namesake first and marks the departed one.
+func TestWarnEmptyAskMarksTheDeactivated(t *testing.T) {
+	t.Parallel()
+	ix := index.New()
+	ix.Build([]connector.Record{
+		{Kind: connector.KindPerson, Name: "Dinesh Adams", Email: "adams@corp.com",
+			Title: "Engineer", Account: model.AccountDeactivated, Source: "slack"},
+		{Kind: connector.KindPerson, Name: "Dinesh Black", Email: "black@corp.com",
+			Title: "Engineer", Account: model.AccountActive, Source: "slack"},
+	})
+	ix.Canonicalize()
+
+	var buf bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetErr(&buf)
+	warnEmptyAsk(cmd, ix, "dinesh", resolve.Answer{})
+	out := buf.String()
+	active := strings.Index(out, "  Dinesh Black (Engineer)\n")
+	departed := strings.Index(out, "  Dinesh Adams (Engineer, deactivated)\n")
+	if active < 0 || departed < 0 || active > departed {
+		t.Errorf("want the active namesake first and the departed one marked, got: %q", out)
+	}
+}
+
 // TestAskTeamsOnlyCodeowners verifies a CODEOWNERS file that names only team
 // handles still answers: the people list is empty, the teams of record carry
 // the answer, the command succeeds, and nothing reads as a miss.

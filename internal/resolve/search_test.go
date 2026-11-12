@@ -1,12 +1,17 @@
 package resolve
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 
 	"github.com/dcadolph/whotoask/internal/connector"
 	"github.com/dcadolph/whotoask/internal/index"
+	"github.com/dcadolph/whotoask/internal/model"
 )
 
 // searchFixture builds a small index across people and a channel for the search
@@ -85,6 +90,154 @@ func TestProfileViewJoins(t *testing.T) {
 	if len(view.Joins) != 1 || view.Joins[0].Alias != "github:kevinnovak" || view.Joins[0].Confidence != 0.9 {
 		t.Errorf("view.Joins = %+v, want the github join at 0.9", view.Joins)
 	}
+}
+
+// TestSortSearchResultsPutsTheActiveFirst checks a departed person never sits
+// above an active person with the same kind of match, while a departed person
+// found by a stronger kind of match still leads. Before this, search ordered
+// by score alone, so a departed colleague who had done more work on a subject
+// came back first, unmarked, for somebody to message.
+func TestSortSearchResultsPutsTheActiveFirst(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		In      []SearchResult
+		WantIDs []string
+	}{{ // Test 0: Two exact-name matches, the active one first.
+		In: []SearchResult{
+			{Kind: "person", ID: "a-dinesh", Name: "Dinesh White", Score: 100, Deactivated: true},
+			{Kind: "person", ID: "b-dinesh", Name: "Dinesh White", Score: 100},
+		},
+		WantIDs: []string{"b-dinesh", "a-dinesh"},
+	}, { // Test 1: A departed exact-name match stays above an active prefix match.
+		In: []SearchResult{
+			{Kind: "person", ID: "prefix", Name: "Dinesh Whitfield", Score: 60},
+			{Kind: "person", ID: "gone", Name: "Dinesh", Score: 100, Deactivated: true},
+		},
+		WantIDs: []string{"gone", "prefix"},
+	}, { // Test 2: A departed subject match with the higher score follows an active one.
+		In: []SearchResult{
+			{Kind: "person", ID: "gone", Name: "Ann", Score: 10.5, Deactivated: true},
+			{Kind: "person", ID: "here", Name: "Bo", Score: 8.4},
+		},
+		WantIDs: []string{"here", "gone"},
+	}, { // Test 3: A departed subject match falls below a channel's subject match.
+		In: []SearchResult{
+			{Kind: "person", ID: "gone", Name: "Ann", Score: 10.5, Deactivated: true},
+			{Kind: "channel", ID: "kafka", Name: "kafka", Score: 10},
+		},
+		WantIDs: []string{"kafka", "gone"},
+	}, { // Test 4: Two departed subject matches keep their score order.
+		In: []SearchResult{
+			{Kind: "person", ID: "low", Name: "Ann", Score: 8.5, Deactivated: true},
+			{Kind: "person", ID: "high", Name: "Bo", Score: 10.2, Deactivated: true},
+		},
+		WantIDs: []string{"high", "low"},
+	}, { // Test 5: A departed title match stays above an active subject match.
+		In: []SearchResult{
+			{Kind: "person", ID: "here", Name: "Ann", Score: 10.9},
+			{Kind: "person", ID: "gone", Name: "Bo", Score: 15, Deactivated: true},
+		},
+		WantIDs: []string{"gone", "here"},
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			got := slices.Clone(test.In)
+			SortSearchResults(got)
+			if diff := cmp.Diff(test.WantIDs, resultIDs(got)); diff != "" {
+				t.Errorf("order mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestSortSearchResultsWithNobodyDeactivated checks an index where nobody is
+// deactivated keeps plain score order, with ties broken by name and then id.
+func TestSortSearchResultsWithNobodyDeactivated(t *testing.T) {
+	t.Parallel()
+	got := []SearchResult{
+		{Kind: "person", ID: "c", Name: "Cy", Score: 8.4},
+		{Kind: "channel", ID: "kafka", Name: "kafka", Score: 10},
+		{Kind: "person", ID: "b2", Name: "Bo", Score: 60},
+		{Kind: "person", ID: "a", Name: "Al", Score: 10.5},
+		{Kind: "person", ID: "b1", Name: "Bo", Score: 60},
+		{Kind: "team", ID: "corp/kafka", Name: "corp/kafka", Score: 8.4},
+		{Kind: "person", ID: "d", Name: "Di", Score: 9.1},
+	}
+	want := slices.Clone(got)
+	slices.SortFunc(want, func(a, b SearchResult) int {
+		if a.Score != b.Score {
+			if a.Score > b.Score {
+				return -1
+			}
+			return 1
+		}
+		if a.Name != b.Name {
+			return strings.Compare(a.Name, b.Name)
+		}
+		return strings.Compare(a.ID, b.ID)
+	})
+	SortSearchResults(got)
+	if diff := cmp.Diff(resultIDs(want), resultIDs(got)); diff != "" {
+		t.Errorf("order mismatch (-plain score order +got):\n%s", diff)
+	}
+}
+
+// TestSearchMarksTheDeactivated checks search sets the flag on a departed
+// person, writes the JSON key only for them, and orders an active namesake
+// first.
+func TestSearchMarksTheDeactivated(t *testing.T) {
+	t.Parallel()
+	ix := index.New()
+	ix.Build([]connector.Record{
+		{Kind: connector.KindPerson, Name: "Dinesh White", Email: "a-dinesh@corp.com",
+			Account: model.AccountDeactivated, Source: "slack"},
+		{Kind: connector.KindPerson, Name: "Dinesh White", Email: "b-dinesh@corp.com",
+			Account: model.AccountActive, Source: "slack"},
+	})
+	ix.Canonicalize()
+
+	got := Search(ix, "dinesh white", 0)
+	wantIDs := []string{"b-dinesh@corp.com", "a-dinesh@corp.com"}
+	if diff := cmp.Diff(wantIDs, resultIDs(got)); diff != "" {
+		t.Fatalf("order mismatch (-want +got):\n%s", diff)
+	}
+	tests := []struct {
+		Result          SearchResult
+		WantDeactivated bool
+	}{{ // Test 0: The active namesake carries no flag and no key.
+		Result: got[0], WantDeactivated: false,
+	}, { // Test 1: The departed one carries the flag and the key.
+		Result: got[1], WantDeactivated: true,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			if test.Result.Deactivated != test.WantDeactivated {
+				t.Errorf("deactivated = %v, want %v", test.Result.Deactivated, test.WantDeactivated)
+			}
+			raw, err := json.Marshal(test.Result)
+			if err != nil {
+				t.Fatalf("marshal: %v", err)
+			}
+			keyed := strings.Contains(string(raw), `"deactivated":true`)
+			if keyed != test.WantDeactivated {
+				t.Errorf("JSON %s has the key: %v, want %v", raw, keyed, test.WantDeactivated)
+			}
+			if !test.WantDeactivated && strings.Contains(string(raw), `"deactivated"`) {
+				t.Errorf("JSON %s names deactivated for an active person", raw)
+			}
+		})
+	}
+}
+
+// resultIDs lists the result ids in order.
+func resultIDs(rs []SearchResult) []string {
+	out := make([]string, 0, len(rs))
+	for _, r := range rs {
+		out = append(out, r.ID)
+	}
+	return out
 }
 
 // TestSearchChannelByTopicTag checks a channel matches on a derived topic tag,

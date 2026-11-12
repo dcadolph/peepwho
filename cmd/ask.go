@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -110,14 +109,7 @@ func warnEmptyAsk(cmd *cobra.Command, ix *index.Index, query string, ans resolve
 	if hits := suggestFromSearch(ix, query, 5); len(hits) > 0 {
 		fmt.Fprintln(w, "No expertise match for that. Closest by name:")
 		for _, h := range hits {
-			label := h.Name
-			if h.Kind == "channel" {
-				label = "#" + h.Name
-			}
-			if ctx := firstNonEmpty(h.Title, h.Team); ctx != "" {
-				label += " (" + ctx + ")"
-			}
-			fmt.Fprintln(w, "  "+label)
+			fmt.Fprintln(w, "  "+suggestionLabel(h))
 		}
 		fmt.Fprintln(w, "Use `whotoask search` to explore, or ask with the terms your team would use.")
 		return
@@ -125,6 +117,26 @@ func warnEmptyAsk(cmd *cobra.Command, ix *index.Index, query string, ans resolve
 	fmt.Fprintln(w,
 		"No match for that question. Matching is on the words people and channels are described by, "+
 			"so try the terms your team would use, or `whotoask directory` to see what is indexed.")
+}
+
+// suggestionLabel is one line of the closest-by-name list: the name, a hash on
+// a channel, then the title or team and a deactivated mark in parentheses.
+func suggestionLabel(h resolve.SearchResult) string {
+	label := h.Name
+	if h.Kind == "channel" {
+		label = "#" + h.Name
+	}
+	var ctx []string
+	if c := firstNonEmpty(h.Title, h.Team); c != "" {
+		ctx = append(ctx, c)
+	}
+	if h.Deactivated {
+		ctx = append(ctx, "deactivated")
+	}
+	if len(ctx) > 0 {
+		label += " (" + strings.Join(ctx, ", ") + ")"
+	}
+	return label
 }
 
 // firstNonEmpty returns the first non-empty string, or empty when all are empty.
@@ -154,12 +166,7 @@ func suggestFromSearch(ix *index.Index, query string, limit int) []resolve.Searc
 	// One person answering for several terms is still one person, and the
 	// strongest term they matched is the one that speaks for them.
 	all = util.Distinct(all, func(r resolve.SearchResult) string { return r.ID })
-	sort.Slice(all, func(i, j int) bool {
-		if all[i].Score != all[j].Score {
-			return all[i].Score > all[j].Score
-		}
-		return all[i].Name < all[j].Name
-	})
+	resolve.SortSearchResults(all)
 	if len(all) > limit {
 		all = all[:limit]
 	}

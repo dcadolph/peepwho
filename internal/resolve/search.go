@@ -33,6 +33,9 @@ type SearchResult struct {
 	Score float64 `json:"score"`
 	// Matched names the fields the query hit, such as "team" or "topic".
 	Matched []string `json:"matched,omitempty"`
+	// Deactivated reports a person whose account is deactivated, somebody who
+	// may have known the subject but is no longer there to ask.
+	Deactivated bool `json:"deactivated,omitempty"`
 }
 
 // Search finds people and channels whose name, email, title, team, or topics
@@ -62,7 +65,7 @@ func Search(ix *index.Index, query string, limit int) []SearchResult {
 		out = append(out, SearchResult{
 			Kind: kind, ID: string(id), Name: nameOr(p.Name, string(id)),
 			Email: p.Email, Title: p.Title, Team: team, Topics: salientTopics(ix, p.Topics, 8),
-			Score: score, Matched: matched,
+			Score: score, Matched: matched, Deactivated: p.Deactivated(),
 		})
 	}
 	for _, ch := range ix.Graph.Channels {
@@ -75,27 +78,55 @@ func Search(ix *index.Index, query string, limit int) []SearchResult {
 			Score: score, Matched: matched,
 		})
 	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].Score != out[j].Score {
-			return out[i].Score > out[j].Score
-		}
-		if out[i].Name != out[j].Name {
-			return out[i].Name < out[j].Name
-		}
-		return out[i].ID < out[j].ID
-	})
+	SortSearchResults(out)
 	if len(out) > limit {
 		out = out[:limit]
 	}
 	return out
 }
 
-// Subject match tie-break. topicTierSpread is how far a subject match may rise
-// above the base tier for the work behind it, kept under the gap to the tier
-// above. topicTierScale is the concentration at which half that spread is
-// earned, on the discounted scale where a strong owner of one subject sits
-// around a fifth.
+// SortSearchResults orders results for showing, closest match first. A
+// departed person never sits above an active person with the same kind of
+// match: within one order value the active come first, then the higher score,
+// then the name and the id. With nobody deactivated this is plain score order.
+func SortSearchResults(results []SearchResult) {
+	sort.Slice(results, func(i, j int) bool {
+		a, b := results[i], results[j]
+		if oa, ob := searchOrder(a), searchOrder(b); oa != ob {
+			return oa > ob
+		}
+		if a.Deactivated != b.Deactivated {
+			return !a.Deactivated
+		}
+		if a.Score != b.Score {
+			return a.Score > b.Score
+		}
+		if a.Name != b.Name {
+			return a.Name < b.Name
+		}
+		return a.ID < b.ID
+	})
+}
+
+// searchOrder is the value a result is ordered by: its score, except that a
+// departed person matched on a subject orders at the floor of the subject
+// band. The work somebody did on a subject is no reason to send the asker to
+// a person who has left ahead of one who is still here, so within the band a
+// departed person orders below every active one.
+func searchOrder(r SearchResult) float64 {
+	if r.Deactivated && r.Score >= personTopicTier && r.Score < personTopicTier+topicTierSpread {
+		return personTopicTier
+	}
+	return r.Score
+}
+
+// Subject match tier. personTopicTier is the score a subject match starts
+// from. topicTierSpread is how far a subject match may rise above it for the
+// work behind it, kept under the gap to the tier above. topicTierScale is the
+// concentration at which half that spread is earned, on the discounted scale
+// where a strong owner of one subject sits around a fifth.
 const (
+	personTopicTier = 8.0
 	topicTierSpread = 3.0
 	topicTierScale  = 0.25
 )
@@ -146,7 +177,7 @@ func scorePerson(p *model.Person, team, q string) (float64, []string) {
 		// reason every other ranking here is: the few who touch all of a code
 		// base out-weigh the owner of any one part of it.
 		concentration := strongest / math.Sqrt(reach)
-		hit(8+topicTierSpread*concentration/(concentration+topicTierScale), "topic")
+		hit(personTopicTier+topicTierSpread*concentration/(concentration+topicTierScale), "topic")
 	}
 	return best, matched
 }

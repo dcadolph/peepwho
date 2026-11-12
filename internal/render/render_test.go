@@ -208,6 +208,16 @@ func goldenCases() []goldenCase {
 				{Kind: "channel", Name: "a-very-long-channel-name-that-keeps-going-and-going"},
 			}, s)
 		}},
+		{"search_deactivated", func(w io.Writer, s Style) {
+			RenderSearch(w, "dinesh", []resolve.SearchResult{
+				{Kind: "person", Name: "Dinesh Black", Title: "Engineer", Team: "Payments",
+					Matched: []string{"name"}},
+				{Kind: "person", Name: "Dinesh White", Title: "Engineer", Team: "Payments",
+					Matched: []string{"name"}, Deactivated: true},
+				{Kind: "person", Name: "Dinesh Adams", Email: "adams@example.com",
+					Matched: []string{"name"}, Deactivated: true},
+			}, s)
+		}},
 		{"search_empty", func(w io.Writer, s Style) { RenderSearch(w, "zzz", nil, s) }},
 		{"risk", func(w io.Writer, s Style) { RenderRisk(w, risk, s) }},
 		{"risk_empty", func(w io.Writer, s Style) { RenderRisk(w, nil, s) }},

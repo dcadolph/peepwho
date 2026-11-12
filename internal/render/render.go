@@ -595,7 +595,7 @@ func RenderSearch(w io.Writer, query string, results []resolve.SearchResult, s S
 }
 
 // searchContext is the muted line after a result's name: a person's role or
-// email, or a channel's topic.
+// email, marked when the person is deactivated, or a channel's topic.
 func searchContext(r resolve.SearchResult) string {
 	if r.Kind == "channel" {
 		if r.Team != "" {
@@ -603,10 +603,14 @@ func searchContext(r resolve.SearchResult) string {
 		}
 		return "channel"
 	}
-	if role := joinRole(r.Title, r.Team); role != "" {
-		return role
+	ctx := joinRole(r.Title, r.Team)
+	if ctx == "" {
+		ctx = r.Email
 	}
-	return r.Email
+	if r.Deactivated {
+		ctx = joinRole(ctx, "deactivated")
+	}
+	return ctx
 }
 
 // searchNameWidth is the column width to pad result names to, capped so one long
