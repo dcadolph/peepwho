@@ -296,4 +296,18 @@ struct DecodeTests {
         let got: WipeResult = try Core.decode(fixture("wipe"))
         #expect(got.removed?.isEmpty == false)
     }
+
+    // searchDeactivated decodes a departed search hit as deactivated with the mark leading its
+    // role, and a hit with no deactivated key as active.
+    @Test func searchDeactivated() throws {
+        let json = """
+            {"query":"lena","results":[
+            {"kind":"person","id":"a","name":"Lena Park","title":"SRE","score":2,"deactivated":true},
+            {"kind":"person","id":"b","name":"Lena Ortiz","team":"Billing","score":1}]}
+            """
+        let got: SearchAnswer = try Core.decode(json)
+        let hits = try #require(got.results)
+        #expect(hits.map(\.isDeactivated) == [true, false])
+        #expect(hits.map(\.role) == ["Deactivated, SRE", "Billing"])
+    }
 }

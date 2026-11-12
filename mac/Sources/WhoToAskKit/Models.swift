@@ -201,6 +201,15 @@ public struct SearchResult: Codable, Hashable, Sendable, Identifiable {
     public let matched: [String]?
     // score is the ranking score.
     public let score: Double
+    // deactivated is true when the person's account is deactivated, absent otherwise.
+    public var deactivated: Bool? = nil
+
+    // isDeactivated reports whether the person can no longer be reached.
+    public var isDeactivated: Bool { deactivated ?? false }
+
+    // role is the person's role line, led by the Deactivated mark for a departed person, empty
+    // when there is nothing to show.
+    public var role: String { Role.line(title: title, team: team, deactivated: isDeactivated) }
 }
 
 // SearchAnswer is the people a search matched.

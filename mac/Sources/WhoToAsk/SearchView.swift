@@ -132,6 +132,15 @@ struct ResultsView: View {
                 }
                 .accessibilityAddTraits(model.selected == index ? .isSelected : [])
             }
+            if !model.closest.isEmpty {
+                Text("Closest by name").font(.caption).foregroundStyle(.secondary)
+                ForEach(model.closest) { hit in
+                    Button { Task { await model.select(hit.id) } } label: {
+                        ClosestRow(hit: hit)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
             if !model.channels.isEmpty {
                 Text("Ask in").font(.caption).foregroundStyle(.secondary).padding(.top, 4)
                 ForEach(model.channels, id: \.name) { channel in
@@ -208,6 +217,26 @@ struct PersonRow: View {
             }
         }
         .padding(.vertical, 3)
+        .contentShape(Rectangle())
+    }
+}
+
+// ClosestRow is one person the name search found when the answer named no one: name and role,
+// with the Deactivated mark for a person who can no longer be reached.
+struct ClosestRow: View {
+    // hit is the person found.
+    let hit: SearchResult
+
+    // body shows the name with the role line under it.
+    var body: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            NameText(name: hit.name, deactivated: hit.isDeactivated).font(.body.weight(.medium))
+            if !hit.role.isEmpty {
+                RoleText(line: hit.role, deactivated: hit.isDeactivated).font(.caption)
+            }
+        }
+        .padding(.vertical, 3)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
     }
 }

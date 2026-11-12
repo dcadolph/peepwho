@@ -14,6 +14,9 @@ public final class SearchModel: ObservableObject {
     @Published public private(set) var channels: [AskChannel] = []
     // teams are the owners of record the last answered query names. They are shown, never opened.
     @Published public private(set) var teams: [AskTeam] = []
+    // closest are the people whose name or details hold the question, shown under "Closest by
+    // name" when the answer names no one, such as a colleague asked for by first name alone.
+    @Published public private(set) var closest: [SearchResult] = []
     // detail is the person shown in place of the results, nil while the results show.
     @Published public private(set) var detail: PersonDetail?
     // selected is the index into people of the row the arrow keys mark, nil when there is no one.
@@ -72,6 +75,7 @@ public final class SearchModel: ObservableObject {
         people = []
         channels = []
         teams = []
+        closest = []
         detail = nil
         selected = nil
         changes = []
@@ -137,12 +141,27 @@ public final class SearchModel: ObservableObject {
             let channels = answer.channels ?? []
             let teams = answer.teams ?? []
             let empty = people.isEmpty && channels.isEmpty && teams.isEmpty
-            let none = empty ? "No one matches \"\(trimmed)\" yet." : nil
-            show(people: people, channels: channels, teams: teams, message: none, for: text)
+            var nearest: [SearchResult] = []
+            if empty {
+                nearest = await nameMatches(trimmed)
+                guard mine == generation else { return }
+            }
+            let none = empty && nearest.isEmpty ? "No one matches \"\(trimmed)\" yet." : nil
+            show(people: people, channels: channels, teams: teams, closest: nearest, message: none,
+                 for: text)
         } catch {
             guard mine == generation else { return }
             show(people: [], channels: [], teams: [], message: Self.describe(error), for: text)
         }
+    }
+
+    // nameMatches finds up to five people whose name, email, title, team, or topics hold text,
+    // best first, through the name search the command line falls back to. It leaves out teams and
+    // channels, which have no page to show, and returns none when the search fails, since the
+    // window then says no one matches, which is still true of the answer.
+    private func nameMatches(_ text: String) async -> [SearchResult] {
+        guard let core, let found = try? await core.search(text, limit: 5) else { return [] }
+        return (found.results ?? []).filter { $0.kind == "person" }
     }
 
     // reask answers the field again from the index as it now stands, such as after an index run
@@ -339,11 +358,12 @@ public final class SearchModel: ObservableObject {
     }
 
     // show replaces the result list with the answer to text.
-    private func show(people: [AskPerson], channels: [AskChannel], teams: [AskTeam], message: String?,
-                      for text: String) {
+    private func show(people: [AskPerson], channels: [AskChannel], teams: [AskTeam],
+                      closest: [SearchResult] = [], message: String?, for text: String) {
         self.people = people
         self.channels = channels
         self.teams = teams
+        self.closest = closest
         self.message = message
         selected = people.isEmpty ? nil : 0
         answered = text

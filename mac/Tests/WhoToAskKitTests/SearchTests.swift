@@ -294,6 +294,36 @@ struct SearchTests {
         let values = [0.834, 1, 0, 1.4, -0.2].map(SearchModel.strengthValue)
         #expect(values == ["83 percent", "100 percent", "0 percent", "100 percent", "0 percent"])
     }
+
+    // Test 11: A surname alone, which the answer leaves to the name search, lists the people it
+    // names under Closest by name, a row opens that person, Enter promises nothing, a word nobody
+    // holds still says no one matches, and a new core clears the list.
+    @Test func surnameFallsBackToClosest() async throws {
+        let dir = try demoDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let core = try Core.open(dir: dir, key: "", secrets: KeychainSecrets())
+        let model = SearchModel(core: core, delay: .milliseconds(1), opener: Opened().open)
+        model.query = "vance"
+        await model.ask(model.query)
+        #expect(model.people.isEmpty)
+        #expect(model.message == nil)
+        let first = try #require(model.closest.first)
+        #expect(first.name == "Pam Vance")
+        #expect(model.closest.allSatisfy { $0.kind == "person" })
+        #expect(model.closest.count <= 5)
+        #expect(model.enterHint == nil)
+        await model.select(first.id)
+        #expect(model.detail?.name == "Pam Vance")
+        model.query = "zzqx"
+        await model.ask(model.query)
+        #expect(model.closest.isEmpty)
+        #expect(model.message == "No one matches \"zzqx\" yet.")
+        model.query = "vance"
+        await model.ask(model.query)
+        try #require(!model.closest.isEmpty)
+        model.use(core)
+        #expect(model.closest.isEmpty)
+    }
 }
 
 // SearchStateTests check that the window never shows or opens what it moved on from.
