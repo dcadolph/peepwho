@@ -336,11 +336,50 @@ func SplitDeparted(matches []model.Match) (people, departed []model.Match) {
 // SearchChannels ranks channels for query and returns up to limit matches, each
 // carrying the most relevant active members. A non-positive limit returns all.
 func (ix *Index) SearchChannels(query string, limit int) []model.ChannelMatch {
-	terms, covers, asked := expandedQuery(query)
+	matches, terms := ix.rankChannels(query, limit)
+	ix.fillTopMembers(terms, matches)
+	return matches
+}
+
+// RankChannels ranks channels for query and returns up to limit matches
+// without their members, for a caller that filters the list before it shows
+// it and fills the members of what is left with FillTopMembers. A non-positive
+// limit returns all.
+func (ix *Index) RankChannels(query string, limit int) []model.ChannelMatch {
+	matches, _ := ix.rankChannels(query, limit)
+	return matches
+}
+
+// FillTopMembers sets the most relevant active members on each of matches in
+// place, ranked for query exactly as SearchChannels ranks them.
+func (ix *Index) FillTopMembers(query string, matches []model.ChannelMatch) {
+	if len(matches) == 0 {
+		return
+	}
+	terms, _, _ := ix.channelTerms(query)
+	ix.fillTopMembers(terms, matches)
+}
+
+// channelTerms builds the terms a channel search ranks by: the words of query
+// and their synonyms, then the subjects that travel with the ones it names. It
+// returns no terms when query has no words.
+func (ix *Index) channelTerms(query string) (terms []string, covers map[string][]string, asked map[string]string) {
+	terms, covers, asked = expandedQuery(query)
 	if len(terms) == 0 {
-		return nil
+		return nil, nil, nil
 	}
 	terms = append(terms, ix.tieExpand(tokenize(query), covers, asked)...)
+	return terms, covers, asked
+}
+
+// rankChannels ranks channels for query and cuts them to limit, without their
+// members. It also returns the terms it ranked by, so a caller fills the
+// members from the same terms without building them again.
+func (ix *Index) rankChannels(query string, limit int) ([]model.ChannelMatch, []string) {
+	terms, covers, asked := ix.channelTerms(query)
+	if len(terms) == 0 {
+		return nil, nil
+	}
 	typed := typedTerms(terms, asked)
 	originals := len(typed)
 	resolved := resolveTerms(ix.channelPostings, ix.channelVocab, terms)
@@ -390,18 +429,24 @@ func (ix *Index) SearchChannels(query string, limit int) []model.ChannelMatch {
 	if limit > 0 && len(matches) > limit {
 		matches = matches[:limit]
 	}
-	// Rank the members only for the channels that survived the limit. Scoring
-	// every person and sorting every channel's whole membership up front, only to
-	// keep a handful of channels, was the bulk of a query at scale.
-	if len(matches) > 0 {
-		personResolved := resolveTerms(ix.peoplePostings, ix.personVocab, terms)
-		personScores, _ := scoreByTerms(
-			ix.peoplePostings, terms, personResolved, ix.peopleN, ix.personLens)
-		for i := range matches {
-			matches[i].TopMembers = ix.topMembers(matches[i].Channel, personScores, 3)
-		}
+	return matches, terms
+}
+
+// fillTopMembers sets the most relevant active members on each of matches in
+// place, from person scores for terms. It runs only on the channels a caller
+// keeps, after its limit cut or its own filter: scoring every person and
+// walking every channel's whole membership up front, only to keep a handful
+// of channels, was the bulk of a query at scale.
+func (ix *Index) fillTopMembers(terms []string, matches []model.ChannelMatch) {
+	if len(matches) == 0 {
+		return
 	}
-	return matches
+	personResolved := resolveTerms(ix.peoplePostings, ix.personVocab, terms)
+	personScores, _ := scoreByTerms(
+		ix.peoplePostings, terms, personResolved, ix.peopleN, ix.personLens)
+	for i := range matches {
+		matches[i].TopMembers = ix.topMembers(matches[i].Channel, personScores, 3)
+	}
 }
 
 // topMembers returns up to n of a channel's members, most relevant to the query

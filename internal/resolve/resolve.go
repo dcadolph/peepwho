@@ -89,7 +89,12 @@ func (k *Keyword) Resolve(_ context.Context, query string, limit int) (Answer, e
 	named, namedGone := index.SplitDeparted(nameMatch(k.ix, query, depth, found, gone))
 	people, departed, channels := trimChatter(
 		withNamed(named, found, depth), withNamed(namedGone, gone, depth),
-		k.ix.SearchChannels(query, depth), limit)
+		k.ix.RankChannels(query, depth), limit)
+	// Members are ranked only for the channels the answer keeps. The read goes
+	// deeper than the limit for the chatter filter, and ranking the members of
+	// every channel in that read costs a pass over each membership for
+	// channels nobody sees.
+	k.ix.FillTopMembers(query, channels)
 	return Answer{
 		People:   people,
 		Departed: departed,

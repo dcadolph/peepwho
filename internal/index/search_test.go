@@ -74,6 +74,101 @@ func TestTopMembersNamesOnlyPeopleWorthAsking(t *testing.T) {
 	}
 }
 
+// channelView is the part of a channel match a ranking decides, with the
+// members reduced to their ids so two searches compare by value.
+type channelView struct {
+	// Name is the channel's name.
+	Name string
+	// Score is the ranking score.
+	Score float64
+	// Strength is the strength the answer shows.
+	Strength float64
+	// Declared reports a match on a stated subject.
+	Declared bool
+	// Reach reports a match only through a tied subject.
+	Reach bool
+	// Reasons are the reason lines.
+	Reasons []string
+	// Members are the ids of the listed members, best first.
+	Members []model.ID
+}
+
+// channelViews reduces matches to their views, in order.
+func channelViews(ms []model.ChannelMatch) []channelView {
+	out := make([]channelView, 0, len(ms))
+	for _, m := range ms {
+		v := channelView{
+			Name: m.Channel.Name, Score: m.Score, Strength: m.Strength,
+			Declared: m.Declared, Reach: m.Reach, Reasons: m.Reasons,
+		}
+		for _, p := range m.TopMembers {
+			v.Members = append(v.Members, p.ID)
+		}
+		out = append(out, v)
+	}
+	return out
+}
+
+// TestRankChannelsThenFillMatchesSearchChannels checks the split under the
+// channel search. RankChannels ranks exactly as SearchChannels does and lists
+// no members, and FillTopMembers on its matches gives what SearchChannels
+// gives, so a caller that filters between the two shows the same members on
+// every channel it keeps.
+func TestRankChannelsThenFillMatchesSearchChannels(t *testing.T) {
+	t.Parallel()
+	ix := New()
+	ix.Build([]connector.Record{
+		{Name: "Jane Roe", Email: "jane@x.com", Topics: []string{"retries"}},
+		{Name: "Bob Lee", Email: "bob@x.com", Topics: []string{"kafka"}},
+		{Name: "Ann Poe", Email: "ann@x.com", Topics: []string{"kafka", "retries"}},
+		{Kind: connector.KindChannel, Name: "billing", Title: "retries and dunning",
+			Members: []string{"jane@x.com", "bob@x.com", "ann@x.com"}},
+		{Kind: connector.KindChannel, Name: "streams", Topics: []string{"kafka"},
+			Members: []string{"bob@x.com", "ann@x.com"}},
+		{Kind: connector.KindChannel, Name: "ops", Text: "kafka retries pager",
+			Members: []string{"jane@x.com", "bob@x.com"}},
+	})
+
+	tests := []struct {
+		Query       string
+		Limit       int
+		WantMembers bool
+	}{{ // Test 0: One word, every channel.
+		Query: "retries", Limit: 0, WantMembers: true,
+	}, { // Test 1: Two words, every channel.
+		Query: "kafka retries", Limit: 0, WantMembers: true,
+	}, { // Test 2: The limit cuts before the members are filled.
+		Query: "kafka", Limit: 1, WantMembers: true,
+	}, { // Test 3: A query with no words gives nothing either way.
+		Query: "   ", Limit: 0, WantMembers: false,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			want := channelViews(ix.SearchChannels(test.Query, test.Limit))
+			var listed bool
+			wantRanked := make([]channelView, len(want))
+			for i, v := range want {
+				listed = listed || len(v.Members) > 0
+				v.Members = nil
+				wantRanked[i] = v
+			}
+			if listed != test.WantMembers {
+				t.Fatalf("SearchChannels listed members: %v, want %v", listed, test.WantMembers)
+			}
+			ranked := ix.RankChannels(test.Query, test.Limit)
+			gotRanked := channelViews(ranked)
+			if diff := cmp.Diff(wantRanked, gotRanked, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("ranking mismatch (-search without members +rank):\n%s", diff)
+			}
+			ix.FillTopMembers(test.Query, ranked)
+			if diff := cmp.Diff(want, channelViews(ranked), cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("filled ranking mismatch (-search +rank and fill):\n%s", diff)
+			}
+		})
+	}
+}
+
 // TestHitReasonNamesWhatACorrectionWasReadAs checks the reason line for one
 // matched word. Before this, a corrected word that landed on a passing mention
 // printed the word as typed, so "spark" answered by a channel about parking
