@@ -267,6 +267,33 @@ struct SearchTests {
         await model.select("nobody-in-these-results")
         #expect(model.selected == 2)
     }
+
+    // Test 10: An arrow key returns the person it marked, which the window speaks, and nothing at
+    // either end, on a person page, or with no results, and the strength bar reads as a whole
+    // percent clamped to the bar.
+    @Test func movesSayWhoIsMarked() async throws {
+        let dir = try demoDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let model = SearchModel(core: try Core.open(dir: dir, key: "", secrets: KeychainSecrets()),
+                                delay: .milliseconds(1), opener: Opened().open)
+        #expect(model.moveDown() == nil)
+        model.query = "billing kafka"
+        await model.ask(model.query)
+        try #require(model.people.count == 4)
+        #expect(model.moveUp() == nil)
+        #expect(model.moveDown()?.id == model.people[1].id)
+        #expect(model.moveDown()?.id == model.people[2].id)
+        #expect(model.moveDown()?.id == model.people[3].id)
+        #expect(model.moveDown() == nil)
+        #expect(model.selected == 3)
+        #expect(model.moveUp()?.id == model.people[2].id)
+        await model.showMarked()
+        try #require(model.detail != nil)
+        #expect(model.moveUp() == nil)
+        #expect(model.selected == 2)
+        let values = [0.834, 1, 0, 1.4, -0.2].map(SearchModel.strengthValue)
+        #expect(values == ["83 percent", "100 percent", "0 percent", "100 percent", "0 percent"])
+    }
 }
 
 // SearchStateTests check that the window never shows or opens what it moved on from.

@@ -182,16 +182,34 @@ public final class SearchModel: ObservableObject {
         return people[selected]
     }
 
-    // moveDown marks the next row, and stays on the last one.
-    public func moveDown() {
-        guard detail == nil, let selected else { return }
-        self.selected = min(selected + 1, people.count - 1)
+    // moveDown marks the next row, stays on the last one, and returns the person it marked, nil
+    // when the mark did not move.
+    @discardableResult
+    public func moveDown() -> AskPerson? {
+        guard detail == nil, let selected else { return nil }
+        return mark(min(selected + 1, people.count - 1))
     }
 
-    // moveUp marks the row before, and stays on the first one.
-    public func moveUp() {
-        guard detail == nil, let selected else { return }
-        self.selected = max(selected - 1, 0)
+    // moveUp marks the row before, stays on the first one, and returns the person it marked, nil
+    // when the mark did not move.
+    @discardableResult
+    public func moveUp() -> AskPerson? {
+        guard detail == nil, let selected else { return nil }
+        return mark(max(selected - 1, 0))
+    }
+
+    // mark marks row and returns its person, or nil when row was marked already, so the window
+    // speaks a name only when the mark moved.
+    private func mark(_ row: Int) -> AskPerson? {
+        guard row != selected else { return nil }
+        selected = row
+        return marked
+    }
+
+    // strengthValue says a match strength from zero to one as a whole percent, such as
+    // "83 percent", for VoiceOver to read beside the bar.
+    public static func strengthValue(_ strength: Double) -> String {
+        "\(Int((max(0, min(1, strength)) * 100).rounded())) percent"
     }
 
     // showMarked shows the marked person in place of the results, which Command-Return does. As

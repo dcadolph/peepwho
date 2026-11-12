@@ -24,11 +24,11 @@ struct SearchView: View {
                 .onSubmit { Task { await model.submit() } }
                 .onChange(of: model.query) { _, text in model.typed(text) }
                 .onKeyPress(.downArrow) {
-                    model.moveDown()
+                    announce(model.moveDown())
                     return .handled
                 }
                 .onKeyPress(.upArrow) {
-                    model.moveUp()
+                    announce(model.moveUp())
                     return .handled
                 }
                 .onKeyPress(.escape) { model.escape() ? .handled : .ignored }
@@ -85,6 +85,13 @@ struct SearchView: View {
         }
         .onDisappear { model.closed() }
     }
+
+    // announce says the name of the person the arrow keys just marked to VoiceOver, since focus
+    // stays in the field and the mark alone is never spoken.
+    private func announce(_ person: AskPerson?) {
+        guard let person else { return }
+        AccessibilityNotification.Announcement(person.name).post()
+    }
 }
 
 // WindowFitter sizes the window it sits in to height whenever height changes.
@@ -121,10 +128,9 @@ struct ResultsView: View {
                 // The marked row gets a quiet background drawn past its edges, so marking it
                 // changes nothing about its size.
                 .background {
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(model.selected == index ? Color.primary.opacity(0.08) : .clear)
-                        .padding(.horizontal, -4)
+                    MarkBackground(marked: model.selected == index).padding(.horizontal, -4)
                 }
+                .accessibilityAddTraits(model.selected == index ? .isSelected : [])
             }
             if !model.channels.isEmpty {
                 Text("Ask in").font(.caption).foregroundStyle(.secondary).padding(.top, 4)
@@ -139,6 +145,27 @@ struct ResultsView: View {
                 }
             }
         }
+    }
+}
+
+// MarkBackground is the shape behind a result row, filled when the row is marked. With Increase
+// Contrast on, the fill is stronger and outlined, since a faint fill alone is hard to see.
+struct MarkBackground: View {
+    // marked reports whether the row is the one Enter acts on.
+    let marked: Bool
+    // contrast is the system contrast setting.
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    // body fills the row's shape when marked and draws nothing otherwise.
+    var body: some View {
+        let increased = contrast == .increased
+        RoundedRectangle(cornerRadius: 5)
+            .fill(marked ? Color.primary.opacity(increased ? 0.2 : 0.08) : .clear)
+            .overlay {
+                if marked, increased {
+                    RoundedRectangle(cornerRadius: 5).strokeBorder(Color.primary.opacity(0.6))
+                }
+            }
     }
 }
 
@@ -247,6 +274,9 @@ struct StrengthBar: View {
             Capsule().fill(.tint).frame(width: 40 * max(0.05, min(1, strength)))
         }
         .frame(width: 40, height: 4)
+        .accessibilityElement()
+        .accessibilityLabel("Match strength")
+        .accessibilityValue(SearchModel.strengthValue(strength))
     }
 }
 
