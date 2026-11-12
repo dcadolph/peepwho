@@ -7,6 +7,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	"github.com/dcadolph/whotoask/internal/connector"
 	"github.com/dcadolph/whotoask/internal/model"
 )
 
@@ -68,6 +69,120 @@ func TestTopMembersNamesOnlyPeopleWorthAsking(t *testing.T) {
 			}
 			if diff := cmp.Diff(test.WantIDs, got, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("members mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestHitReasonNamesWhatACorrectionWasReadAs checks the reason line for one
+// matched word. Before this, a corrected word that landed on a passing mention
+// printed the word as typed, so "spark" answered by a channel about parking
+// read as if the channel had talked about Spark.
+func TestHitReasonNamesWhatACorrectionWasReadAs(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		Term       string
+		Field      string
+		Found      string
+		Hit        termHit
+		Asked      map[string]string
+		WantResult string
+	}{{ // Test 0: A corrected mention names the stem it resolved to.
+		Term: "spark", Field: "mention", Hit: termHit{key: "park", penalty: fuzzyPenalty},
+		WantResult: `park (mention, read for "spark")`,
+	}, { // Test 1: A corrected field hit names the word the field holds.
+		Term: "kafkaa", Field: "topic", Found: "kafka",
+		Hit:        termHit{key: "kafka", penalty: fuzzyPenalty},
+		WantResult: `kafka (topic, read for "kafkaa")`,
+	}, { // Test 2: An exact mention prints the word as typed.
+		Term: "parking", Field: "mention", Hit: termHit{key: "park", penalty: 1},
+		WantResult: "parking (mention)",
+	}, { // Test 3: An exact field hit prints the word as typed.
+		Term: "kafka", Field: "name", Found: "kafka", Hit: termHit{key: "kafka", penalty: 1},
+		WantResult: "kafka (name)",
+	}, { // Test 4: A synonym says what it stood in for and is no correction.
+		Term: "vacation", Field: "topic", Found: "vacation",
+		Hit:        termHit{key: "vacat", penalty: expansionPenalty},
+		Asked:      map[string]string{"vacation": "time off"},
+		WantResult: `vacation (topic) for "time off"`,
+	}, { // Test 5: A correction that reads as the word typed has nothing to name.
+		Term: "parking", Field: "mention", Hit: termHit{key: "parking", penalty: fuzzyPenalty},
+		WantResult: "parking (mention, fuzzy)",
+	}, { // Test 6: Two edits on a mention still name the stem.
+		Term: "elastcsearh", Field: "mention",
+		Hit:        termHit{key: "elasticsearch", penalty: fuzzyPenalty * fuzzyPenalty},
+		WantResult: `elasticsearch (mention, read for "elastcsearh")`,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			got := hitReason(test.Term, test.Field, test.Found, test.Hit, test.Asked)
+			if diff := cmp.Diff(test.WantResult, got); diff != "" {
+				t.Errorf("reason mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestReasonsNameWhatAMentionWasReadAs checks the whole path for people and
+// channels: a misspelled question answered through a passing mention says in
+// its reason which word the answer was read for.
+func TestReasonsNameWhatAMentionWasReadAs(t *testing.T) {
+	t.Parallel()
+	ix := New()
+	ix.Build([]connector.Record{{
+		Kind: connector.KindPerson, Email: "owner@corp.com", Name: "Owner",
+		Topics: []string{"kafka"}, Source: "org-csv",
+	}, {
+		Kind: connector.KindPerson, Email: "mention@corp.com", Name: "Mention",
+		Text: "the parking garage is full again", Source: "slack",
+	}, {
+		Kind: connector.KindChannel, Name: "office", Title: "office chatter",
+		Text: "parking passes are at the front desk", Source: "slack",
+	}, {
+		Kind: connector.KindChannel, Name: "kafka", Title: "kafka questions", Source: "slack",
+	}})
+
+	tests := []struct {
+		Query       string
+		Person      string
+		Channel     string
+		WantReasons []string
+	}{{ // Test 0: A person who only mentioned the corrected word.
+		Query: "spark", Person: "mention@corp.com",
+		WantReasons: []string{`park (mention, read for "spark")`},
+	}, { // Test 1: A channel that only mentioned the corrected word.
+		Query: "spark", Channel: "office",
+		WantReasons: []string{`park (mention, read for "spark")`},
+	}, { // Test 2: A person holding the corrected word as a topic.
+		Query: "kafkaa", Person: "owner@corp.com",
+		WantReasons: []string{`kafka (topic, read for "kafkaa")`},
+	}, { // Test 3: A channel holding the corrected word as its topic.
+		Query: "kafkaa", Channel: "kafka",
+		WantReasons: []string{`kafka (topic, read for "kafkaa")`},
+	}, { // Test 4: The exact word on a mention prints as typed.
+		Query: "parking", Person: "mention@corp.com",
+		WantReasons: []string{"parking (mention)"},
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			var got []string
+			if test.Person != "" {
+				for _, m := range ix.Search(test.Query, 0) {
+					if m.Person.Email == test.Person {
+						got = m.Reasons
+					}
+				}
+			} else {
+				for _, m := range ix.SearchChannels(test.Query, 0) {
+					if m.Channel.Name == test.Channel {
+						got = m.Reasons
+					}
+				}
+			}
+			if diff := cmp.Diff(test.WantReasons, got, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("reasons mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}

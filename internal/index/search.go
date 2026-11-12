@@ -774,8 +774,8 @@ func (ix *Index) reasons(
 		// "zigby" was fuzzy, a reader cannot tell whether whotoask read it as
 		// zigbee or as zigzag, which is the difference between a lucky save
 		// and a wrong guess presented with strength.
-		if hit.fuzzy() && found != "" && found != term {
-			out = append(out, fmt.Sprintf("%s (%s, read for %q)", found, field, term))
+		if as := readAs(term, found, hit); as != "" {
+			out = append(out, fmt.Sprintf("%s (%s, read for %q)", as, field, term))
 			continue
 		}
 		if hit.fuzzy() {
@@ -785,6 +785,25 @@ func (ix *Index) reasons(
 	}
 	sort.Strings(out)
 	return out, evidence, shown
+}
+
+// readAs returns the word a corrected term was read as, or the empty string
+// when the term was not corrected or was read as itself. A topic, title, team,
+// or name supplies the word it holds. A mention has no field to quote, so it
+// is named by the stem the term resolved to: "spark" answered by people who
+// wrote about parking has to say park, or the reason claims they wrote about
+// Spark.
+func readAs(term, found string, hit termHit) string {
+	if !hit.fuzzy() {
+		return ""
+	}
+	if found == "" {
+		found = hit.key
+	}
+	if found == term {
+		return ""
+	}
+	return found
 }
 
 // quietOn reports whether somebody knows a subject but has stopped working on
@@ -849,8 +868,8 @@ func hitReason(term, field, found string, hit termHit, asked map[string]string) 
 	// was fuzzy, a reader cannot tell whether whotoask read it as zigbee or as
 	// zigzag, which is the difference between a lucky save and a wrong guess
 	// presented with strength.
-	if hit.fuzzy() && found != "" && found != term {
-		return fmt.Sprintf("%s (%s, read for %q)", found, field, term)
+	if as := readAs(term, found, hit); as != "" {
+		return fmt.Sprintf("%s (%s, read for %q)", as, field, term)
 	}
 	if hit.fuzzy() {
 		field += ", fuzzy"
