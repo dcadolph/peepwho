@@ -64,7 +64,8 @@ public enum Bookmarks {
     }
 
     // resolve turns slot's bookmark back into a URL and starts access to it. A stale bookmark is
-    // saved again from the resolved URL. It returns nil when slot holds no bookmark.
+    // saved again from the resolved URL when the store takes it. It returns nil when slot holds
+    // no bookmark.
     public static func resolve(_ slot: BookmarkSlot, store: SecretStore = KeychainStore()) throws -> Resolved? {
         guard let text = store.get(slot.storeKey), let data = Data(base64Encoded: text) else {
             return nil
@@ -79,8 +80,10 @@ public enum Bookmarks {
         guard url.startAccessingSecurityScopedResource() else {
             throw BookmarkError.noAccess(slot)
         }
+        // Saving a fresh bookmark is best effort: the stale one still resolves, a later resolve
+        // tries the save again, and a throw here would leave access started that no caller ends.
         if stale {
-            try save(url, in: slot, store: store)
+            try? save(url, in: slot, store: store)
         }
         return Resolved(url: url, stale: stale)
     }

@@ -56,6 +56,33 @@ final class ReadOnlySecrets: SecretStore {
     func delete(_ name: String) {}
 }
 
+// FrozenSecrets answers every read from the values it was made with and refuses every write,
+// like a Keychain that can be read and not changed, and counts the writes it refused.
+final class FrozenSecrets: SecretStore {
+    // values are the secrets it holds.
+    let values: [String: String]
+    // sets is how many writes it refused.
+    var sets = 0
+
+    // init holds values.
+    init(_ values: [String: String]) { self.values = values }
+
+    // get returns the value held under name.
+    func get(_ name: String) -> String? { values[name] }
+
+    // read returns the value held under name, and never refuses.
+    func read(_ name: String) throws -> String? { values[name] }
+
+    // set counts the write and refuses it.
+    func set(_ name: String, _ value: String) throws {
+        sets += 1
+        throw KeychainError(status: errSecAuthFailed)
+    }
+
+    // delete does nothing.
+    func delete(_ name: String) {}
+}
+
 // LockableSecrets keeps secrets in a dictionary and refuses every read while locked, like a
 // Keychain before it unlocks. A write always lands and is counted, so a test sees any write made
 // under the lock.
@@ -1674,6 +1701,28 @@ struct SettingsTests {
         #expect(!line.contains("/Users/someone"))
         #expect(line.hasSuffix(".") && !line.hasSuffix(".."))
         #expect(places.urls[.git] == nil)
+    }
+
+    // Test 44: A bookmark gone stale after its folder moved still resolves to where the folder is
+    // now when the store refuses the fresh one, and the old bookmark stays for a later try.
+    @Test func staleBookmarkResolvesWhenSaveFails() throws {
+        let (first, moved) = (tempDir("whotoask-place"), tempDir("whotoask-place"))
+        try FileManager.default.createDirectory(at: first, withIntermediateDirectories: true)
+        defer {
+            for place in [first, moved] {
+                try? FileManager.default.removeItem(at: place)
+            }
+        }
+        let secrets = MemorySecrets()
+        try Bookmarks.save(first, in: .git, store: secrets)
+        try FileManager.default.moveItem(at: first, to: moved)
+        let frozen = FrozenSecrets(secrets.values)
+        let resolved = try #require(try Bookmarks.resolve(.git, store: frozen))
+        defer { resolved.url.stopAccessingSecurityScopedResource() }
+        #expect(resolved.stale)
+        #expect(resolved.url.resolvingSymlinksInPath().path == moved.resolvingSymlinksInPath().path)
+        #expect(frozen.sets == 1)
+        #expect(frozen.values == secrets.values)
     }
 }
 
