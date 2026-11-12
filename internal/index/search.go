@@ -256,14 +256,16 @@ func (ix *Index) SearchSplit(query string, limit int) (people, departed []model.
 		reasons []string
 		// evidence is the strongest field any matched term hit.
 		evidence float64
+		// shown is that evidence with each corrected word marked down.
+		shown float64
 	}
 	// Judging the window reads every reason, so they are kept for the people
 	// who survive the cut, and explaining a deep search costs no more than this.
 	seen := make(map[model.ID]explained, window)
 	for i := range window {
 		pid := matches[i].Person.ID
-		reasons, evidence := ix.reasons(pid, matched[pid], resolved, asked)
-		seen[pid] = explained{reasons: reasons, evidence: evidence}
+		reasons, evidence, shown := ix.reasons(pid, matched[pid], resolved, asked)
+		seen[pid] = explained{reasons: reasons, evidence: evidence, shown: shown}
 		matches[i].Score *= evidenceBoost(evidence)
 	}
 	// The boost never lifts tie reach above anyone the question or its synonyms
@@ -299,14 +301,14 @@ func (ix *Index) SearchSplit(query string, limit int) (people, departed []model.
 			pid := list[i].Person.ID
 			e, ok := seen[pid]
 			if !ok {
-				e.reasons, e.evidence = ix.reasons(pid, matched[pid], resolved, asked)
+				e.reasons, e.evidence, e.shown = ix.reasons(pid, matched[pid], resolved, asked)
 			}
 			reasons := e.reasons
 			if net := nets[pid]; net != 0 {
 				reasons = append(reasons, feedbackReason(net))
 			}
 			list[i].Reasons = reasons
-			list[i].Strength = e.evidence * coveredShare(matched[pid], covers, originals)
+			list[i].Strength = e.shown * coveredShare(matched[pid], covers, originals)
 			list[i].Declared = e.evidence > evidenceTeam
 			list[i].Reach = !matchedBeyondTies(matched[pid], asked)
 		}
@@ -359,7 +361,7 @@ func (ix *Index) SearchChannels(query string, limit int) []model.ChannelMatch {
 		if ch == nil {
 			continue
 		}
-		reasons, evidence := ix.channelReasons(cid, matched[cid], resolved, asked)
+		reasons, evidence, shown := ix.channelReasons(cid, matched[cid], resolved, asked)
 		if net := nets[cid]; net != 0 {
 			sc *= ix.feedbackFactor(net)
 			reasons = append(reasons, feedbackReason(net))
@@ -368,7 +370,7 @@ func (ix *Index) SearchChannels(query string, limit int) []model.ChannelMatch {
 		matches = append(matches, model.ChannelMatch{
 			Channel:  ch,
 			Score:    sc,
-			Strength: evidence * coverage,
+			Strength: shown * coverage,
 			Declared: evidence > evidenceTeam,
 			Reach:    !matchedBeyondTies(matched[cid], asked),
 			Reasons:  reasons,
@@ -491,6 +493,12 @@ type termHit struct {
 	key string
 	// penalty scales the term's contribution; one for an exact match.
 	penalty float64
+	// correction is what a corrected word keeps of its strength: fuzzyPenalty
+	// once, whatever the number of edits, and one for an exact match. Two edits
+	// are allowed only on a long word, where they are as small a share of it as
+	// one edit is of a short word, and a swapped pair of letters counts as two.
+	// A synonym or tie discount never enters it.
+	correction float64
 }
 
 // fuzzy reports whether the resolution corrected the term.
@@ -542,7 +550,7 @@ func resolveTerm(
 ) (termHit, bool) {
 	key := stem(term)
 	if len(postings[key]) > 0 {
-		return termHit{key: key, penalty: 1}, true
+		return termHit{key: key, penalty: 1, correction: 1}, true
 	}
 	runes := len([]rune(term))
 	if runes < fuzzyMinLen {
@@ -568,7 +576,9 @@ func resolveTerm(
 	if best == "" || bestDist > maxDist {
 		return termHit{}, false
 	}
-	return termHit{key: best, penalty: math.Pow(fuzzyPenalty, float64(bestDist))}, true
+	return termHit{
+		key: best, penalty: math.Pow(fuzzyPenalty, float64(bestDist)), correction: fuzzyPenalty,
+	}, true
 }
 
 // entityLens holds the accumulated posting mass per entity and its average,
@@ -705,15 +715,16 @@ func distinct(terms []string) []string {
 }
 
 // reasons describes, for each matched term, which field of the person it hit,
-// and returns the strongest evidence among those hits. A fuzzily corrected
-// term classifies by its resolved stem and says so.
+// and returns the strongest evidence among those hits twice over: evidence as
+// it ranks and classes the match, and shown as strength reports it, with each
+// corrected word marked down, so a guess at a typo never reads as proof. A
+// fuzzily corrected term classifies by its resolved stem and says so.
 func (ix *Index) reasons(
 	pid model.ID, terms map[string]bool, resolved map[string]termHit, asked map[string]string,
-) ([]string, float64) {
+) (out []string, evidence, shown float64) {
 	pt := ix.texts[pid]
 	p := ix.Graph.People[pid]
-	out := make([]string, 0, len(terms))
-	var evidence float64
+	out = make([]string, 0, len(terms))
 	for term := range terms {
 		hit := resolved[term]
 		field, strength := "mention", evidenceMention
@@ -736,6 +747,8 @@ func (ix *Index) reasons(
 		}
 		// mapsum: strength is a constant picked in this iteration, and max is exact in any order.
 		evidence = max(evidence, strength)
+		// mapsum: the product is this iteration's own, and max is exact in any order.
+		shown = max(shown, strength*hit.correction)
 		// A synonym arrives with a deliberate discount, which must not read as a
 		// typo correction: the "for" clause already says why the word differs
 		// from the question.
@@ -771,7 +784,7 @@ func (ix *Index) reasons(
 		out = append(out, fmt.Sprintf("%s (%s)", term, field))
 	}
 	sort.Strings(out)
-	return out, evidence
+	return out, evidence, shown
 }
 
 // quietOn reports whether somebody knows a subject but has stopped working on
@@ -785,15 +798,16 @@ func quietOn(p *model.Person, topic string) bool {
 	return p.Topics[tid] > 0 && p.Recent[tid] == 0
 }
 
-// match records the word a stem lookup found// channelReasons describes, for each matched term, which field of the channel
-// it hit, and returns the strongest evidence among those hits. A fuzzily
-// corrected term classifies by its resolved stem and says so.
+// channelReasons describes, for each matched term, which field of the channel
+// it hit, and returns the strongest evidence among those hits the way reasons
+// does: evidence as it classes the match, and shown as strength reports it,
+// with each corrected word marked down. A fuzzily corrected term classifies by
+// its resolved stem and says so.
 func (ix *Index) channelReasons(
 	cid model.ID, terms map[string]bool, resolved map[string]termHit, asked map[string]string,
-) ([]string, float64) {
+) (out []string, evidence, shown float64) {
 	ct := ix.channelTexts[cid]
-	out := make([]string, 0, len(terms))
-	var evidence float64
+	out = make([]string, 0, len(terms))
 	for term := range terms {
 		hit := resolved[term]
 		field, strength := "mention", evidenceMention
@@ -816,10 +830,12 @@ func (ix *Index) channelReasons(
 		}
 		// mapsum: strength is a constant picked in this iteration, and max is exact in any order.
 		evidence = max(evidence, strength)
+		// mapsum: the product is this iteration's own, and max is exact in any order.
+		shown = max(shown, strength*hit.correction)
 		out = append(out, hitReason(term, field, found, hit, asked))
 	}
 	sort.Strings(out)
-	return out, evidence
+	return out, evidence, shown
 }
 
 // hitReason writes the reason line for one matched term of a channel or team:
