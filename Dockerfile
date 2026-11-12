@@ -12,9 +12,15 @@ ARG VERSION=dev
 RUN CGO_ENABLED=0 go build \
     -ldflags "-s -w -X github.com/dcadolph/whotoask/cmd.version=${VERSION}" \
     -o /out/whotoask .
+# The data directory is staged here because the final image has no shell to
+# create it. It is copied as an entry under the staging root, so --chown
+# reaches it, and a new named volume mounted at /data takes its owner.
+RUN mkdir -p /rootfs/data
 
 FROM gcr.io/distroless/static-debian12
 COPY --from=build /out/whotoask /whotoask
+COPY --from=build --chown=65532:65532 /rootfs/ /
+VOLUME /data
 USER nonroot:nonroot
 ENTRYPOINT ["/whotoask"]
 CMD ["serve", "--addr", "0.0.0.0:8765"]
