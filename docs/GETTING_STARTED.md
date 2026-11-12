@@ -611,9 +611,11 @@ offline, with no account and nothing sent anywhere:
 
     whotoask verify finding
 
-It names any file that was altered or is missing and exits non-zero if so. To
-prove the seal came from your install, publish the output of `WhoToAsk attest
-key`, and have the reader pass that key to `WhoToAsk verify --key`.
+It names any file that was altered or is missing, and reports a file the seal
+does not cover as unlisted. Any of the three fails the check, which exits
+non-zero. To prove the seal came from your install, publish the output of
+`WhoToAsk attest key`, and have the reader pass that key to `WhoToAsk verify
+--key`.
 
 ## Troubleshooting
 

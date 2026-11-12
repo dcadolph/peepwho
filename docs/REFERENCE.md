@@ -480,8 +480,9 @@ copy:
 
     whotoask verify acme-assessment
 
-It names any file whose bytes no longer match what was sealed, and any file
-that is missing, and exits non-zero when there is either.
+It names any file whose bytes no longer match what was sealed and any file
+that is missing. A file in the directory that the seal does not cover is
+reported as unlisted. It exits non-zero when there is any of the three.
 
 ## whotoask attest
 
@@ -507,6 +508,12 @@ exact bytes of `manifest.json`, the key id must match the public key, and every
 listed file must still have the recorded size and sha256. Files that changed
 are reported as altered and files that are gone as missing. Paths that could
 reach outside DIR are refused before anything is read.
+
+Anything else in DIR, at any depth, is reported as unlisted and fails the
+check, because the seal does not cover it: a file added later, a symbolic
+link, or a file left over from an earlier run into the same directory. Only
+`manifest.json`, `manifest.sig`, and the folder metadata an operating system
+writes on its own (`.DS_Store`, `Thumbs.db`, `desktop.ini`) are left out.
 
 The signature proves the manifest is unchanged since it was signed, by the key
 it names. `--key` takes the producer's public key, obtained out of band, and

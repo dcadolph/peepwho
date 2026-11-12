@@ -14,8 +14,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -112,10 +115,15 @@ type Report struct {
 	Altered []string `json:"altered"`
 	// Missing lists files the manifest names that are not on disk.
 	Missing []string `json:"missing"`
+	// Unlisted lists what is on disk that the manifest does not name.
+	Unlisted []string `json:"unlisted"`
 }
 
-// OK reports whether every sealed file is present and unaltered.
-func (r Report) OK() bool { return len(r.Altered) == 0 && len(r.Missing) == 0 }
+// OK reports whether every sealed file is present and unaltered and the
+// directory holds nothing the seal does not cover.
+func (r Report) OK() bool {
+	return len(r.Altered) == 0 && len(r.Missing) == 0 && len(r.Unlisted) == 0
+}
 
 // KeyID returns the short identifier of a public key: the hex of the first
 // eight bytes of its sha256.
@@ -185,11 +193,12 @@ func Write(dir string, m Manifest, priv ed25519.PrivateKey) (Manifest, error) {
 }
 
 // Verify checks the seal in dir. It verifies the signature over the exact
-// manifest bytes, then checks every listed file by size and sha256. When pin is
-// set it must be the base64 public key the reader obtained out of band, and the
-// seal's key must equal it. An error means the manifest itself cannot be
-// trusted; a nil error with a Report that is not OK means the manifest is
-// genuine and some files no longer match it.
+// manifest bytes, checks every listed file by size and sha256, then walks dir
+// for anything the manifest does not name. When pin is set it must be the
+// base64 public key the reader obtained out of band, and the seal's key must
+// equal it. An error means the manifest cannot be trusted or dir cannot be read
+// in full; a nil error with a Report that is not OK means the manifest is
+// genuine and the directory no longer matches it.
 func Verify(dir, pin string) (Report, error) {
 	body, err := os.ReadFile(filepath.Join(dir, ManifestName))
 	if err != nil {
@@ -247,7 +256,7 @@ func Verify(dir, pin string) (Report, error) {
 
 	report := Report{
 		KeyID: m.KeyID, PublicKey: m.PublicKey, Claim: m.Claim.Type,
-		Verified: []string{}, Altered: []string{}, Missing: []string{},
+		Verified: []string{}, Altered: []string{}, Missing: []string{}, Unlisted: []string{},
 	}
 	for _, f := range m.Files {
 		size, digest, err := digest(filepath.Join(dir, filepath.FromSlash(f.Path)))
@@ -260,7 +269,55 @@ func Verify(dir, pin string) (Report, error) {
 			report.Verified = append(report.Verified, f.Path)
 		}
 	}
+	if report.Unlisted, err = unlisted(dir, m.Files); err != nil {
+		return Report{}, err
+	}
 	return report, nil
+}
+
+// unlisted returns the slash-separated path of everything under dir that the
+// seal does not cover, sorted. Files at any depth count. Directories are walked
+// and never reported themselves. A symbolic link or any other entry that is not
+// a regular file is reported by its own path and never followed, so the walk
+// reads nothing outside dir. Only manifest.json and manifest.sig at the top of
+// dir, the files the manifest names, and folder metadata are left out. A
+// directory that cannot be read is an error, since nothing under it can be
+// ruled out.
+func unlisted(dir string, files []File) ([]string, error) {
+	listed := map[string]bool{ManifestName: true, SignatureName: true}
+	for _, f := range files {
+		listed[f.Path] = true
+	}
+	found := []string{}
+	err := fs.WalkDir(os.DirFS(dir), ".", func(p string, d fs.DirEntry, err error) error {
+		switch {
+		case err != nil:
+			return err
+		case d.IsDir(), listed[p]:
+			return nil
+		case d.Type().IsRegular() && isFolderMetadata(path.Base(p)):
+			return nil
+		}
+		found = append(found, p)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrManifest, err)
+	}
+	slices.Sort(found)
+	return found, nil
+}
+
+// isFolderMetadata reports whether name is a file an operating system writes
+// into a folder a person merely opens: the Finder's view settings, or the
+// Explorer's thumbnail cache and view settings. The match is exact, so a name
+// that only resembles one of these is still reported.
+func isFolderMetadata(name string) bool {
+	switch name {
+	case ".DS_Store", "Thumbs.db", "desktop.ini":
+		return true
+	}
+	return false
 }
 
 // checkPath rejects any manifest path that could name a file outside the

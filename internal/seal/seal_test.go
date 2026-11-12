@@ -66,12 +66,15 @@ func TestVerify(t *testing.T) {
 	t.Parallel()
 	pub, priv := testKey(t)
 	other, _ := testKey(t)
+	all := []string{"findings.json", "sub/notes.txt", "summary.md"}
 	tests := []struct {
 		Mutate       func(t *testing.T, dir string)
 		Pin          string
+		ViaLink      bool
 		WantVerified []string
 		WantAltered  []string
 		WantMissing  []string
+		WantUnlisted []string
 		WantOK       bool
 		Want         error
 	}{{ // Test 0: An untouched seal verifies every file.
@@ -154,12 +157,128 @@ func TestVerify(t *testing.T) {
 			}
 		},
 		WantVerified: []string{"findings.json", "sub/notes.txt"}, WantAltered: []string{"summary.md"},
+	}, { // Test 14: A file added at the top is unlisted.
+		Mutate:       func(t *testing.T, dir string) { plant(t, dir, "extra.txt") },
+		WantVerified: all, WantUnlisted: []string{"extra.txt"},
+	}, { // Test 15: A file added beside a sealed file in a subdirectory is unlisted.
+		Mutate:       func(t *testing.T, dir string) { plant(t, dir, "sub/extra.txt") },
+		WantVerified: all, WantUnlisted: []string{"sub/extra.txt"},
+	}, { // Test 16: A file added in a new nested directory is unlisted.
+		Mutate:       func(t *testing.T, dir string) { plant(t, dir, "new/deep/extra.txt") },
+		WantVerified: all, WantUnlisted: []string{"new/deep/extra.txt"},
+	}, { // Test 17: An added directory holding no file is not reported.
+		Mutate: func(t *testing.T, dir string) {
+			if err := os.MkdirAll(filepath.Join(dir, "empty", "deeper"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+		},
+		WantVerified: all, WantOK: true,
+	}, { // Test 18: A symbolic link to a file outside the directory is reported.
+		Mutate: func(t *testing.T, dir string) {
+			link(t, plant(t, t.TempDir(), "outside.json"), filepath.Join(dir, "systems.json"))
+		},
+		WantVerified: all, WantUnlisted: []string{"systems.json"},
+	}, { // Test 19: A symbolic link to a directory is reported itself and never followed.
+		Mutate: func(t *testing.T, dir string) {
+			outside := t.TempDir()
+			plant(t, outside, "inside.txt")
+			link(t, outside, filepath.Join(dir, "linked"))
+		},
+		WantVerified: all, WantUnlisted: []string{"linked"},
+	}, { // Test 20: A symbolic link that points nowhere is reported.
+		Mutate: func(t *testing.T, dir string) {
+			link(t, filepath.Join(t.TempDir(), "absent"), filepath.Join(dir, "sub", "dangling"))
+		},
+		WantVerified: all, WantUnlisted: []string{"sub/dangling"},
+	}, { // Test 21: Finder metadata at any depth is left out.
+		Mutate: func(t *testing.T, dir string) {
+			plant(t, dir, ".DS_Store")
+			plant(t, dir, "sub/.DS_Store")
+		},
+		WantVerified: all, WantOK: true,
+	}, { // Test 22: The Explorer thumbnail cache is left out.
+		Mutate:       func(t *testing.T, dir string) { plant(t, dir, "Thumbs.db") },
+		WantVerified: all, WantOK: true,
+	}, { // Test 23: The Explorer folder settings file is left out.
+		Mutate:       func(t *testing.T, dir string) { plant(t, dir, "desktop.ini") },
+		WantVerified: all, WantOK: true,
+	}, { // Test 24: A symbolic link under a metadata name is still reported.
+		Mutate: func(t *testing.T, dir string) {
+			link(t, plant(t, t.TempDir(), "outside.json"), filepath.Join(dir, ".DS_Store"))
+		},
+		WantVerified: all, WantUnlisted: []string{".DS_Store"},
+	}, { // Test 25: A file inside a directory with a metadata name is still reported.
+		Mutate:       func(t *testing.T, dir string) { plant(t, dir, "Thumbs.db/extra.txt") },
+		WantVerified: all, WantUnlisted: []string{"Thumbs.db/extra.txt"},
+	}, { // Test 26: Names that only resemble folder metadata are reported.
+		Mutate: func(t *testing.T, dir string) {
+			plant(t, dir, "._summary.md")
+			plant(t, dir, ".DS_Store.json")
+			plant(t, dir, "__MACOSX/summary.md")
+		},
+		WantVerified: all,
+		WantUnlisted: []string{".DS_Store.json", "._summary.md", "__MACOSX/summary.md"},
+	}, { // Test 27: Seal files below the top of the directory are reported.
+		Mutate: func(t *testing.T, dir string) {
+			plant(t, dir, "sub/"+ManifestName)
+			plant(t, dir, "sub/"+SignatureName)
+		},
+		WantVerified: all, WantUnlisted: []string{"sub/manifest.json", "sub/manifest.sig"},
+	}, { // Test 28: The files of a version-control directory are reported.
+		Mutate: func(t *testing.T, dir string) {
+			plant(t, dir, ".git/HEAD")
+			plant(t, dir, ".git/refs/heads/main")
+		},
+		WantVerified: all, WantUnlisted: []string{".git/HEAD", ".git/refs/heads/main"},
+	}, { // Test 29: An added file is reported together with an altered one.
+		Mutate: func(t *testing.T, dir string) {
+			appendByte(t, filepath.Join(dir, "summary.md"))
+			plant(t, dir, "extra.txt")
+		},
+		WantVerified: []string{"findings.json", "sub/notes.txt"},
+		WantAltered:  []string{"summary.md"}, WantUnlisted: []string{"extra.txt"},
+	}, { // Test 30: A renamed file is missing under the old name and unlisted under the new.
+		Mutate: func(t *testing.T, dir string) {
+			from, to := filepath.Join(dir, "summary.md"), filepath.Join(dir, "summary-v2.md")
+			if err := os.Rename(from, to); err != nil {
+				t.Fatal(err)
+			}
+		},
+		WantVerified: []string{"findings.json", "sub/notes.txt"},
+		WantMissing:  []string{"summary.md"}, WantUnlisted: []string{"summary-v2.md"},
+	}, { // Test 31: Unlisted paths are sorted as strings, not in walk order.
+		Mutate: func(t *testing.T, dir string) {
+			plant(t, dir, "sub/extra.txt")
+			plant(t, dir, "sub.txt")
+			plant(t, dir, "a.txt")
+		},
+		WantVerified: all, WantUnlisted: []string{"a.txt", "sub.txt", "sub/extra.txt"},
+	}, { // Test 32: A directory named through a symbolic link is still walked.
+		Mutate:  func(t *testing.T, dir string) { plant(t, dir, "sub/extra.txt") },
+		ViaLink: true, WantVerified: all, WantUnlisted: []string{"sub/extra.txt"},
+	}, { // Test 33: A directory that cannot be listed fails the check outright.
+		Mutate: func(t *testing.T, dir string) {
+			if os.Geteuid() == 0 {
+				t.Skip("root reads a directory whatever its mode")
+			}
+			locked := filepath.Dir(plant(t, dir, "locked/extra.txt"))
+			if err := os.Chmod(locked, 0); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+		},
+		Want: ErrManifest,
 	}}
 	for testNum, test := range tests {
 		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
 			t.Parallel()
 			dir := newTestSealDir(t, priv)
 			test.Mutate(t, dir)
+			if test.ViaLink {
+				through := filepath.Join(t.TempDir(), "through")
+				link(t, dir, through)
+				dir = through
+			}
 			got, err := Verify(dir, test.Pin)
 			if !errors.Is(err, test.Want) {
 				t.Fatalf("Verify error = %v, want %v", err, test.Want)
@@ -176,8 +295,73 @@ func TestVerify(t *testing.T) {
 			if diff := cmp.Diff(test.WantMissing, got.Missing, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("missing mismatch (-want +got):\n%s", diff)
 			}
+			diff := cmp.Diff(test.WantUnlisted, got.Unlisted, cmpopts.EquateEmpty())
+			if diff != "" {
+				t.Errorf("unlisted mismatch (-want +got):\n%s", diff)
+			}
 			if got.OK() != test.WantOK {
 				t.Errorf("OK = %v, want %v", got.OK(), test.WantOK)
+			}
+		})
+	}
+}
+
+// TestReportOK checks any altered, missing, or unlisted entry fails a report.
+func TestReportOK(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		In     Report
+		WantOK bool
+	}{
+		{In: Report{}, WantOK: true},                        // Test 0: Nothing recorded.
+		{In: Report{Verified: []string{"a"}}, WantOK: true}, // Test 1: Only verified files.
+		{In: Report{Altered: []string{"a"}}},                // Test 2: An altered file.
+		{In: Report{Missing: []string{"a"}}},                // Test 3: A missing file.
+		{In: Report{Unlisted: []string{"a"}}},               // Test 4: An unlisted file.
+	}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			if got := test.In.OK(); got != test.WantOK {
+				t.Errorf("OK = %v, want %v", got, test.WantOK)
+			}
+		})
+	}
+}
+
+// TestReportJSON checks the report names unlisted entries under the unlisted
+// key, and writes an empty list rather than null when there are none.
+func TestReportJSON(t *testing.T) {
+	t.Parallel()
+	_, priv := testKey(t)
+	tests := []struct {
+		Extra        string
+		WantUnlisted string
+	}{
+		{WantUnlisted: `[]`}, // Test 0: Nothing added.
+		{Extra: "extra.txt", WantUnlisted: `["extra.txt"]`}, // Test 1: One added file.
+	}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			dir := newTestSealDir(t, priv)
+			if test.Extra != "" {
+				plant(t, dir, test.Extra)
+			}
+			report, err := Verify(dir, "")
+			if err != nil {
+				t.Fatalf("Verify: %v", err)
+			}
+			data, err := json.Marshal(report)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var fields map[string]json.RawMessage
+			if err := json.Unmarshal(data, &fields); err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(test.WantUnlisted, string(fields["unlisted"])); diff != "" {
+				t.Errorf("unlisted field mismatch (-want +got):\n%s\nreport: %s", diff, data)
 			}
 		})
 	}
@@ -267,6 +451,26 @@ func TestKeyID(t *testing.T) {
 	}
 	if KeyID(pub) != id {
 		t.Error("KeyID is not stable for the same key")
+	}
+}
+
+// plant writes a file the seal does not cover at the slash-separated name
+// under dir, creating its parent directories, and returns the file's path.
+func plant(t *testing.T, dir, name string) string {
+	t.Helper()
+	path := filepath.Join(dir, filepath.FromSlash(name))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, path, "planted\n")
+	return path
+}
+
+// link creates a symbolic link at path that points to target.
+func link(t *testing.T, target, path string) {
+	t.Helper()
+	if err := os.Symlink(target, path); err != nil {
+		t.Fatal(err)
 	}
 }
 

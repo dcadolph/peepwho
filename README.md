@@ -141,7 +141,8 @@ without trusting the machine that made it:
 `attest` writes the finding to `risk.json`, then `manifest.json` listing every file by size and
 SHA-256, then `manifest.sig`, an Ed25519 signature over the exact bytes of the manifest.
 `verify` checks the signature, then every file, and names each file that was altered or is
-missing. A failed check exits non-zero. `whotoask attest key` prints the public key to share
+missing. A file in the directory that the seal does not cover is reported as unlisted and fails
+the check. A failed check exits non-zero. `whotoask attest key` prints the public key to share
 through some other channel, and `whotoask verify --key` refuses a seal made by any other key.
 
 `whotoask assess` seals its whole deliverable the same way, over the bytes it already wrote, so a
